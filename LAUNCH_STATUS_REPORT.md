@@ -11,23 +11,29 @@ This follows `project_launch_workflow_natford.md`.
   - `PROJECT_CHARTER.md`
 - ✅ Ethics + confidentiality gate included.
 - ✅ Licensing/legal boundary risk identified (AGPLv3 implications).
+- ✅ GitHub repo created + initial commit pushed:
+  - `https://github.com/nfredmond/aerial-intel-platform`
+- ✅ Labels seeded (`priority:*`, `type:*`, `status:*`)
+- ✅ Milestones seeded (`M0 Foundations`, `M1 MVP`, `M2 Pilot`)
 
 ## 2) Blocked / Pending
-- ⛔ GitHub repo not yet created for this project.
+- ⛔ Branch protection blocked on private repo by current GitHub plan (403)
 - ⛔ Slack channels not yet created/mapped:
   - `#aerial-intel-platform-build`
   - `#aerial-intel-platform-ops`
-- ⛔ Branch-protection constraints expected on private free-tier repos.
 - ⛔ Fork-vs-compose legal architecture decision not yet finalized (ADR required).
 - ⛔ No sample dataset benchmark run yet.
 
 ## 3) Exact Next Actions
-1. Create GitHub repo `aerial-intel-platform`.
+1. Decide branch-protection path:
+   - upgrade GitHub plan, or
+   - temporary public repo, or
+   - manual PR discipline while private.
 2. Create Slack channels and bot mapping.
 3. Write ADR-001 update: "Compose around ODM vs direct fork".
 4. Build technical proof-of-concept pipeline using one controlled demo dataset.
 5. Publish a draft showcase section on natfordplanning.com with clear OSS attribution + limitations.
 
 ## 4) Readiness Snapshot
-- **Setup completeness:** 45%
+- **Setup completeness:** 72%
 - **Operational readiness:** early concept phase, architecture decision pending
