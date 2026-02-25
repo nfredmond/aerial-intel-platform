@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate required project docs
+        run: |
+          set -euo pipefail
+          test -f PROJECT_CHARTER.md
+          test -f docs/ROADMAP.md
+          test -f docs/ARCHITECTURE.md
+          test -f docs/TEST_STRATEGY.md
+          test -f docs/OPERATIONS.md
+          test -f docs/RISK_REGISTER.md
+          test -f docs/CHANGELOG.md
+          echo "Core docs present."
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Simulate baseline build gate
+        run: |
+          set -euo pipefail
+          echo "No application build configured yet; baseline build gate passed."
