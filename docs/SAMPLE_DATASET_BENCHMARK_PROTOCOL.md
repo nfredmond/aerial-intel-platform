@@ -8,7 +8,45 @@ Produce reproducible ODM benchmark runs that can be compared across datasets, ha
 
 - Baseline engine: ODM Docker image
 - Input: image-only datasets (optional GCP files allowed if explicitly noted)
-- Output: runtime logs, summary manifest, and QA checklist results
+- Output: runtime logs, preflight record, summary manifest, output inventory, and QA checklist results
+
+## Dataset Contract (Required Structure)
+
+The benchmark script expects:
+
+```text
+<dataset_root>/
+  images/
+    IMG_0001.JPG
+    IMG_0002.JPG
+    ...
+```
+
+Accepted image extensions: `jpg`, `jpeg`, `tif`, `tiff`, `png`.
+
+If sample datasets are not available yet, operators should still create the expected directory scaffold so preflight can be repeated deterministically once files arrive.
+
+## Preflight Gate (Do This Before Runtime)
+
+Run:
+
+```bash
+./scripts/run_odm_benchmark.sh --preflight-only <dataset_root> [benchmark_label]
+```
+
+Preflight currently enforces:
+
+- Dataset path exists and includes `images/`
+- At least one supported image is present
+- Docker is installed and daemon is reachable
+- Disk free space at dataset volume meets threshold (`MIN_FREE_GB`, default `40`)
+- ODM invocation command is resolved and written to artifact
+
+Artifacts created during preflight:
+
+- `benchmark/<timestamp>-<label>/preflight.txt`
+
+Do **not** run full benchmarks until preflight passes.
 
 ## Required Dataset Metadata
 
@@ -43,7 +81,8 @@ Capture:
 
 For each run, store:
 
-- Project name
+- Benchmark label
+- Dataset root and ODM project name
 - Full ODM command arguments
 - Key parameters tracked explicitly:
   - `--orthophoto-resolution`
@@ -52,6 +91,12 @@ For each run, store:
   - `--pc-quality`
   - Any fast-orthophoto/split/mesh options
 - Randomness controls/seeding notes (if any step is non-deterministic)
+
+Determinism defaults in script:
+
+- Pinned default image: `opendronemap/odm:3.5.5`
+- Deterministic ODM arg mode unless `ODM_ARGS` override is used
+- Explicit preflight artifact generated per run folder
 
 ## Runtime Measurement Rules
 
@@ -65,6 +110,7 @@ For each run, store:
 
 For each run, publish:
 
+- `preflight.txt`
 - `run.log`
 - `summary.json` with:
   - dataset metadata
@@ -73,11 +119,15 @@ For each run, publish:
   - runtime timing
   - exit status
   - key output file presence checks
-- Output inventory list (file names + sizes) for major deliverables:
-  - Orthophoto
-  - DEM/DSM
-  - Point cloud
-  - Texturing/mesh (if enabled)
+- `output_inventory.tsv` (status + size for major deliverables)
+
+Major deliverables tracked by default inventory:
+
+- Orthophoto (`odm_orthophoto/odm_orthophoto.tif`)
+- DSM (`odm_dem/dsm.tif`)
+- DTM (`odm_dem/dtm.tif`)
+- Georeferenced model (`odm_georeferencing/odm_georeferenced_model.laz`)
+- Textured model (`odm_texturing/odm_textured_model.obj`)
 
 ## QA Checks
 
