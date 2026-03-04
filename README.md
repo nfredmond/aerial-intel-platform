@@ -5,6 +5,12 @@ default branch: main
 
 See project charter and docs folder for current scope and architecture.
 
+## Current Implementation Tracks
+
+- ODM benchmark harness (`scripts/run_odm_benchmark.sh`)
+- Auth delivery readiness plan (`docs/AUTH_DELIVERY_READINESS_2026-03-03.md`)
+- Supabase auth/entitlement schema scaffold (`supabase/migrations/202603040001_droneops_auth_foundation.sql`)
+
 ## Quickstart (Benchmark Script)
 
 Run ODM against a dataset folder that contains an `images/` directory:
