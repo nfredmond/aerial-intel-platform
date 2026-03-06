@@ -157,3 +157,23 @@ export function buildBlockedAccessSupportContext(options: {
     ].join("\n"),
   };
 }
+
+export function buildBlockedAccessSupportContextJson(options: {
+  reference: string;
+  generatedAtIso: string;
+  blockedReason: string | null | undefined;
+  fields: BlockedAccessSupportField[];
+}) {
+  const diagnostics = Object.fromEntries(options.fields.map((field) => [field.label, field.value]));
+
+  return JSON.stringify(
+    {
+      supportReference: options.reference,
+      snapshotGeneratedUtc: options.generatedAtIso,
+      observedReason: options.blockedReason ?? "not provided",
+      diagnostics,
+    },
+    null,
+    2,
+  );
+}

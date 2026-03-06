@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Added a blocked-access "Copy support context JSON" action so operators can paste structured diagnostics directly into ticket forms that support JSON.
 - Added a blocked-access "Copy support snapshot timestamp" action so operators can quickly share the exact UTC support snapshot with support for case traceability.
 - Added a blocked-access "Copy support email body" action so operators can quickly paste the prefilled email body into local mail clients or support ticket forms.
 - Added a blocked-access "Copy support email address" action so operators can quickly paste the support inbox into local email clients when mailto handoff is unavailable.

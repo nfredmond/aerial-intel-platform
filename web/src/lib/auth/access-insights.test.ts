@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildBlockedAccessSupportContext,
+  buildBlockedAccessSupportContextJson,
   formatEntitlementTier,
   getBlockedAccessDetails,
   getBlockedAccessSupportFields,
@@ -105,6 +106,31 @@ describe("access-insights", () => {
     expect(context.text).toContain("Snapshot generated (UTC): 2026-03-06T19:33:12.000Z");
     expect(context.text).toContain("User ID: abc123");
     expect(context.text).toContain("Observed reason: No active entitlement record");
+  });
+
+  it("builds a JSON payload for support ticket systems", () => {
+    const json = buildBlockedAccessSupportContextJson({
+      reference: "AIR-20260306193312",
+      generatedAtIso: "2026-03-06T19:33:12.000Z",
+      blockedReason: "No active entitlement record",
+      fields: [
+        { label: "User ID", value: "abc123" },
+        { label: "Entitlement active", value: "No" },
+      ],
+    });
+
+    const payload = JSON.parse(json) as {
+      supportReference: string;
+      snapshotGeneratedUtc: string;
+      observedReason: string;
+      diagnostics: Record<string, string>;
+    };
+
+    expect(payload.supportReference).toBe("AIR-20260306193312");
+    expect(payload.snapshotGeneratedUtc).toBe("2026-03-06T19:33:12.000Z");
+    expect(payload.observedReason).toBe("No active entitlement record");
+    expect(payload.diagnostics["User ID"]).toBe("abc123");
+    expect(payload.diagnostics["Entitlement active"]).toBe("No");
   });
 
   it("falls back to AIR-UNKNOWN when generated timestamp is not parseable", () => {
