@@ -49,18 +49,23 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
     blockedReason: access.blockedReason,
   });
 
+  const supportSubject = buildBlockedAccessSupportSubject(supportContext.reference);
+  const supportEmailBody = [
+    "Hello support team,",
+    "",
+    "My DroneOps access is currently blocked.",
+    "",
+    supportContext.text,
+    "",
+    "Please help me restore access.",
+  ].join("\n");
+
   const supportHref = createSupportMailto({
-    subject: buildBlockedAccessSupportSubject(supportContext.reference),
-    body: [
-      "Hello support team,",
-      "",
-      "My DroneOps access is currently blocked.",
-      "",
-      supportContext.text,
-      "",
-      "Please help me restore access.",
-    ].join("\n"),
+    subject: supportSubject,
+    body: supportEmailBody,
   });
+
+  const supportEmailDraftText = [`Subject: ${supportSubject}`, "", supportEmailBody].join("\n");
 
   return (
     <main className="app-shell center-screen">
@@ -98,6 +103,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             ))}
           </ul>
           <SupportContextCopyButton text={supportContext.text} />
+          <SupportContextCopyButton
+            text={supportEmailDraftText}
+            buttonLabel="Copy support email draft"
+            successMessage="Support email draft copied. Paste it into your email client."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy email draft below."
+            fallbackAriaLabel="Support email draft text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste into your email client."
+          />
         </section>
 
         <div className="support-actions">
