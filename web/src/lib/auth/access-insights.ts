@@ -1,5 +1,10 @@
 import type { DroneMembershipRole } from "@/lib/supabase/types";
 
+export type BlockedAccessSupportField = {
+  label: string;
+  value: string;
+};
+
 export function formatEntitlementTier(tierId: string | null | undefined) {
   if (!tierId) {
     return "Unknown tier";
@@ -88,7 +93,7 @@ export function getBlockedAccessSupportFields(options: {
   hasMembership: boolean;
   hasActiveEntitlement: boolean;
   tierId: string | null | undefined;
-}) {
+}): BlockedAccessSupportField[] {
   return [
     {
       label: "User ID",
@@ -125,4 +130,25 @@ export function getBlockedAccessSupportFields(options: {
         : "Not active",
     },
   ];
+}
+
+export function buildBlockedAccessSupportContext(options: {
+  fields: BlockedAccessSupportField[];
+  blockedReason: string | null | undefined;
+  generatedAtIso?: string;
+}) {
+  const generatedAtIso = options.generatedAtIso ?? new Date().toISOString();
+  const compactTimestamp = generatedAtIso.replace(/\D/g, "").slice(0, 14);
+  const reference = compactTimestamp.length === 14 ? `AIR-${compactTimestamp}` : "AIR-UNKNOWN";
+
+  return {
+    reference,
+    generatedAtIso,
+    text: [
+      `Support reference: ${reference}`,
+      `Snapshot generated (UTC): ${generatedAtIso}`,
+      ...options.fields.map((field) => `${field.label}: ${field.value}`),
+      `Observed reason: ${options.blockedReason ?? "not provided"}`,
+    ].join("\n"),
+  };
 }

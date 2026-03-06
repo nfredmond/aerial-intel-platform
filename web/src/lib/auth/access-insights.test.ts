@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildBlockedAccessSupportContext,
   formatEntitlementTier,
   getBlockedAccessDetails,
   getBlockedAccessSupportFields,
@@ -86,5 +87,30 @@ describe("access-insights", () => {
     expect(fields[3]).toEqual({ label: "Organization slug", value: "acme-drone-co" });
     expect(fields[4]).toEqual({ label: "Role", value: "Admin" });
     expect(fields[7]).toEqual({ label: "Entitlement tier", value: "Enterprise Plus" });
+  });
+
+  it("builds support context with reference and snapshot timestamp", () => {
+    const context = buildBlockedAccessSupportContext({
+      fields: [{ label: "User ID", value: "abc123" }],
+      blockedReason: "No active entitlement record",
+      generatedAtIso: "2026-03-06T19:33:12.000Z",
+    });
+
+    expect(context.reference).toBe("AIR-20260306193312");
+    expect(context.text).toContain("Support reference: AIR-20260306193312");
+    expect(context.text).toContain("Snapshot generated (UTC): 2026-03-06T19:33:12.000Z");
+    expect(context.text).toContain("User ID: abc123");
+    expect(context.text).toContain("Observed reason: No active entitlement record");
+  });
+
+  it("falls back to AIR-UNKNOWN when generated timestamp is not parseable", () => {
+    const context = buildBlockedAccessSupportContext({
+      fields: [],
+      blockedReason: null,
+      generatedAtIso: "not-a-timestamp",
+    });
+
+    expect(context.reference).toBe("AIR-UNKNOWN");
+    expect(context.text).toContain("Observed reason: not provided");
   });
 });

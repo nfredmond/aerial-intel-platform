@@ -1,5 +1,6 @@
 import type { DroneOpsAccessResult } from "@/lib/auth/drone-ops-access";
 import {
+  buildBlockedAccessSupportContext,
   getBlockedAccessDetails,
   getBlockedAccessSupportFields,
 } from "@/lib/auth/access-insights";
@@ -11,6 +12,20 @@ import { SupportContextCopyButton } from "./support-context-copy-button";
 type BlockedAccessViewProps = {
   access: DroneOpsAccessResult;
 };
+
+function formatSupportSnapshotTimestamp(value: string) {
+  const timestamp = new Date(value);
+
+  if (Number.isNaN(timestamp.getTime())) {
+    return "Unavailable";
+  }
+
+  return `${new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "UTC",
+  }).format(timestamp)} UTC`;
+}
 
 export function BlockedAccessView({ access }: BlockedAccessViewProps) {
   const details = getBlockedAccessDetails({
@@ -29,10 +44,10 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
     tierId: access.entitlement?.tier_id,
   });
 
-  const supportContextText = [
-    ...supportFields.map((field) => `${field.label}: ${field.value}`),
-    `Observed reason: ${access.blockedReason ?? "not provided"}`,
-  ].join("\n");
+  const supportContext = buildBlockedAccessSupportContext({
+    fields: supportFields,
+    blockedReason: access.blockedReason,
+  });
 
   const supportHref = createSupportMailto({
     subject: "DroneOps access blocked",
@@ -41,7 +56,7 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
       "",
       "My DroneOps access is currently blocked.",
       "",
-      supportContextText,
+      supportContext.text,
       "",
       "Please help me restore access.",
     ].join("\n"),
@@ -71,6 +86,10 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
 
         <section className="stack-xs">
           <h2>Support context</h2>
+          <p className="muted helper-copy">
+            Reference <strong>{supportContext.reference}</strong> · Snapshot{" "}
+            {formatSupportSnapshotTimestamp(supportContext.generatedAtIso)}
+          </p>
           <ul className="stack-xs action-list">
             {supportFields.map((field) => (
               <li key={field.label}>
@@ -78,7 +97,7 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
               </li>
             ))}
           </ul>
-          <SupportContextCopyButton text={supportContextText} />
+          <SupportContextCopyButton text={supportContext.text} />
         </section>
 
         <div className="support-actions">
