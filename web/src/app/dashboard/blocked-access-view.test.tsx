@@ -88,4 +88,27 @@ describe("BlockedAccessView", () => {
 
     expect(writeText).toHaveBeenCalledWith("DroneOps access blocked (AIR-20260306213312)");
   });
+
+  it("adds a one-click action for the prefilled support email body", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<BlockedAccessView access={blockedAccessFixture} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy support email body" }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(writeText).toHaveBeenCalledTimes(1);
+
+    const copiedText = writeText.mock.calls[0]?.[0] as string;
+    expect(copiedText).toContain("Hello support team,");
+    expect(copiedText).toContain("Support reference: AIR-20260306213312");
+    expect(copiedText).toContain("Observed reason: Your organization does not currently have an active DroneOps entitlement.");
+    expect(copiedText).toContain("Please help me restore access.");
+  });
 });
