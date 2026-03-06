@@ -72,6 +72,23 @@ describe("BlockedAccessView", () => {
     expect(writeText).toHaveBeenCalledWith("pilot@example.com");
   });
 
+  it("adds a one-click action to copy the organization ID", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<BlockedAccessView access={blockedAccessFixture} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy organization ID" }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(writeText).toHaveBeenCalledWith("org-456");
+  });
+
   it("adds a one-click action to copy the organization slug", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
 
