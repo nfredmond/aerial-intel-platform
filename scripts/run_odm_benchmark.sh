@@ -6,6 +6,38 @@ json_escape() {
   echo "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
 }
 
+file_size_bytes() {
+  if [[ -f "$1" ]]; then
+    stat -c%s "$1"
+  else
+    echo 0
+  fi
+}
+
+output_json() {
+  local key="$1"
+  local path="$2"
+  local exists="false"
+  local non_zero_size="false"
+  local size_bytes=0
+
+  if [[ -f "$path" ]]; then
+    exists="true"
+    size_bytes="$(file_size_bytes "$path")"
+  fi
+
+  if [[ -s "$path" ]]; then
+    non_zero_size="true"
+  fi
+
+  printf '    "%s": {\n' "$key"
+  printf '      "path": "%s",\n' "$(json_escape "$path")"
+  printf '      "exists": %s,\n' "$exists"
+  printf '      "non_zero_size": %s,\n' "$non_zero_size"
+  printf '      "size_bytes": %s\n' "$size_bytes"
+  printf '    }'
+}
+
 usage() {
   echo "Usage: $0 <dataset_root> <project_name>"
 }
@@ -90,10 +122,72 @@ set -e
 END_EPOCH="$(date +%s)"
 END_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 DURATION_SECONDS="$((END_EPOCH - START_EPOCH))"
+ESC_END_UTC="$(json_escape "$END_UTC")"
 
 STATUS="success"
 if [[ "$RUN_EXIT_CODE" -ne 0 ]]; then
   STATUS="failed"
+fi
+
+PROJECT_OUTPUT_DIR="$ABS_DATASET_ROOT/$PROJECT_NAME"
+ORTHOPHOTO_PATH="$PROJECT_OUTPUT_DIR/odm_orthophoto/odm_orthophoto.tif"
+
+DEM_PATH="$PROJECT_OUTPUT_DIR/odm_dem/dsm.tif"
+if [[ ! -f "$DEM_PATH" ]]; then
+  DEM_PATH="$PROJECT_OUTPUT_DIR/odm_dem/dtm.tif"
+fi
+
+POINT_CLOUD_PATH="$PROJECT_OUTPUT_DIR/odm_georeferencing/odm_georeferenced_model.laz"
+if [[ ! -f "$POINT_CLOUD_PATH" ]]; then
+  POINT_CLOUD_PATH="$PROJECT_OUTPUT_DIR/odm_georeferencing/odm_georeferenced_model.ply"
+fi
+
+MESH_PATH="$PROJECT_OUTPUT_DIR/odm_texturing/odm_textured_model.obj"
+
+ORTHOPHOTO_EXISTS=false
+if [[ -s "$ORTHOPHOTO_PATH" ]]; then
+  ORTHOPHOTO_EXISTS=true
+fi
+
+DEM_EXISTS=false
+if [[ -s "$DEM_PATH" ]]; then
+  DEM_EXISTS=true
+fi
+
+POINT_CLOUD_EXISTS=false
+if [[ -s "$POINT_CLOUD_PATH" ]]; then
+  POINT_CLOUD_EXISTS=true
+fi
+
+MISSING_REQUIRED_OUTPUTS=()
+if [[ "$ORTHOPHOTO_EXISTS" != true ]]; then
+  MISSING_REQUIRED_OUTPUTS+=("orthophoto")
+fi
+if [[ "$DEM_EXISTS" != true ]]; then
+  MISSING_REQUIRED_OUTPUTS+=("dem")
+fi
+if [[ "$POINT_CLOUD_EXISTS" != true ]]; then
+  MISSING_REQUIRED_OUTPUTS+=("point_cloud")
+fi
+
+REQUIRED_OUTPUTS_PRESENT=false
+if [[ "${#MISSING_REQUIRED_OUTPUTS[@]}" -eq 0 ]]; then
+  REQUIRED_OUTPUTS_PRESENT=true
+fi
+
+MINIMUM_PASS=false
+if [[ "$STATUS" == "success" && "$REQUIRED_OUTPUTS_PRESENT" == true ]]; then
+  MINIMUM_PASS=true
+fi
+
+MISSING_REQUIRED_OUTPUTS_JSON=""
+if [[ "${#MISSING_REQUIRED_OUTPUTS[@]}" -gt 0 ]]; then
+  for output_name in "${MISSING_REQUIRED_OUTPUTS[@]}"; do
+    if [[ -n "$MISSING_REQUIRED_OUTPUTS_JSON" ]]; then
+      MISSING_REQUIRED_OUTPUTS_JSON+=", "
+    fi
+    MISSING_REQUIRED_OUTPUTS_JSON+="\"$(json_escape "$output_name")\""
+  done
 fi
 
 {
@@ -116,9 +210,20 @@ cat >"$SUMMARY_JSON" <<EOF
   "image_count": $IMAGE_COUNT,
   "run_exit_code": $RUN_EXIT_CODE,
   "status": "$STATUS",
-  "end_timestamp_utc": "$END_UTC",
+  "end_timestamp_utc": "$ESC_END_UTC",
   "duration_seconds": $DURATION_SECONDS,
-  "run_log": "$RUN_LOG"
+  "run_log": "$(json_escape "$RUN_LOG")",
+  "outputs": {
+$(output_json "orthophoto" "$ORTHOPHOTO_PATH"),
+$(output_json "dem" "$DEM_PATH"),
+$(output_json "point_cloud" "$POINT_CLOUD_PATH"),
+$(output_json "mesh" "$MESH_PATH")
+  },
+  "qa_gate": {
+    "required_outputs_present": $REQUIRED_OUTPUTS_PRESENT,
+    "minimum_pass": $MINIMUM_PASS,
+    "missing_required_outputs": [$MISSING_REQUIRED_OUTPUTS_JSON]
+  }
 }
 EOF
 

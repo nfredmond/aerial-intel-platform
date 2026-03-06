@@ -31,6 +31,26 @@ Artifacts are written to:
 - `benchmark/<timestamp>/run.log`
 - `benchmark/<timestamp>/summary.json`
 
+`summary.json` now includes output presence checks in `outputs` for:
+
+- `orthophoto` (`odm_orthophoto/odm_orthophoto.tif`)
+- `dem` (prefers `odm_dem/dsm.tif`, falls back to `odm_dem/dtm.tif`)
+- `point_cloud` (prefers `odm_georeferencing/odm_georeferenced_model.laz`, falls back to `.ply`)
+- `mesh` (`odm_texturing/odm_textured_model.obj`)
+
+Each output entry includes:
+
+- `path`
+- `exists`
+- `non_zero_size`
+- `size_bytes`
+
+`summary.json` also includes a `qa_gate` section with:
+
+- `required_outputs_present` (orthophoto + dem + point cloud)
+- `minimum_pass` (run status is `success` and required outputs are present)
+- `missing_required_outputs` (array)
+
 Optional overrides:
 
 - `ODM_IMAGE` (default: `opendronemap/odm:latest`)

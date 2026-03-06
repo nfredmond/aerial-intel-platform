@@ -72,7 +72,16 @@ For each run, publish:
   - command args
   - runtime timing
   - exit status
-  - key output file presence checks
+  - key output file presence checks:
+    - `outputs.orthophoto`: `odm_orthophoto/odm_orthophoto.tif`
+    - `outputs.dem`: prefer `odm_dem/dsm.tif`, fallback `odm_dem/dtm.tif`
+    - `outputs.point_cloud`: prefer `odm_georeferencing/odm_georeferenced_model.laz`, fallback `.ply`
+    - `outputs.mesh`: `odm_texturing/odm_textured_model.obj`
+    - each output contains `path`, `exists`, `non_zero_size`, `size_bytes`
+  - QA gate snapshot:
+    - `qa_gate.required_outputs_present` (orthophoto + dem + point cloud)
+    - `qa_gate.minimum_pass` (`status=success` and required outputs present)
+    - `qa_gate.missing_required_outputs` (array of missing required keys)
 - Output inventory list (file names + sizes) for major deliverables:
   - Orthophoto
   - DEM/DSM
