@@ -69,7 +69,7 @@ Minimal Next.js app with:
 - `/sign-in` email/password auth via Supabase
 - `/dashboard` protected route
 - role + entitlement gate (`drone_memberships` + active `drone_entitlements` where `product_id='drone-ops'`)
-- blocked state with support contact + prefilled support diagnostics (user ID, organization ID/slug/name, role, membership, entitlement), a generated support reference + UTC snapshot timestamp, support email subjects prefilled with that reference, one-click copy actions for both support context and full support email draft text, and ready-to-copy manual fallback text boxes when clipboard access is unavailable
+- blocked state with support contact + prefilled support diagnostics (user ID, organization ID/slug/name, role, membership, entitlement), a generated support reference + UTC snapshot timestamp, support email subjects prefilled with that reference, one-click copy actions for the support reference, support context, and full support email draft text, and ready-to-copy manual fallback text boxes when clipboard access is unavailable
 
 ### Local setup
 

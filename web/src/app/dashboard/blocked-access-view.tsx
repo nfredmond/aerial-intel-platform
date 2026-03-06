@@ -103,6 +103,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
               </li>
             ))}
           </ul>
+          <SupportContextCopyButton
+            text={supportContext.reference}
+            buttonLabel="Copy support reference"
+            successMessage="Support reference copied. Share it with support."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the support reference below."
+            fallbackAriaLabel="Support reference text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then share this reference with support."
+          />
           <SupportContextCopyButton text={supportContext.text} />
           <SupportContextCopyButton
             text={supportEmailDraftText}
