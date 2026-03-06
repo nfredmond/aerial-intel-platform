@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Added a blocked-access "Copy support reference" action so operators can quickly share the generated case reference in tickets, chat, or phone support workflows.
 - Added a blocked-access "Copy support email draft" action so operators can manually paste full subject+body content when opening a local email client or when mailto handoff is unavailable.
 - Prefilled blocked-access support emails with the generated support reference in the subject line for faster triage.
 - Added a one-click copy control for blocked-access support context so operators can paste diagnostics into support channels without retyping.
