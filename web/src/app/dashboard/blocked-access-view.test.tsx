@@ -38,6 +38,23 @@ describe("BlockedAccessView", () => {
     vi.useRealTimers();
   });
 
+  it("adds a one-click action to copy the support inbox address", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<BlockedAccessView access={blockedAccessFixture} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy support email address" }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(writeText).toHaveBeenCalledWith("support@natfordplanning.com");
+  });
+
   it("adds a quick copy action for the generated support reference", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
 

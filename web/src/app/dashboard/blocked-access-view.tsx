@@ -4,7 +4,11 @@ import {
   getBlockedAccessDetails,
   getBlockedAccessSupportFields,
 } from "@/lib/auth/access-insights";
-import { buildBlockedAccessSupportSubject, createSupportMailto } from "@/lib/support";
+import {
+  DRONE_OPS_SUPPORT_EMAIL,
+  buildBlockedAccessSupportSubject,
+  createSupportMailto,
+} from "@/lib/support";
 
 import { SignOutForm } from "./sign-out-form";
 import { SupportContextCopyButton } from "./support-context-copy-button";
@@ -103,6 +107,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
               </li>
             ))}
           </ul>
+          <SupportContextCopyButton
+            text={DRONE_OPS_SUPPORT_EMAIL}
+            buttonLabel="Copy support email address"
+            successMessage="Support email address copied. Paste it into your email client."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the support email address below."
+            fallbackAriaLabel="Support email address text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste into your email client."
+          />
           <SupportContextCopyButton
             text={supportContext.reference}
             buttonLabel="Copy support reference"
