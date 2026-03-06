@@ -38,6 +38,23 @@ describe("BlockedAccessView", () => {
     vi.useRealTimers();
   });
 
+  it("adds a one-click action to copy the signed-in user ID", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<BlockedAccessView access={blockedAccessFixture} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy signed-in user ID" }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(writeText).toHaveBeenCalledWith("user-123");
+  });
+
   it("adds a one-click action to copy the signed-in account email", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
 
