@@ -4,7 +4,7 @@ import {
   getBlockedAccessDetails,
   getBlockedAccessSupportFields,
 } from "@/lib/auth/access-insights";
-import { createSupportMailto } from "@/lib/support";
+import { buildBlockedAccessSupportSubject, createSupportMailto } from "@/lib/support";
 
 import { SignOutForm } from "./sign-out-form";
 import { SupportContextCopyButton } from "./support-context-copy-button";
@@ -50,7 +50,7 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
   });
 
   const supportHref = createSupportMailto({
-    subject: "DroneOps access blocked",
+    subject: buildBlockedAccessSupportSubject(supportContext.reference),
     body: [
       "Hello support team,",
       "",
