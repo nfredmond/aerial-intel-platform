@@ -1,6 +1,7 @@
 import type { DroneOpsAccessResult } from "@/lib/auth/drone-ops-access";
 import {
   buildBlockedAccessSupportContext,
+  buildBlockedAccessSupportContextJson,
   getBlockedAccessDetails,
   getBlockedAccessSupportFields,
 } from "@/lib/auth/access-insights";
@@ -72,6 +73,12 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
 
   const supportEmailDraftText = [`Subject: ${supportSubject}`, "", supportEmailBody].join("\n");
   const supportSnapshotTimestampUtc = supportContext.generatedAtIso;
+  const supportContextJson = buildBlockedAccessSupportContextJson({
+    reference: supportContext.reference,
+    generatedAtIso: supportContext.generatedAtIso,
+    blockedReason: access.blockedReason,
+    fields: supportFields,
+  });
 
   return (
     <main className="app-shell center-screen">
@@ -149,6 +156,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             fallbackHintMessage="Press Ctrl/Cmd+C, then paste into your email body."
           />
           <SupportContextCopyButton text={supportContext.text} />
+          <SupportContextCopyButton
+            text={supportContextJson}
+            buttonLabel="Copy support context JSON"
+            successMessage="Support context JSON copied. Paste it into ticket forms that accept JSON."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy JSON support context below."
+            fallbackAriaLabel="Support context JSON text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste into your support ticket form."
+          />
           <SupportContextCopyButton
             text={supportEmailDraftText}
             buttonLabel="Copy support email draft"

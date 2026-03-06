@@ -128,4 +128,37 @@ describe("BlockedAccessView", () => {
     expect(copiedText).toContain("Observed reason: Your organization does not currently have an active DroneOps entitlement.");
     expect(copiedText).toContain("Please help me restore access.");
   });
+
+  it("adds a one-click action for JSON support context payloads", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<BlockedAccessView access={blockedAccessFixture} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy support context JSON" }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(writeText).toHaveBeenCalledTimes(1);
+
+    const copiedText = writeText.mock.calls[0]?.[0] as string;
+    const payload = JSON.parse(copiedText) as {
+      supportReference: string;
+      snapshotGeneratedUtc: string;
+      observedReason: string;
+      diagnostics: Record<string, string>;
+    };
+
+    expect(payload.supportReference).toBe("AIR-20260306213312");
+    expect(payload.snapshotGeneratedUtc).toBe("2026-03-06T21:33:12.000Z");
+    expect(payload.observedReason).toBe(
+      "Your organization does not currently have an active DroneOps entitlement.",
+    );
+    expect(payload.diagnostics["User ID"]).toBe("user-123");
+    expect(payload.diagnostics["Organization ID"]).toBe("org-456");
+  });
 });
