@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatEntitlementTier,
   getBlockedAccessDetails,
+  getBlockedAccessSupportFields,
   getDashboardNextActions,
 } from "./access-insights";
 
@@ -43,5 +44,39 @@ describe("access-insights", () => {
 
     expect(details.title).toContain("inactive");
     expect(details.explanation).toContain("active entitlement");
+  });
+
+  it("builds support fields with safe fallbacks for blocked users", () => {
+    const fields = getBlockedAccessSupportFields({
+      email: null,
+      orgName: null,
+      role: null,
+      hasMembership: false,
+      hasActiveEntitlement: false,
+      tierId: null,
+    });
+
+    expect(fields).toEqual([
+      { label: "Signed-in email", value: "Unknown" },
+      { label: "Organization", value: "Unknown" },
+      { label: "Role", value: "Unknown" },
+      { label: "Membership linked", value: "No" },
+      { label: "Entitlement active", value: "No" },
+      { label: "Entitlement tier", value: "Not active" },
+    ]);
+  });
+
+  it("includes formatted role and tier when entitlement is active", () => {
+    const fields = getBlockedAccessSupportFields({
+      email: "pilot@example.com",
+      orgName: "Acme Drone Co",
+      role: "admin",
+      hasMembership: true,
+      hasActiveEntitlement: true,
+      tierId: "enterprise_plus",
+    });
+
+    expect(fields[2]).toEqual({ label: "Role", value: "Admin" });
+    expect(fields[5]).toEqual({ label: "Entitlement tier", value: "Enterprise Plus" });
   });
 });

@@ -69,7 +69,7 @@ Minimal Next.js app with:
 - `/sign-in` email/password auth via Supabase
 - `/dashboard` protected route
 - role + entitlement gate (`drone_memberships` + active `drone_entitlements` where `product_id='drone-ops'`)
-- blocked state with support contact when user is signed in but not entitled
+- blocked state with support contact + prefilled support diagnostics when user is signed in but not entitled
 
 ### Local setup
 

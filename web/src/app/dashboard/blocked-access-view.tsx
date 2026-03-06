@@ -1,5 +1,8 @@
 import type { DroneOpsAccessResult } from "@/lib/auth/drone-ops-access";
-import { getBlockedAccessDetails } from "@/lib/auth/access-insights";
+import {
+  getBlockedAccessDetails,
+  getBlockedAccessSupportFields,
+} from "@/lib/auth/access-insights";
 import { createSupportMailto } from "@/lib/support";
 
 import { SignOutForm } from "./sign-out-form";
@@ -14,13 +17,22 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
     hasActiveEntitlement: access.hasActiveEntitlement,
   });
 
+  const supportFields = getBlockedAccessSupportFields({
+    email: access.user?.email,
+    orgName: access.org?.name,
+    role: access.role,
+    hasMembership: access.hasMembership,
+    hasActiveEntitlement: access.hasActiveEntitlement,
+    tierId: access.entitlement?.tier_id,
+  });
+
   const supportHref = createSupportMailto({
     subject: "DroneOps access blocked",
     body: [
       "Hello support team,",
       "",
       "My DroneOps access is currently blocked.",
-      `Signed-in email: ${access.user?.email ?? "unknown"}`,
+      ...supportFields.map((field) => `${field.label}: ${field.value}`),
       `Observed reason: ${access.blockedReason ?? "not provided"}`,
       "",
       "Please help me restore access.",
@@ -45,6 +57,17 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
           <ul className="stack-xs action-list">
             {details.nextSteps.map((step) => (
               <li key={step}>{step}</li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="stack-xs">
+          <h2>Support context</h2>
+          <ul className="stack-xs action-list">
+            {supportFields.map((field) => (
+              <li key={field.label}>
+                <strong>{field.label}:</strong> {field.value}
+              </li>
             ))}
           </ul>
         </section>

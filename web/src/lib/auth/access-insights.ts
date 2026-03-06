@@ -12,6 +12,14 @@ export function formatEntitlementTier(tierId: string | null | undefined) {
     .join(" ");
 }
 
+function formatMembershipRole(role: DroneMembershipRole | null) {
+  if (!role) {
+    return "Unknown";
+  }
+
+  return role[0].toUpperCase() + role.slice(1);
+}
+
 export function getDashboardNextActions(options: {
   role: DroneMembershipRole | null;
   tierId: string | null | undefined;
@@ -69,4 +77,42 @@ export function getBlockedAccessDetails(options: {
     explanation: "Your membership and entitlement are both active.",
     nextSteps: [],
   };
+}
+
+export function getBlockedAccessSupportFields(options: {
+  email: string | null | undefined;
+  orgName: string | null | undefined;
+  role: DroneMembershipRole | null;
+  hasMembership: boolean;
+  hasActiveEntitlement: boolean;
+  tierId: string | null | undefined;
+}) {
+  return [
+    {
+      label: "Signed-in email",
+      value: options.email ?? "Unknown",
+    },
+    {
+      label: "Organization",
+      value: options.orgName ?? "Unknown",
+    },
+    {
+      label: "Role",
+      value: formatMembershipRole(options.role),
+    },
+    {
+      label: "Membership linked",
+      value: options.hasMembership ? "Yes" : "No",
+    },
+    {
+      label: "Entitlement active",
+      value: options.hasActiveEntitlement ? "Yes" : "No",
+    },
+    {
+      label: "Entitlement tier",
+      value: options.hasActiveEntitlement
+        ? formatEntitlementTier(options.tierId)
+        : "Not active",
+    },
+  ];
 }
