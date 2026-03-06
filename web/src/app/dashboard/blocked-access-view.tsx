@@ -73,6 +73,7 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
 
   const supportEmailDraftText = [`Subject: ${supportSubject}`, "", supportEmailBody].join("\n");
   const supportSnapshotTimestampUtc = supportContext.generatedAtIso;
+  const signedInUserId = access.user?.id ?? "Unknown";
   const signedInAccountEmail = access.user?.email ?? "Unknown";
   const organizationSlug = access.org?.slug ?? "Unknown";
   const supportContextJson = buildBlockedAccessSupportContextJson({
@@ -134,6 +135,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
               </li>
             ))}
           </ul>
+          <SupportContextCopyButton
+            text={signedInUserId}
+            buttonLabel="Copy signed-in user ID"
+            successMessage="Signed-in user ID copied. Paste it into support forms or ticket fields."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the signed-in user ID below."
+            fallbackAriaLabel="Signed-in user ID text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this user ID into support chat, forms, or tickets."
+          />
           <SupportContextCopyButton
             text={signedInAccountEmail}
             buttonLabel="Copy signed-in account email"
