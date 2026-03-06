@@ -13,6 +13,7 @@ export function SupportContextCopyButton({
 }: SupportContextCopyButtonProps) {
   const [copyState, setCopyState] = useState<CopyState>("idle");
   const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fallbackTextRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     return () => {
@@ -21,6 +22,15 @@ export function SupportContextCopyButton({
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (copyState !== "error") {
+      return;
+    }
+
+    fallbackTextRef.current?.focus();
+    fallbackTextRef.current?.select();
+  }, [copyState]);
 
   async function handleCopy() {
     if (
@@ -61,9 +71,22 @@ export function SupportContextCopyButton({
       ) : null}
 
       {copyState === "error" ? (
-        <p className="helper-copy" role="status">
-          Couldn’t access your clipboard. Please copy the support fields manually.
-        </p>
+        <div className="stack-xs">
+          <p className="helper-copy" role="status">
+            Couldn’t access your clipboard. Use the ready-to-copy text below.
+          </p>
+          <textarea
+            ref={fallbackTextRef}
+            aria-label="Support context text"
+            className="support-context-manual-copy"
+            readOnly
+            rows={Math.min(12, Math.max(4, text.split("\n").length + 1))}
+            value={text}
+          />
+          <p className="helper-copy muted">
+            Press Ctrl/Cmd+C, then paste into support chat or email.
+          </p>
+        </div>
       ) : null}
     </div>
   );

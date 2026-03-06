@@ -269,6 +269,23 @@ main {
   font-size: 0.93rem;
 }
 
+.support-context-manual-copy {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.75rem;
+  padding: 0.68rem 0.78rem;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 0.9rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.support-context-manual-copy:focus {
+  outline: none;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.16);
+}
+
 .eyebrow {
   font-size: 0.78rem;
   text-transform: uppercase;
