@@ -55,6 +55,28 @@ describe("BlockedAccessView", () => {
     expect(writeText).toHaveBeenCalledWith("support@natfordplanning.com");
   });
 
+  it("adds a one-click action for copying the prefilled support email link", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<BlockedAccessView access={blockedAccessFixture} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy support email link" }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(writeText).toHaveBeenCalledTimes(1);
+
+    const copiedLink = writeText.mock.calls[0]?.[0] as string;
+    expect(copiedLink).toContain("mailto:support@natfordplanning.com?subject=");
+    expect(copiedLink).toContain("DroneOps%20access%20blocked%20(AIR-20260306213312)");
+    expect(copiedLink).toContain("body=Hello%20support%20team%2C");
+  });
+
   it("adds a quick copy action for the generated support reference", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
 
