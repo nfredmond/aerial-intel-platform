@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "DroneOps Auth MVP",
-  description: "Minimal DroneOps authentication and entitlement gate",
+  title: "DroneOps Console",
+  description: "Secure DroneOps authentication and entitlement dashboard",
 };
 
 export default function RootLayout({
