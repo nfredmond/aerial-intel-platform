@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Added a blocked-access "Copy signed-in account email" action so operators can quickly paste the authenticated user email into support forms and triage chats.
 - Added a blocked-access "Copy support email link" action so operators can paste a prefilled mailto handoff into chat/docs when local email-client launch is unavailable.
 - Added a blocked-access "Copy support context JSON" action so operators can paste structured diagnostics directly into ticket forms that support JSON.
 - Added a blocked-access "Copy support snapshot timestamp" action so operators can quickly share the exact UTC support snapshot with support for case traceability.

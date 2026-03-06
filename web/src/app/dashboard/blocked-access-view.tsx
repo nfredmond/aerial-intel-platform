@@ -73,6 +73,7 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
 
   const supportEmailDraftText = [`Subject: ${supportSubject}`, "", supportEmailBody].join("\n");
   const supportSnapshotTimestampUtc = supportContext.generatedAtIso;
+  const signedInAccountEmail = access.user?.email ?? "Unknown";
   const supportContextJson = buildBlockedAccessSupportContextJson({
     reference: supportContext.reference,
     generatedAtIso: supportContext.generatedAtIso,
@@ -115,6 +116,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
               </li>
             ))}
           </ul>
+          <SupportContextCopyButton
+            text={signedInAccountEmail}
+            buttonLabel="Copy signed-in account email"
+            successMessage="Signed-in account email copied. Paste it into support forms."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the signed-in account email below."
+            fallbackAriaLabel="Signed-in account email text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this email into support chat, forms, or tickets."
+          />
           <SupportContextCopyButton
             text={DRONE_OPS_SUPPORT_EMAIL}
             buttonLabel="Copy support email address"
