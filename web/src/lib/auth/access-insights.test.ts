@@ -51,6 +51,7 @@ describe("access-insights", () => {
     const fields = getBlockedAccessSupportFields({
       userId: null,
       email: null,
+      orgId: null,
       orgName: null,
       orgSlug: null,
       role: null,
@@ -62,6 +63,7 @@ describe("access-insights", () => {
     expect(fields).toEqual([
       { label: "User ID", value: "Unknown" },
       { label: "Signed-in email", value: "Unknown" },
+      { label: "Organization ID", value: "Unknown" },
       { label: "Organization", value: "Unknown" },
       { label: "Organization slug", value: "Unknown" },
       { label: "Role", value: "Unknown" },
@@ -75,6 +77,7 @@ describe("access-insights", () => {
     const fields = getBlockedAccessSupportFields({
       userId: "1d2f3a4b",
       email: "pilot@example.com",
+      orgId: "org-123",
       orgName: "Acme Drone Co",
       orgSlug: "acme-drone-co",
       role: "admin",
@@ -84,9 +87,10 @@ describe("access-insights", () => {
     });
 
     expect(fields[0]).toEqual({ label: "User ID", value: "1d2f3a4b" });
-    expect(fields[3]).toEqual({ label: "Organization slug", value: "acme-drone-co" });
-    expect(fields[4]).toEqual({ label: "Role", value: "Admin" });
-    expect(fields[7]).toEqual({ label: "Entitlement tier", value: "Enterprise Plus" });
+    expect(fields[2]).toEqual({ label: "Organization ID", value: "org-123" });
+    expect(fields[4]).toEqual({ label: "Organization slug", value: "acme-drone-co" });
+    expect(fields[5]).toEqual({ label: "Role", value: "Admin" });
+    expect(fields[8]).toEqual({ label: "Entitlement tier", value: "Enterprise Plus" });
   });
 
   it("builds support context with reference and snapshot timestamp", () => {

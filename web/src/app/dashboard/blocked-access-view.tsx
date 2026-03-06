@@ -36,6 +36,7 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
   const supportFields = getBlockedAccessSupportFields({
     userId: access.user?.id,
     email: access.user?.email,
+    orgId: access.org?.id,
     orgName: access.org?.name,
     orgSlug: access.org?.slug,
     role: access.role,
