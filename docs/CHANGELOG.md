@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Added a blocked-access "Copy operator handoff checklist" action so operators can quickly paste a support-ready checklist with reference, inbox, subject, and follow-up steps.
 - Added a blocked-access "Copy support triage summary" action so operators can paste a compact reference/account/org/reason handoff into chat, tickets, or call notes.
 - Added a blocked-access "Copy signed-in account email" action so operators can quickly paste the authenticated user email into support forms and triage chats.
 - Added a blocked-access "Copy support email link" action so operators can paste a prefilled mailto handoff into chat/docs when local email-client launch is unavailable.
