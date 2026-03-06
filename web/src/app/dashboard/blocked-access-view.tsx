@@ -111,6 +111,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             fallbackAriaLabel="Support reference text"
             fallbackHintMessage="Press Ctrl/Cmd+C, then share this reference with support."
           />
+          <SupportContextCopyButton
+            text={supportSubject}
+            buttonLabel="Copy support email subject"
+            successMessage="Support email subject copied. Paste it into your email client."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy email subject below."
+            fallbackAriaLabel="Support email subject text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste into your email subject line."
+          />
           <SupportContextCopyButton text={supportContext.text} />
           <SupportContextCopyButton
             text={supportEmailDraftText}
