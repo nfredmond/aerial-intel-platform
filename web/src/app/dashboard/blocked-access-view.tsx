@@ -80,11 +80,12 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
     blockedReason: access.blockedReason,
     fields: supportFields,
   });
+  const observedBlockedReason = access.blockedReason ?? "not provided";
   const supportTriageSummary = [
     `Support reference: ${supportContext.reference}`,
     `Signed-in account: ${signedInAccountEmail}`,
     `Organization: ${access.org?.name ?? "Unknown"} (${access.org?.slug ?? "Unknown"})`,
-    `Observed reason: ${access.blockedReason ?? "not provided"}`,
+    `Observed reason: ${observedBlockedReason}`,
   ].join("\n");
   const operatorHandoffChecklist = [
     `Support reference: ${supportContext.reference}`,
@@ -179,6 +180,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support triage summary below."
             fallbackAriaLabel="Support triage summary text"
             fallbackHintMessage="Press Ctrl/Cmd+C, then paste this summary into support channels."
+          />
+          <SupportContextCopyButton
+            text={observedBlockedReason}
+            buttonLabel="Copy blocked-access reason"
+            successMessage="Blocked-access reason copied. Paste it into support forms or call notes."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy blocked-access reason below."
+            fallbackAriaLabel="Blocked-access reason text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this reason into support chat, forms, or notes."
           />
           <SupportContextCopyButton
             text={operatorHandoffChecklist}
