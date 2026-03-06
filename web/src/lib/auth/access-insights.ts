@@ -80,8 +80,10 @@ export function getBlockedAccessDetails(options: {
 }
 
 export function getBlockedAccessSupportFields(options: {
+  userId: string | null | undefined;
   email: string | null | undefined;
   orgName: string | null | undefined;
+  orgSlug: string | null | undefined;
   role: DroneMembershipRole | null;
   hasMembership: boolean;
   hasActiveEntitlement: boolean;
@@ -89,12 +91,20 @@ export function getBlockedAccessSupportFields(options: {
 }) {
   return [
     {
+      label: "User ID",
+      value: options.userId ?? "Unknown",
+    },
+    {
       label: "Signed-in email",
       value: options.email ?? "Unknown",
     },
     {
       label: "Organization",
       value: options.orgName ?? "Unknown",
+    },
+    {
+      label: "Organization slug",
+      value: options.orgSlug ?? "Unknown",
     },
     {
       label: "Role",

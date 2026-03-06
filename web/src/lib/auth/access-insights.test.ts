@@ -48,8 +48,10 @@ describe("access-insights", () => {
 
   it("builds support fields with safe fallbacks for blocked users", () => {
     const fields = getBlockedAccessSupportFields({
+      userId: null,
       email: null,
       orgName: null,
+      orgSlug: null,
       role: null,
       hasMembership: false,
       hasActiveEntitlement: false,
@@ -57,8 +59,10 @@ describe("access-insights", () => {
     });
 
     expect(fields).toEqual([
+      { label: "User ID", value: "Unknown" },
       { label: "Signed-in email", value: "Unknown" },
       { label: "Organization", value: "Unknown" },
+      { label: "Organization slug", value: "Unknown" },
       { label: "Role", value: "Unknown" },
       { label: "Membership linked", value: "No" },
       { label: "Entitlement active", value: "No" },
@@ -68,15 +72,19 @@ describe("access-insights", () => {
 
   it("includes formatted role and tier when entitlement is active", () => {
     const fields = getBlockedAccessSupportFields({
+      userId: "1d2f3a4b",
       email: "pilot@example.com",
       orgName: "Acme Drone Co",
+      orgSlug: "acme-drone-co",
       role: "admin",
       hasMembership: true,
       hasActiveEntitlement: true,
       tierId: "enterprise_plus",
     });
 
-    expect(fields[2]).toEqual({ label: "Role", value: "Admin" });
-    expect(fields[5]).toEqual({ label: "Entitlement tier", value: "Enterprise Plus" });
+    expect(fields[0]).toEqual({ label: "User ID", value: "1d2f3a4b" });
+    expect(fields[3]).toEqual({ label: "Organization slug", value: "acme-drone-co" });
+    expect(fields[4]).toEqual({ label: "Role", value: "Admin" });
+    expect(fields[7]).toEqual({ label: "Entitlement tier", value: "Enterprise Plus" });
   });
 });

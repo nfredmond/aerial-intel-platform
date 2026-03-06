@@ -69,6 +69,22 @@ export async function getDroneOpsAccess(): Promise<DroneOpsAccessResult> {
   }
 
   const orgIds = typedMemberships.map((membership) => membership.org_id);
+  const primaryMembership = typedMemberships[0] ?? null;
+
+  const { data: orgs, error: orgError } = await supabase
+    .from("drone_orgs")
+    .select("id, name, slug, created_at")
+    .in("id", orgIds);
+
+  if (orgError) {
+    throw orgError;
+  }
+
+  const typedOrgs = (orgs ?? []) as OrgRow[];
+  const orgById = new Map(typedOrgs.map((org) => [org.id, org]));
+  const fallbackOrg = primaryMembership
+    ? (orgById.get(primaryMembership.org_id) ?? null)
+    : null;
 
   const { data: entitlements, error: entitlementError } = await supabase
     .from("drone_entitlements")
@@ -99,8 +115,8 @@ export async function getDroneOpsAccess(): Promise<DroneOpsAccessResult> {
       isAuthenticated: true,
       hasMembership: true,
       hasActiveEntitlement: false,
-      role: typedMemberships[0]?.role ?? null,
-      org: null,
+      role: primaryMembership?.role ?? null,
+      org: fallbackOrg,
       entitlement: null,
       blockedReason:
         "Your organization does not currently have an active DroneOps entitlement.",
@@ -108,16 +124,7 @@ export async function getDroneOpsAccess(): Promise<DroneOpsAccessResult> {
   }
 
   const entitlement = entitlementByOrgId.get(entitledMembership.org_id) ?? null;
-
-  const { data: org, error: orgError } = await supabase
-    .from("drone_orgs")
-    .select("id, name, slug, created_at")
-    .eq("id", entitledMembership.org_id)
-    .single();
-
-  if (orgError) {
-    throw orgError;
-  }
+  const entitledOrg = orgById.get(entitledMembership.org_id) ?? null;
 
   return {
     user,
@@ -125,7 +132,7 @@ export async function getDroneOpsAccess(): Promise<DroneOpsAccessResult> {
     hasMembership: true,
     hasActiveEntitlement: true,
     role: entitledMembership.role,
-    org: org as OrgRow,
+    org: entitledOrg,
     entitlement,
     blockedReason: null,
   };
