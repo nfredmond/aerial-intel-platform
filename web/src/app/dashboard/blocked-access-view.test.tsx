@@ -153,6 +153,25 @@ describe("BlockedAccessView", () => {
     );
   });
 
+  it("adds a one-click action for just the blocked-access reason", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<BlockedAccessView access={blockedAccessFixture} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy blocked-access reason" }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(writeText).toHaveBeenCalledWith(
+      "Your organization does not currently have an active DroneOps entitlement.",
+    );
+  });
+
   it("adds a one-click action for an operator handoff checklist", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
 
