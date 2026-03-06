@@ -80,6 +80,12 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
     blockedReason: access.blockedReason,
     fields: supportFields,
   });
+  const supportTriageSummary = [
+    `Support reference: ${supportContext.reference}`,
+    `Signed-in account: ${signedInAccountEmail}`,
+    `Organization: ${access.org?.name ?? "Unknown"} (${access.org?.slug ?? "Unknown"})`,
+    `Observed reason: ${access.blockedReason ?? "not provided"}`,
+  ].join("\n");
 
   return (
     <main className="app-shell center-screen">
@@ -155,6 +161,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             fallbackStatusMessage="Couldn’t access your clipboard. Use the support snapshot timestamp below."
             fallbackAriaLabel="Support snapshot timestamp text"
             fallbackHintMessage="Press Ctrl/Cmd+C, then share this UTC timestamp with support."
+          />
+          <SupportContextCopyButton
+            text={supportTriageSummary}
+            buttonLabel="Copy support triage summary"
+            successMessage="Support triage summary copied. Paste it into chat, tickets, or call notes."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support triage summary below."
+            fallbackAriaLabel="Support triage summary text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this summary into support channels."
           />
           <SupportContextCopyButton
             text={supportSubject}
