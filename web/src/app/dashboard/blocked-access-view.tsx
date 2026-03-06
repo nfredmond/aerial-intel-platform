@@ -6,6 +6,7 @@ import {
 import { createSupportMailto } from "@/lib/support";
 
 import { SignOutForm } from "./sign-out-form";
+import { SupportContextCopyButton } from "./support-context-copy-button";
 
 type BlockedAccessViewProps = {
   access: DroneOpsAccessResult;
@@ -28,14 +29,19 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
     tierId: access.entitlement?.tier_id,
   });
 
+  const supportContextText = [
+    ...supportFields.map((field) => `${field.label}: ${field.value}`),
+    `Observed reason: ${access.blockedReason ?? "not provided"}`,
+  ].join("\n");
+
   const supportHref = createSupportMailto({
     subject: "DroneOps access blocked",
     body: [
       "Hello support team,",
       "",
       "My DroneOps access is currently blocked.",
-      ...supportFields.map((field) => `${field.label}: ${field.value}`),
-      `Observed reason: ${access.blockedReason ?? "not provided"}`,
+      "",
+      supportContextText,
       "",
       "Please help me restore access.",
     ].join("\n"),
@@ -72,6 +78,7 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
               </li>
             ))}
           </ul>
+          <SupportContextCopyButton text={supportContextText} />
         </section>
 
         <div className="support-actions">
