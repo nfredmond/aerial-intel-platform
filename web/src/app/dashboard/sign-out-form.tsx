@@ -2,7 +2,15 @@ import { redirect } from "next/navigation";
 
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
-export function SignOutForm() {
+type SignOutFormProps = {
+  label?: string;
+  variant?: "primary" | "secondary";
+};
+
+export function SignOutForm({
+  label = "Sign out",
+  variant = "primary",
+}: SignOutFormProps) {
   async function signOut() {
     "use server";
 
@@ -14,7 +22,12 @@ export function SignOutForm() {
 
   return (
     <form action={signOut}>
-      <button type="submit">Sign out</button>
+      <button
+        className={`button ${variant === "secondary" ? "button-secondary" : "button-primary"}`}
+        type="submit"
+      >
+        {label}
+      </button>
     </form>
   );
 }
