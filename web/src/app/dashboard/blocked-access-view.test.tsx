@@ -72,6 +72,23 @@ describe("BlockedAccessView", () => {
     expect(writeText).toHaveBeenCalledWith("AIR-20260306213312");
   });
 
+  it("adds a one-click action for the support snapshot timestamp", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<BlockedAccessView access={blockedAccessFixture} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy support snapshot timestamp" }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(writeText).toHaveBeenCalledWith("2026-03-06T21:33:12.000Z");
+  });
+
   it("adds a one-click action for the prefilled support email subject", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
 
