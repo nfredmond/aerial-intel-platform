@@ -153,6 +153,30 @@ describe("BlockedAccessView", () => {
     );
   });
 
+  it("adds a one-click action for an operator handoff checklist", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<BlockedAccessView access={blockedAccessFixture} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy operator handoff checklist" }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(writeText).toHaveBeenCalledTimes(1);
+
+    const copiedText = writeText.mock.calls[0]?.[0] as string;
+    expect(copiedText).toContain("Support reference: AIR-20260306213312");
+    expect(copiedText).toContain("Support inbox: support@natfordplanning.com");
+    expect(copiedText).toContain("Recommended email subject: DroneOps access blocked (AIR-20260306213312)");
+    expect(copiedText).toContain("Operator handoff checklist:");
+    expect(copiedText).toContain("1) Paste the support triage summary into the ticket or chat thread.");
+  });
+
   it("adds a one-click action for the prefilled support email subject", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
 

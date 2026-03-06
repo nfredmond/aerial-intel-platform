@@ -86,6 +86,16 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
     `Organization: ${access.org?.name ?? "Unknown"} (${access.org?.slug ?? "Unknown"})`,
     `Observed reason: ${access.blockedReason ?? "not provided"}`,
   ].join("\n");
+  const operatorHandoffChecklist = [
+    `Support reference: ${supportContext.reference}`,
+    `Signed-in account: ${signedInAccountEmail}`,
+    `Support inbox: ${DRONE_OPS_SUPPORT_EMAIL}`,
+    `Recommended email subject: ${supportSubject}`,
+    "Operator handoff checklist:",
+    "1) Paste the support triage summary into the ticket or chat thread.",
+    "2) Include support context JSON when the form accepts structured fields.",
+    "3) Keep the support reference in every follow-up message.",
+  ].join("\n");
 
   return (
     <main className="app-shell center-screen">
@@ -169,6 +179,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support triage summary below."
             fallbackAriaLabel="Support triage summary text"
             fallbackHintMessage="Press Ctrl/Cmd+C, then paste this summary into support channels."
+          />
+          <SupportContextCopyButton
+            text={operatorHandoffChecklist}
+            buttonLabel="Copy operator handoff checklist"
+            successMessage="Operator handoff checklist copied. Paste it into your support workflow notes."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy operator handoff checklist below."
+            fallbackAriaLabel="Operator handoff checklist text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this checklist into your support handoff notes."
           />
           <SupportContextCopyButton
             text={supportSubject}
