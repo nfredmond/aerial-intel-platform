@@ -71,6 +71,7 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
   });
 
   const supportEmailDraftText = [`Subject: ${supportSubject}`, "", supportEmailBody].join("\n");
+  const supportSnapshotTimestampUtc = supportContext.generatedAtIso;
 
   return (
     <main className="app-shell center-screen">
@@ -122,6 +123,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             fallbackStatusMessage="Couldn’t access your clipboard. Use the support reference below."
             fallbackAriaLabel="Support reference text"
             fallbackHintMessage="Press Ctrl/Cmd+C, then share this reference with support."
+          />
+          <SupportContextCopyButton
+            text={supportSnapshotTimestampUtc}
+            buttonLabel="Copy support snapshot timestamp"
+            successMessage="Snapshot timestamp copied. Share it with support for case traceability."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the support snapshot timestamp below."
+            fallbackAriaLabel="Support snapshot timestamp text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then share this UTC timestamp with support."
           />
           <SupportContextCopyButton
             text={supportSubject}
