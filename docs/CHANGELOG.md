@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Added a blocked-access "Copy support email address" action so operators can quickly paste the support inbox into local email clients when mailto handoff is unavailable.
 - Added a blocked-access "Copy support email subject" action so operators can quickly paste the prefilled subject line into local email clients or support ticket forms.
 - Added a blocked-access "Copy support reference" action so operators can quickly share the generated case reference in tickets, chat, or phone support workflows.
 - Added a blocked-access "Copy support email draft" action so operators can manually paste full subject+body content when opening a local email client or when mailto handoff is unavailable.
