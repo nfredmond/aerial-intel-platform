@@ -283,6 +283,33 @@ describe("BlockedAccessView", () => {
     expect(copiedText).toContain("1) Paste the support triage summary into the ticket or chat thread.");
   });
 
+  it("adds a one-click action for an operator escalation packet", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<BlockedAccessView access={blockedAccessFixture} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy operator escalation packet" }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(writeText).toHaveBeenCalledTimes(1);
+
+    const copiedText = writeText.mock.calls[0]?.[0] as string;
+    expect(copiedText).toContain("Support reference: AIR-20260306213312");
+    expect(copiedText).toContain("Snapshot UTC: 2026-03-06T21:33:12.000Z");
+    expect(copiedText).toContain("Support email link: mailto:support@natfordplanning.com?subject=");
+    expect(copiedText).toContain("Support Gmail compose link: https://mail.google.com/mail/?view=cm&fs=1&to=support%40natfordplanning.com");
+    expect(copiedText).toContain("Support triage summary:");
+    expect(copiedText).toContain("Support email draft:");
+    expect(copiedText).toContain("Support context JSON:");
+    expect(copiedText).toContain('"supportReference": "AIR-20260306213312"');
+  });
+
   it("adds a one-click action for the prefilled support email subject", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
 
