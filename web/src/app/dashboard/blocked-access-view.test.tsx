@@ -534,6 +534,25 @@ describe("BlockedAccessView", () => {
     );
   });
 
+  it("adds a one-click action for the support ticket header line", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<BlockedAccessView access={blockedAccessFixture} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy support ticket header line" }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(writeText).toHaveBeenCalledWith(
+      "### DroneOps blocked access · AIR-20260306213312 · pilot@example.com · Skyline Survey (skyline-survey)",
+    );
+  });
+
   it("adds a one-click action for the prefilled support email subject", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
 
