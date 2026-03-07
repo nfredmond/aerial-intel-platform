@@ -33,6 +33,16 @@ function formatSupportSnapshotTimestamp(value: string) {
   }).format(timestamp)} UTC`;
 }
 
+function escapeCsvCell(value: string) {
+  const escaped = value.replaceAll('"', '""');
+
+  if (/[",\n]/.test(escaped)) {
+    return `"${escaped}"`;
+  }
+
+  return escaped;
+}
+
 export function BlockedAccessView({ access }: BlockedAccessViewProps) {
   const details = getBlockedAccessDetails({
     hasMembership: access.hasMembership,
@@ -106,6 +116,19 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
     `Ref ${supportContext.reference}`,
     `Snapshot ${supportSnapshotTimestampUtc}`,
   ].join(" | ");
+  const supportDiagnosticsCsvBlock = [
+    "support_reference,snapshot_utc,signed_in_account_email,organization_slug,organization_name,blocked_reason",
+    [
+      supportContext.reference,
+      supportSnapshotTimestampUtc,
+      signedInAccountEmail,
+      organizationSlug,
+      organizationName,
+      observedBlockedReason,
+    ]
+      .map((value) => escapeCsvCell(value))
+      .join(","),
+  ].join("\n");
   const operatorHandoffChecklist = [
     `Support reference: ${supportContext.reference}`,
     `Signed-in account: ${signedInAccountEmail}`,
@@ -274,6 +297,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support reference + snapshot line below."
             fallbackAriaLabel="Support reference + snapshot line text"
             fallbackHintMessage="Press Ctrl/Cmd+C, then paste this line into support ticket comments or handoff notes."
+          />
+          <SupportContextCopyButton
+            text={supportDiagnosticsCsvBlock}
+            buttonLabel="Copy support diagnostics CSV block"
+            successMessage="Support diagnostics CSV block copied. Paste it into spreadsheets or CSV-friendly ticket fields."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support diagnostics CSV block below."
+            fallbackAriaLabel="Support diagnostics CSV block text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this CSV block into spreadsheets, docs, or support forms."
           />
           <SupportContextCopyButton
             text={observedBlockedReason}
