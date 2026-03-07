@@ -8,6 +8,7 @@ import {
 import {
   DRONE_OPS_SUPPORT_EMAIL,
   buildBlockedAccessSupportSubject,
+  createSupportGmailComposeUrl,
   createSupportMailto,
 } from "@/lib/support";
 
@@ -67,6 +68,10 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
   ].join("\n");
 
   const supportHref = createSupportMailto({
+    subject: supportSubject,
+    body: supportEmailBody,
+  });
+  const supportGmailHref = createSupportGmailComposeUrl({
     subject: supportSubject,
     body: supportEmailBody,
   });
@@ -262,6 +267,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
         <div className="support-actions">
           <a className="button button-primary" href={supportHref}>
             Contact support
+          </a>
+          <a
+            className="button button-secondary"
+            href={supportGmailHref}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Open in Gmail
           </a>
           <SignOutForm label="Sign out" variant="secondary" />
         </div>

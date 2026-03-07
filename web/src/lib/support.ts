@@ -21,3 +21,15 @@ export function createSupportMailto(options: {
 
   return `mailto:${email}?subject=${subject}${body}`;
 }
+
+export function createSupportGmailComposeUrl(options: {
+  subject: string;
+  body?: string;
+  email?: string;
+}) {
+  const email = encodeURIComponent(options.email ?? DRONE_OPS_SUPPORT_EMAIL);
+  const subject = encodeURIComponent(options.subject);
+  const body = options.body ? `&body=${encodeURIComponent(options.body)}` : "";
+
+  return `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${subject}${body}`;
+}
