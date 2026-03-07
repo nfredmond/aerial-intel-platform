@@ -276,6 +276,25 @@ describe("BlockedAccessView", () => {
     );
   });
 
+  it("adds a one-click action for a compact support reference plus snapshot line", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<BlockedAccessView access={blockedAccessFixture} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy support reference + snapshot line" }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(writeText).toHaveBeenCalledWith(
+      "Ref AIR-20260306213312 | Snapshot 2026-03-06T21:33:12.000Z",
+    );
+  });
+
   it("adds a one-click action for just the blocked-access reason", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
 

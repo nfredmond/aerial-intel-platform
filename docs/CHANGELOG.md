@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Added a blocked-access "Copy support reference + snapshot line" action so operators can quickly paste a compact ref/timestamp traceability line into ticket comments and handoff notes.
 - Added a blocked-access "Copy support follow-up line" action so operators can paste a compact ref/account/org/reason summary into ticket comments and escalation chats.
 - Added a blocked-access "Copy organization name" action so operators can quickly paste the org display name into support forms, ticket notes, and escalation chats.
 - Added a blocked-access "Copy operator escalation packet" action so operators can copy a single support-ready packet (reference, links, triage summary, checklist, email draft, JSON diagnostics) into ticket threads and handoff docs.
