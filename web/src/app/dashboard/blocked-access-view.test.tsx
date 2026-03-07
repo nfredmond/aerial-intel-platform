@@ -106,6 +106,23 @@ describe("BlockedAccessView", () => {
     expect(writeText).toHaveBeenCalledWith("skyline-survey");
   });
 
+  it("adds a one-click action to copy the organization name", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<BlockedAccessView access={blockedAccessFixture} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy organization name" }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(writeText).toHaveBeenCalledWith("Skyline Survey");
+  });
+
   it("adds a one-click action to copy the support inbox address", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
 

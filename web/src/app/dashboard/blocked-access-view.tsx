@@ -82,6 +82,7 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
   const signedInAccountEmail = access.user?.email ?? "Unknown";
   const organizationId = access.org?.id ?? "Unknown";
   const organizationSlug = access.org?.slug ?? "Unknown";
+  const organizationName = access.org?.name ?? "Unknown";
   const supportContextJson = buildBlockedAccessSupportContextJson({
     reference: supportContext.reference,
     generatedAtIso: supportContext.generatedAtIso,
@@ -191,6 +192,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             fallbackStatusMessage="Couldn’t access your clipboard. Use the organization slug below."
             fallbackAriaLabel="Organization slug text"
             fallbackHintMessage="Press Ctrl/Cmd+C, then paste this slug into support chat, forms, or admin tools."
+          />
+          <SupportContextCopyButton
+            text={organizationName}
+            buttonLabel="Copy organization name"
+            successMessage="Organization name copied. Paste it into support forms or ticket notes."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the organization name below."
+            fallbackAriaLabel="Organization name text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this name into support chat, forms, or tickets."
           />
           <SupportContextCopyButton
             text={DRONE_OPS_SUPPORT_EMAIL}
