@@ -528,6 +528,25 @@ describe("BlockedAccessView", () => {
     );
   });
 
+  it("adds a one-click action for a support log search query", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<BlockedAccessView access={blockedAccessFixture} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy support log search query" }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(writeText).toHaveBeenCalledWith(
+      'support_reference="AIR-20260306213312" OR user_id="user-123" OR organization_id="org-456" OR organization_slug="skyline-survey" OR signed_in_account_email="pilot@example.com"',
+    );
+  });
+
   it("adds a one-click action for just the blocked-access reason", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
 
