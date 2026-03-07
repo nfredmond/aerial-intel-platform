@@ -102,6 +102,10 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
     `Org ${organizationName} (${organizationSlug})`,
     `Reason ${observedBlockedReason}`,
   ].join(" | ");
+  const supportReferenceSnapshotLine = [
+    `Ref ${supportContext.reference}`,
+    `Snapshot ${supportSnapshotTimestampUtc}`,
+  ].join(" | ");
   const operatorHandoffChecklist = [
     `Support reference: ${supportContext.reference}`,
     `Signed-in account: ${signedInAccountEmail}`,
@@ -262,6 +266,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support follow-up line below."
             fallbackAriaLabel="Support follow-up line text"
             fallbackHintMessage="Press Ctrl/Cmd+C, then paste this line into support ticket comments or chat."
+          />
+          <SupportContextCopyButton
+            text={supportReferenceSnapshotLine}
+            buttonLabel="Copy support reference + snapshot line"
+            successMessage="Support reference + snapshot line copied. Paste it into ticket comments for traceability."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support reference + snapshot line below."
+            fallbackAriaLabel="Support reference + snapshot line text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this line into support ticket comments or handoff notes."
           />
           <SupportContextCopyButton
             text={observedBlockedReason}
