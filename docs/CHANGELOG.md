@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Added a blocked-access "Copy support call brief" action so operators can quickly paste a phone-ready opener (reference, account, org, reason, snapshot) into support call notes and live escalations.
 - Added a blocked-access "Copy support diagnostics TSV block" action so operators can quickly paste tab-delimited diagnostics into spreadsheet columns and tab-friendly ticket fields.
 - Added a blocked-access "Copy support diagnostics markdown block" action so operators can quickly paste markdown-ready diagnostics into ticket comments, docs, and chat threads.
 - Added a blocked-access "Copy support ticket title" action so operators can quickly paste a support-ready case title (account, org, and reference) into ticket systems and escalation threads.

@@ -276,6 +276,33 @@ describe("BlockedAccessView", () => {
     );
   });
 
+  it("adds a one-click action for a phone-ready support call brief", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<BlockedAccessView access={blockedAccessFixture} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy support call brief" }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(writeText).toHaveBeenCalledTimes(1);
+
+    const copiedText = writeText.mock.calls[0]?.[0] as string;
+    expect(copiedText).toContain("Hello support team — I’m calling about blocked DroneOps access.");
+    expect(copiedText).toContain("Support reference: AIR-20260306213312.");
+    expect(copiedText).toContain("Signed-in account: pilot@example.com.");
+    expect(copiedText).toContain("Organization: Skyline Survey (skyline-survey).");
+    expect(copiedText).toContain(
+      "Observed reason: Your organization does not currently have an active DroneOps entitlement.",
+    );
+    expect(copiedText).toContain("Snapshot UTC: 2026-03-06T21:33:12.000Z.");
+  });
+
   it("adds a one-click action for a compact support reference plus snapshot line", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
 

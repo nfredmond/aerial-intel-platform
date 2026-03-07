@@ -128,6 +128,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
     `Org ${organizationName} (${organizationSlug})`,
     `Reason ${observedBlockedReason}`,
   ].join(" | ");
+  const supportCallBrief = [
+    "Hello support team — I’m calling about blocked DroneOps access.",
+    `Support reference: ${supportContext.reference}.`,
+    `Signed-in account: ${signedInAccountEmail}.`,
+    `Organization: ${organizationName} (${organizationSlug}).`,
+    `Observed reason: ${observedBlockedReason}.`,
+    `Snapshot UTC: ${supportSnapshotTimestampUtc}.`,
+  ].join(" ");
   const supportReferenceSnapshotLine = [
     `Ref ${supportContext.reference}`,
     `Snapshot ${supportSnapshotTimestampUtc}`,
@@ -190,6 +198,9 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
     `Support inbox: ${DRONE_OPS_SUPPORT_EMAIL}`,
     `Support email link: ${supportHref}`,
     `Support Gmail compose link: ${supportGmailHref}`,
+    "",
+    "Support call brief:",
+    supportCallBrief,
     "",
     "Support triage summary:",
     supportTriageSummary,
@@ -334,6 +345,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support follow-up line below."
             fallbackAriaLabel="Support follow-up line text"
             fallbackHintMessage="Press Ctrl/Cmd+C, then paste this line into support ticket comments or chat."
+          />
+          <SupportContextCopyButton
+            text={supportCallBrief}
+            buttonLabel="Copy support call brief"
+            successMessage="Support call brief copied. Use it as a phone-ready opener with support."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support call brief below."
+            fallbackAriaLabel="Support call brief text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then use this brief in phone support handoffs or call notes."
           />
           <SupportContextCopyButton
             text={supportReferenceSnapshotLine}
