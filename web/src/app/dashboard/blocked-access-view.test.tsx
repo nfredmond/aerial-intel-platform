@@ -295,6 +295,38 @@ describe("BlockedAccessView", () => {
     );
   });
 
+  it("adds a one-click action for a support diagnostics CSV block", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<BlockedAccessView access={blockedAccessFixture} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy support diagnostics CSV block" }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(writeText).toHaveBeenCalledTimes(1);
+
+    const copiedText = writeText.mock.calls[0]?.[0] as string;
+    const [header, row] = copiedText.split("\n");
+
+    expect(header).toBe(
+      "support_reference,snapshot_utc,signed_in_account_email,organization_slug,organization_name,blocked_reason",
+    );
+    expect(row).toContain("AIR-20260306213312");
+    expect(row).toContain("2026-03-06T21:33:12.000Z");
+    expect(row).toContain("pilot@example.com");
+    expect(row).toContain("skyline-survey");
+    expect(row).toContain("Skyline Survey");
+    expect(row).toContain(
+      "Your organization does not currently have an active DroneOps entitlement.",
+    );
+  });
+
   it("adds a one-click action for just the blocked-access reason", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
 
