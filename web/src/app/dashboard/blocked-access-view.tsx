@@ -129,6 +129,13 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
     `Org ${organizationName} (${organizationSlug})`,
     `Reason ${observedBlockedReason}`,
   ].join(" | ");
+  const supportEscalationLine = [
+    `Ref ${supportContext.reference}`,
+    `Snapshot ${supportSnapshotTimestampUtc}`,
+    `Acct ${signedInAccountEmail}`,
+    `Org ${organizationName} (${organizationSlug})`,
+    `Reason ${observedBlockedReason}`,
+  ].join(" | ");
   const supportCallBrief = [
     "Hello support team — I’m calling about blocked DroneOps access.",
     `Support reference: ${supportContext.reference}.`,
@@ -358,6 +365,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support follow-up line below."
             fallbackAriaLabel="Support follow-up line text"
             fallbackHintMessage="Press Ctrl/Cmd+C, then paste this line into support ticket comments or chat."
+          />
+          <SupportContextCopyButton
+            text={supportEscalationLine}
+            buttonLabel="Copy support escalation line"
+            successMessage="Support escalation line copied. Paste it into ticket comments or escalation chats."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support escalation line below."
+            fallbackAriaLabel="Support escalation line text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this line into support ticket comments or escalation chats."
           />
           <SupportContextCopyButton
             text={supportCallBrief}
