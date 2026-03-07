@@ -99,6 +99,12 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
     blockedReason: access.blockedReason,
     fields: supportFields,
   });
+  const supportTicketTitle = [
+    "DroneOps blocked access",
+    signedInAccountEmail,
+    `${organizationName} (${organizationSlug})`,
+    supportContext.reference,
+  ].join(" | ");
   const observedBlockedReason = access.blockedReason ?? "not provided";
   const supportTriageSummary = [
     `Support reference: ${supportContext.reference}`,
@@ -345,6 +351,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy operator escalation packet below."
             fallbackAriaLabel="Operator escalation packet text"
             fallbackHintMessage="Press Ctrl/Cmd+C, then paste this packet into support ticket threads or handoff docs."
+          />
+          <SupportContextCopyButton
+            text={supportTicketTitle}
+            buttonLabel="Copy support ticket title"
+            successMessage="Support ticket title copied. Paste it into ticket systems or escalation threads."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support ticket title below."
+            fallbackAriaLabel="Support ticket title text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this title into support ticket fields or escalation chat subjects."
           />
           <SupportContextCopyButton
             text={supportSubject}
