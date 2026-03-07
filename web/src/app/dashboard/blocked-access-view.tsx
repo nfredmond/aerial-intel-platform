@@ -105,6 +105,25 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
     "2) Include support context JSON when the form accepts structured fields.",
     "3) Keep the support reference in every follow-up message.",
   ].join("\n");
+  const operatorEscalationPacket = [
+    `Support reference: ${supportContext.reference}`,
+    `Snapshot UTC: ${supportSnapshotTimestampUtc}`,
+    `Support inbox: ${DRONE_OPS_SUPPORT_EMAIL}`,
+    `Support email link: ${supportHref}`,
+    `Support Gmail compose link: ${supportGmailHref}`,
+    "",
+    "Support triage summary:",
+    supportTriageSummary,
+    "",
+    "Operator handoff checklist:",
+    operatorHandoffChecklist,
+    "",
+    "Support email draft:",
+    supportEmailDraftText,
+    "",
+    "Support context JSON:",
+    supportContextJson,
+  ].join("\n");
 
   return (
     <main className="app-shell center-screen">
@@ -236,6 +255,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy operator handoff checklist below."
             fallbackAriaLabel="Operator handoff checklist text"
             fallbackHintMessage="Press Ctrl/Cmd+C, then paste this checklist into your support handoff notes."
+          />
+          <SupportContextCopyButton
+            text={operatorEscalationPacket}
+            buttonLabel="Copy operator escalation packet"
+            successMessage="Operator escalation packet copied. Paste it into ticket threads or support handoff docs."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy operator escalation packet below."
+            fallbackAriaLabel="Operator escalation packet text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this packet into support ticket threads or handoff docs."
           />
           <SupportContextCopyButton
             text={supportSubject}

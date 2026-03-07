@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Added a blocked-access "Copy operator escalation packet" action so operators can copy a single support-ready packet (reference, links, triage summary, checklist, email draft, JSON diagnostics) into ticket threads and handoff docs.
 - Added a blocked-access "Copy support Gmail compose link" action so operators can paste a prefilled Gmail compose URL into chat/docs when browser handoff is needed.
 - Added a blocked-access "Open in Gmail" shortcut so operators can launch a prefilled support draft even when local `mailto:` handlers are unavailable.
 - Added a blocked-access "Copy signed-in user ID" action so operators can quickly paste the authenticated user ID into support forms and ticket fields.
