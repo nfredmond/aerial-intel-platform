@@ -53,6 +53,10 @@ function escapeTsvCell(value: string) {
   return escaped;
 }
 
+function escapeMarkdownTableCell(value: string) {
+  return value.replaceAll("|", "\\|").replaceAll("\n", "<br />");
+}
+
 export function BlockedAccessView({ access }: BlockedAccessViewProps) {
   const details = getBlockedAccessDetails({
     hasMembership: access.hasMembership,
@@ -189,6 +193,11 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
     `- organization_slug: ${organizationSlug}`,
     `- organization_name: ${organizationName}`,
     `- blocked_reason: ${observedBlockedReason}`,
+  ].join("\n");
+  const supportDiagnosticsMarkdownTable = [
+    "| support_reference | snapshot_utc | signed_in_account_email | organization_slug | organization_name | blocked_reason |",
+    "| --- | --- | --- | --- | --- | --- |",
+    `| ${escapeMarkdownTableCell(supportContext.reference)} | ${escapeMarkdownTableCell(supportSnapshotTimestampUtc)} | ${escapeMarkdownTableCell(signedInAccountEmail)} | ${escapeMarkdownTableCell(organizationSlug)} | ${escapeMarkdownTableCell(organizationName)} | ${escapeMarkdownTableCell(observedBlockedReason)} |`,
   ].join("\n");
   const supportTicketBody = [
     supportTicketHeaderLine,
@@ -421,6 +430,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support diagnostics markdown block below."
             fallbackAriaLabel="Support diagnostics markdown block text"
             fallbackHintMessage="Press Ctrl/Cmd+C, then paste this markdown block into docs, tickets, or chat."
+          />
+          <SupportContextCopyButton
+            text={supportDiagnosticsMarkdownTable}
+            buttonLabel="Copy support diagnostics markdown table"
+            successMessage="Support diagnostics markdown table copied. Paste it into markdown-friendly tickets, docs, or chat threads."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support diagnostics markdown table below."
+            fallbackAriaLabel="Support diagnostics markdown table text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this markdown table into tickets, docs, or chat."
           />
           <SupportContextCopyButton
             text={observedBlockedReason}
