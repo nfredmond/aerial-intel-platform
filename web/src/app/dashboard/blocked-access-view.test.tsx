@@ -327,6 +327,41 @@ describe("BlockedAccessView", () => {
     );
   });
 
+  it("adds a one-click action for a support diagnostics TSV block", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<BlockedAccessView access={blockedAccessFixture} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy support diagnostics TSV block" }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(writeText).toHaveBeenCalledTimes(1);
+
+    const copiedText = writeText.mock.calls[0]?.[0] as string;
+    const [header, row] = copiedText.split("\n");
+
+    expect(header).toBe(
+      "support_reference\tsnapshot_utc\tsigned_in_account_email\torganization_slug\torganization_name\tblocked_reason",
+    );
+
+    const columns = row?.split("\t") ?? [];
+
+    expect(columns[0]).toBe("AIR-20260306213312");
+    expect(columns[1]).toBe("2026-03-06T21:33:12.000Z");
+    expect(columns[2]).toBe("pilot@example.com");
+    expect(columns[3]).toBe("skyline-survey");
+    expect(columns[4]).toBe("Skyline Survey");
+    expect(columns[5]).toBe(
+      "Your organization does not currently have an active DroneOps entitlement.",
+    );
+  });
+
   it("adds a one-click action for a support diagnostics key-value block", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
 
