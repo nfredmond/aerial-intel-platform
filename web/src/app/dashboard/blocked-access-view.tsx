@@ -129,6 +129,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
       .map((value) => escapeCsvCell(value))
       .join(","),
   ].join("\n");
+  const supportDiagnosticsKeyValueBlock = [
+    `support_reference: ${supportContext.reference}`,
+    `snapshot_utc: ${supportSnapshotTimestampUtc}`,
+    `signed_in_account_email: ${signedInAccountEmail}`,
+    `organization_slug: ${organizationSlug}`,
+    `organization_name: ${organizationName}`,
+    `blocked_reason: ${observedBlockedReason}`,
+  ].join("\n");
   const operatorHandoffChecklist = [
     `Support reference: ${supportContext.reference}`,
     `Signed-in account: ${signedInAccountEmail}`,
@@ -305,6 +313,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support diagnostics CSV block below."
             fallbackAriaLabel="Support diagnostics CSV block text"
             fallbackHintMessage="Press Ctrl/Cmd+C, then paste this CSV block into spreadsheets, docs, or support forms."
+          />
+          <SupportContextCopyButton
+            text={supportDiagnosticsKeyValueBlock}
+            buttonLabel="Copy support diagnostics key-value block"
+            successMessage="Support diagnostics key-value block copied. Paste it into plain-text ticket fields or chat threads."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support diagnostics key-value block below."
+            fallbackAriaLabel="Support diagnostics key-value block text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this key-value block into docs, chat, or support forms."
           />
           <SupportContextCopyButton
             text={observedBlockedReason}

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Added a blocked-access "Copy support diagnostics key-value block" action so operators can quickly paste plain-text diagnostics into support chats and ticket fields that do not accept CSV or JSON.
 - Added a blocked-access "Copy support reference + snapshot line" action so operators can quickly paste a compact ref/timestamp traceability line into ticket comments and handoff notes.
 - Added a blocked-access "Copy support follow-up line" action so operators can paste a compact ref/account/org/reason summary into ticket comments and escalation chats.
 - Added a blocked-access "Copy organization name" action so operators can quickly paste the org display name into support forms, ticket notes, and escalation chats.
