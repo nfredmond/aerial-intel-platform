@@ -145,6 +145,20 @@ describe("BlockedAccessView", () => {
     expect(copiedLink).toContain("body=Hello%20support%20team%2C");
   });
 
+  it("adds an Open in Gmail shortcut with a prefilled subject and body", () => {
+    render(<BlockedAccessView access={blockedAccessFixture} />);
+
+    const gmailLink = screen.getByRole("link", { name: "Open in Gmail" });
+    const href = gmailLink.getAttribute("href");
+
+    expect(href).not.toBeNull();
+    expect(href).toContain("https://mail.google.com/mail/?view=cm&fs=1&to=support%40natfordplanning.com");
+    expect(href).toContain("su=DroneOps%20access%20blocked%20(AIR-20260306213312)");
+    expect(href).toContain("body=Hello%20support%20team%2C");
+    expect(gmailLink.getAttribute("target")).toBe("_blank");
+    expect(gmailLink.getAttribute("rel")).toBe("noopener noreferrer");
+  });
+
   it("adds a quick copy action for the generated support reference", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
 

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Added a blocked-access "Open in Gmail" shortcut so operators can launch a prefilled support draft even when local `mailto:` handlers are unavailable.
 - Added a blocked-access "Copy signed-in user ID" action so operators can quickly paste the authenticated user ID into support forms and ticket fields.
 - Added a blocked-access "Copy organization slug" action so operators can quickly paste the org slug into support forms and internal org lookup workflows.
 - Added a blocked-access "Copy blocked-access reason" action so operators can quickly paste the exact observed reason into support forms, ticket comments, and call notes.
