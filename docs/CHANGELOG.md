@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Added a blocked-access "Copy support follow-up line" action so operators can paste a compact ref/account/org/reason summary into ticket comments and escalation chats.
 - Added a blocked-access "Copy organization name" action so operators can quickly paste the org display name into support forms, ticket notes, and escalation chats.
 - Added a blocked-access "Copy operator escalation packet" action so operators can copy a single support-ready packet (reference, links, triage summary, checklist, email draft, JSON diagnostics) into ticket threads and handoff docs.
 - Added a blocked-access "Copy support Gmail compose link" action so operators can paste a prefilled Gmail compose URL into chat/docs when browser handoff is needed.
