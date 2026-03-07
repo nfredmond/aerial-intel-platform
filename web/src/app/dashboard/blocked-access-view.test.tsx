@@ -425,6 +425,25 @@ describe("BlockedAccessView", () => {
     expect(copiedText).toContain('"supportReference": "AIR-20260306213312"');
   });
 
+  it("adds a one-click action for the support ticket title", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<BlockedAccessView access={blockedAccessFixture} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy support ticket title" }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(writeText).toHaveBeenCalledWith(
+      "DroneOps blocked access | pilot@example.com | Skyline Survey (skyline-survey) | AIR-20260306213312",
+    );
+  });
+
   it("adds a one-click action for the prefilled support email subject", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
 
