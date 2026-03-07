@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Added a blocked-access "Copy support escalation line" action so operators can quickly paste a compact ref/snapshot/account/org/reason line into escalation chats and ticket comments.
 - Added a blocked-access "Copy support ticket body" action so operators can paste a support-ready markdown body (header, reference/snapshot, triage summary, diagnostics) into ticket systems and escalation docs.
 - Added a blocked-access "Copy support ticket header line" action so operators can paste a markdown-ready incident heading (reference, account, org) into ticket bodies and escalation docs.
 - Added a blocked-access "Copy support call brief" action so operators can quickly paste a phone-ready opener (reference, account, org, reason, snapshot) into support call notes and live escalations.
