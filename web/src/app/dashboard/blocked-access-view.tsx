@@ -183,6 +183,18 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
     `- organization_name: ${organizationName}`,
     `- blocked_reason: ${observedBlockedReason}`,
   ].join("\n");
+  const supportTicketBody = [
+    supportTicketHeaderLine,
+    "",
+    `Support reference: ${supportContext.reference}`,
+    `Snapshot UTC: ${supportSnapshotTimestampUtc}`,
+    "",
+    "Support triage summary:",
+    supportTriageSummary,
+    "",
+    "Support diagnostics (markdown):",
+    supportDiagnosticsMarkdownBlock,
+  ].join("\n");
   const operatorHandoffChecklist = [
     `Support reference: ${supportContext.reference}`,
     `Signed-in account: ${signedInAccountEmail}`,
@@ -434,6 +446,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support ticket header line below."
             fallbackAriaLabel="Support ticket header line text"
             fallbackHintMessage="Press Ctrl/Cmd+C, then paste this markdown header line into support ticket notes or docs."
+          />
+          <SupportContextCopyButton
+            text={supportTicketBody}
+            buttonLabel="Copy support ticket body"
+            successMessage="Support ticket body copied. Paste it into support ticket bodies or escalation docs."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support ticket body below."
+            fallbackAriaLabel="Support ticket body text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this ticket body into support ticket systems or escalation notes."
           />
           <SupportContextCopyButton
             text={supportSubject}

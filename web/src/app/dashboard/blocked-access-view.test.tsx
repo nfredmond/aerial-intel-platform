@@ -553,6 +553,35 @@ describe("BlockedAccessView", () => {
     );
   });
 
+  it("adds a one-click action for the support ticket body", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<BlockedAccessView access={blockedAccessFixture} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy support ticket body" }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(writeText).toHaveBeenCalledTimes(1);
+
+    const copiedText = writeText.mock.calls[0]?.[0] as string;
+    expect(copiedText).toContain(
+      "### DroneOps blocked access · AIR-20260306213312 · pilot@example.com · Skyline Survey (skyline-survey)",
+    );
+    expect(copiedText).toContain("Support reference: AIR-20260306213312");
+    expect(copiedText).toContain("Snapshot UTC: 2026-03-06T21:33:12.000Z");
+    expect(copiedText).toContain("Support triage summary:");
+    expect(copiedText).toContain("Support diagnostics (markdown):");
+    expect(copiedText).toContain(
+      "- blocked_reason: Your organization does not currently have an active DroneOps entitlement.",
+    );
+  });
+
   it("adds a one-click action for the prefilled support email subject", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
 
