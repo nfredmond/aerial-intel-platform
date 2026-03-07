@@ -207,6 +207,13 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
     organization_name: organizationName,
     blocked_reason: observedBlockedReason,
   });
+  const supportLogSearchQuery = [
+    `support_reference="${supportContext.reference}"`,
+    `user_id="${signedInUserId}"`,
+    `organization_id="${organizationId}"`,
+    `organization_slug="${organizationSlug}"`,
+    `signed_in_account_email="${signedInAccountEmail}"`,
+  ].join(" OR ");
   const supportTicketBody = [
     supportTicketHeaderLine,
     "",
@@ -454,6 +461,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support diagnostics JSON line below."
             fallbackAriaLabel="Support diagnostics JSON line text"
             fallbackHintMessage="Press Ctrl/Cmd+C, then paste this JSON line into logs, docs, or support ticket forms."
+          />
+          <SupportContextCopyButton
+            text={supportLogSearchQuery}
+            buttonLabel="Copy support log search query"
+            successMessage="Support log search query copied. Paste it into log search tools to find the related access event quickly."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support log search query below."
+            fallbackAriaLabel="Support log search query text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this query into log search, SIEM, or ticket diagnostics fields."
           />
           <SupportContextCopyButton
             text={observedBlockedReason}
