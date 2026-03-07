@@ -143,6 +143,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
     `organization_name: ${organizationName}`,
     `blocked_reason: ${observedBlockedReason}`,
   ].join("\n");
+  const supportDiagnosticsMarkdownBlock = [
+    `- support_reference: ${supportContext.reference}`,
+    `- snapshot_utc: ${supportSnapshotTimestampUtc}`,
+    `- signed_in_account_email: ${signedInAccountEmail}`,
+    `- organization_slug: ${organizationSlug}`,
+    `- organization_name: ${organizationName}`,
+    `- blocked_reason: ${observedBlockedReason}`,
+  ].join("\n");
   const operatorHandoffChecklist = [
     `Support reference: ${supportContext.reference}`,
     `Signed-in account: ${signedInAccountEmail}`,
@@ -327,6 +335,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support diagnostics key-value block below."
             fallbackAriaLabel="Support diagnostics key-value block text"
             fallbackHintMessage="Press Ctrl/Cmd+C, then paste this key-value block into docs, chat, or support forms."
+          />
+          <SupportContextCopyButton
+            text={supportDiagnosticsMarkdownBlock}
+            buttonLabel="Copy support diagnostics markdown block"
+            successMessage="Support diagnostics markdown block copied. Paste it into markdown-ready docs, tickets, or chat threads."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support diagnostics markdown block below."
+            fallbackAriaLabel="Support diagnostics markdown block text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this markdown block into docs, tickets, or chat."
           />
           <SupportContextCopyButton
             text={observedBlockedReason}
