@@ -96,6 +96,12 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
     `Organization: ${access.org?.name ?? "Unknown"} (${access.org?.slug ?? "Unknown"})`,
     `Observed reason: ${observedBlockedReason}`,
   ].join("\n");
+  const supportFollowUpLine = [
+    `Ref ${supportContext.reference}`,
+    `Acct ${signedInAccountEmail}`,
+    `Org ${organizationName} (${organizationSlug})`,
+    `Reason ${observedBlockedReason}`,
+  ].join(" | ");
   const operatorHandoffChecklist = [
     `Support reference: ${supportContext.reference}`,
     `Signed-in account: ${signedInAccountEmail}`,
@@ -248,6 +254,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support triage summary below."
             fallbackAriaLabel="Support triage summary text"
             fallbackHintMessage="Press Ctrl/Cmd+C, then paste this summary into support channels."
+          />
+          <SupportContextCopyButton
+            text={supportFollowUpLine}
+            buttonLabel="Copy support follow-up line"
+            successMessage="Support follow-up line copied. Paste it into ticket comments or escalation chats."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support follow-up line below."
+            fallbackAriaLabel="Support follow-up line text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this line into support ticket comments or chat."
           />
           <SupportContextCopyButton
             text={observedBlockedReason}
