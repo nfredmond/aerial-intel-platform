@@ -199,6 +199,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
     "| --- | --- | --- | --- | --- | --- |",
     `| ${escapeMarkdownTableCell(supportContext.reference)} | ${escapeMarkdownTableCell(supportSnapshotTimestampUtc)} | ${escapeMarkdownTableCell(signedInAccountEmail)} | ${escapeMarkdownTableCell(organizationSlug)} | ${escapeMarkdownTableCell(organizationName)} | ${escapeMarkdownTableCell(observedBlockedReason)} |`,
   ].join("\n");
+  const supportDiagnosticsJsonLine = JSON.stringify({
+    support_reference: supportContext.reference,
+    snapshot_utc: supportSnapshotTimestampUtc,
+    signed_in_account_email: signedInAccountEmail,
+    organization_slug: organizationSlug,
+    organization_name: organizationName,
+    blocked_reason: observedBlockedReason,
+  });
   const supportTicketBody = [
     supportTicketHeaderLine,
     "",
@@ -438,6 +446,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support diagnostics markdown table below."
             fallbackAriaLabel="Support diagnostics markdown table text"
             fallbackHintMessage="Press Ctrl/Cmd+C, then paste this markdown table into tickets, docs, or chat."
+          />
+          <SupportContextCopyButton
+            text={supportDiagnosticsJsonLine}
+            buttonLabel="Copy support diagnostics JSON line"
+            successMessage="Support diagnostics JSON line copied. Paste it into log-friendly ticket fields or chat threads."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support diagnostics JSON line below."
+            fallbackAriaLabel="Support diagnostics JSON line text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this JSON line into logs, docs, or support ticket forms."
           />
           <SupportContextCopyButton
             text={observedBlockedReason}

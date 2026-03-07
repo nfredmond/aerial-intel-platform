@@ -492,6 +492,42 @@ describe("BlockedAccessView", () => {
     );
   });
 
+  it("adds a one-click action for a support diagnostics JSON line", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<BlockedAccessView access={blockedAccessFixture} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy support diagnostics JSON line" }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(writeText).toHaveBeenCalledTimes(1);
+
+    const copiedText = writeText.mock.calls[0]?.[0] as string;
+    const payload = JSON.parse(copiedText) as {
+      support_reference: string;
+      snapshot_utc: string;
+      signed_in_account_email: string;
+      organization_slug: string;
+      organization_name: string;
+      blocked_reason: string;
+    };
+
+    expect(payload.support_reference).toBe("AIR-20260306213312");
+    expect(payload.snapshot_utc).toBe("2026-03-06T21:33:12.000Z");
+    expect(payload.signed_in_account_email).toBe("pilot@example.com");
+    expect(payload.organization_slug).toBe("skyline-survey");
+    expect(payload.organization_name).toBe("Skyline Survey");
+    expect(payload.blocked_reason).toBe(
+      "Your organization does not currently have an active DroneOps entitlement.",
+    );
+  });
+
   it("adds a one-click action for just the blocked-access reason", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
 
