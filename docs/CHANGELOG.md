@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Added a blocked-access "Copy support diagnostics TSV block" action so operators can quickly paste tab-delimited diagnostics into spreadsheet columns and tab-friendly ticket fields.
 - Added a blocked-access "Copy support diagnostics markdown block" action so operators can quickly paste markdown-ready diagnostics into ticket comments, docs, and chat threads.
 - Added a blocked-access "Copy support ticket title" action so operators can quickly paste a support-ready case title (account, org, and reference) into ticket systems and escalation threads.
 - Added a blocked-access "Copy support diagnostics key-value block" action so operators can quickly paste plain-text diagnostics into support chats and ticket fields that do not accept CSV or JSON.

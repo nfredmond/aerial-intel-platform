@@ -43,6 +43,16 @@ function escapeCsvCell(value: string) {
   return escaped;
 }
 
+function escapeTsvCell(value: string) {
+  const escaped = value.replaceAll('"', '""');
+
+  if (/["\t\n]/.test(escaped)) {
+    return `"${escaped}"`;
+  }
+
+  return escaped;
+}
+
 export function BlockedAccessView({ access }: BlockedAccessViewProps) {
   const details = getBlockedAccessDetails({
     hasMembership: access.hasMembership,
@@ -134,6 +144,19 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
     ]
       .map((value) => escapeCsvCell(value))
       .join(","),
+  ].join("\n");
+  const supportDiagnosticsTsvBlock = [
+    "support_reference\tsnapshot_utc\tsigned_in_account_email\torganization_slug\torganization_name\tblocked_reason",
+    [
+      supportContext.reference,
+      supportSnapshotTimestampUtc,
+      signedInAccountEmail,
+      organizationSlug,
+      organizationName,
+      observedBlockedReason,
+    ]
+      .map((value) => escapeTsvCell(value))
+      .join("\t"),
   ].join("\n");
   const supportDiagnosticsKeyValueBlock = [
     `support_reference: ${supportContext.reference}`,
@@ -327,6 +350,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support diagnostics CSV block below."
             fallbackAriaLabel="Support diagnostics CSV block text"
             fallbackHintMessage="Press Ctrl/Cmd+C, then paste this CSV block into spreadsheets, docs, or support forms."
+          />
+          <SupportContextCopyButton
+            text={supportDiagnosticsTsvBlock}
+            buttonLabel="Copy support diagnostics TSV block"
+            successMessage="Support diagnostics TSV block copied. Paste it into spreadsheet columns or tab-friendly ticket fields."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support diagnostics TSV block below."
+            fallbackAriaLabel="Support diagnostics TSV block text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this TSV block into spreadsheets, docs, or support forms."
           />
           <SupportContextCopyButton
             text={supportDiagnosticsKeyValueBlock}
