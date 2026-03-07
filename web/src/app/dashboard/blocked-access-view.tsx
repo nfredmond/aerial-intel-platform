@@ -190,6 +190,14 @@ export function BlockedAccessView({ access }: BlockedAccessViewProps) {
             fallbackHintMessage="Press Ctrl/Cmd+C, then paste this link into chat, docs, or your browser."
           />
           <SupportContextCopyButton
+            text={supportGmailHref}
+            buttonLabel="Copy support Gmail compose link"
+            successMessage="Support Gmail compose link copied. Paste it where webmail compose URLs are accepted."
+            fallbackStatusMessage="Couldn’t access your clipboard. Use the ready-to-copy support Gmail compose link below."
+            fallbackAriaLabel="Support Gmail compose link text"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this link into chat, docs, or your browser."
+          />
+          <SupportContextCopyButton
             text={supportContext.reference}
             buttonLabel="Copy support reference"
             successMessage="Support reference copied. Share it with support."

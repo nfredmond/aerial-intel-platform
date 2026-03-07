@@ -145,6 +145,28 @@ describe("BlockedAccessView", () => {
     expect(copiedLink).toContain("body=Hello%20support%20team%2C");
   });
 
+  it("adds a one-click action for copying the prefilled support Gmail compose link", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<BlockedAccessView access={blockedAccessFixture} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy support Gmail compose link" }));
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(writeText).toHaveBeenCalledTimes(1);
+
+    const copiedLink = writeText.mock.calls[0]?.[0] as string;
+    expect(copiedLink).toContain("https://mail.google.com/mail/?view=cm&fs=1&to=support%40natfordplanning.com");
+    expect(copiedLink).toContain("su=DroneOps%20access%20blocked%20(AIR-20260306213312)");
+    expect(copiedLink).toContain("body=Hello%20support%20team%2C");
+  });
+
   it("adds an Open in Gmail shortcut with a prefilled subject and body", () => {
     render(<BlockedAccessView access={blockedAccessFixture} />);
 
