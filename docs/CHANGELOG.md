@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Added an entitlement-protected `/missions` workspace route so DroneOps now has a real mission pipeline surface beyond the auth dashboard.
+- Added a GIS/drone mission workspace snapshot model with AOI, capture, processing, CRS, and deliverable readiness metadata for the first workflow slice.
+- Added mission workspace unit coverage for summary totals and stage/output label formatting.
 - Added a blocked-access "Copy support diagnostics markdown table" action so operators can paste a markdown-ready diagnostics table into ticket systems, docs, and chat threads that render tabular markdown.
 - Added a blocked-access "Copy support escalation line" action so operators can quickly paste a compact ref/snapshot/account/org/reason line into escalation chats and ticket comments.
 - Added a blocked-access "Copy support ticket body" action so operators can paste a support-ready markdown body (header, reference/snapshot, triage summary, diagnostics) into ticket systems and escalation docs.

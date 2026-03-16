@@ -228,6 +228,16 @@ main {
   color: #166534;
 }
 
+.status-pill--info {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.status-pill--warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 .callout {
   border-radius: 0.75rem;
   border: 1px solid;
@@ -313,6 +323,66 @@ main {
   color: #475569;
 }
 
+.stats-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.stat-card {
+  min-height: 100%;
+}
+
+.stat-value {
+  font-size: clamp(1.5rem, 2vw, 2rem);
+  line-height: 1.1;
+}
+
+.mission-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.mission-card {
+  min-height: 100%;
+}
+
+.mission-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.mission-meta-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.mission-meta-grid__wide {
+  grid-column: 1 / -1;
+}
+
+.output-pill-grid {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.output-pill-card {
+  border: 1px solid #dbe3f4;
+  border-radius: 0.85rem;
+  background: #f8fafc;
+  padding: 0.8rem 0.85rem;
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.mission-blocker-list {
+  color: #334155;
+}
+
 @media (min-width: 900px) {
   .auth-layout {
     grid-template-columns: minmax(0, 1fr) minmax(0, 470px);
@@ -325,6 +395,22 @@ main {
   }
 
   .grid-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .mission-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mission-meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .output-pill-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

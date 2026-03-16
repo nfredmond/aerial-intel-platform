@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import type { DroneOpsAccessResult } from "@/lib/auth/drone-ops-access";
 import {
   formatEntitlementTier,
@@ -42,11 +44,16 @@ export function DashboardOverview({ access }: DashboardOverviewProps) {
           <h1>Mission dashboard</h1>
           <p className="muted">
             Your account is authenticated and has an active DroneOps entitlement.
+            Use the mission workspace to review field captures, processing readiness,
+            and output status.
           </p>
         </div>
 
         <div className="header-actions">
           <span className="status-pill status-pill--success">Access active</span>
+          <Link href="/missions" className="button button-secondary">
+            Open mission workspace
+          </Link>
           <SignOutForm label="Sign out" variant="secondary" />
         </div>
       </section>
