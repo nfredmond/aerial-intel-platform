@@ -112,6 +112,21 @@ NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
 ```
 
+## Import a real ODM benchmark run
+
+After you have a `benchmark/<timestamp>/summary.json`, you can import it into the aerial-ops data model and surface it in the app:
+
+```bash
+SUPABASE_URL=https://<project-ref>.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
+node scripts/import_odm_benchmark_run.mjs \
+  --org-slug acme-drone-co \
+  --mission-id <mission-uuid> \
+  --summary benchmark/<timestamp>/summary.json
+```
+
+This creates a completed benchmark-backed processing job, links/creates a dataset when needed, inserts output records for detected deliverables, and records benchmark QA events so `/jobs/[jobId]` and `/artifacts/[artifactId]` can show evidence-backed readiness.
+
 ## Buyer provisioning script
 
 Use this script to create/find a buyer auth user, create/find org, and upsert membership + active entitlement:

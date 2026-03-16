@@ -5,6 +5,10 @@ import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-button";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
+import {
+  getBenchmarkOutputForArtifact,
+  getBenchmarkSummaryView,
+} from "@/lib/benchmark-summary";
 import { getArtifactDetail, getString } from "@/lib/missions/detail-data";
 
 function formatDateTime(value: string | null) {
@@ -55,6 +59,8 @@ export default async function ArtifactDetailPage({
 
   const artifactName = getString(detail.metadata.name, detail.output.kind.replaceAll("_", " "));
   const storagePath = detail.output.storage_path ?? "Storage path pending";
+  const benchmarkSummary = getBenchmarkSummaryView(detail.outputSummary.benchmarkSummary ?? detail.outputSummary);
+  const benchmarkOutput = getBenchmarkOutputForArtifact(benchmarkSummary, detail.output.kind);
   const exportPacket = [
     `Artifact: ${artifactName}`,
     `Kind: ${detail.output.kind}`,
@@ -212,6 +218,83 @@ export default async function ArtifactDetailPage({
           <p className="muted">{getString(detail.outputSummary.notes, "No job notes recorded yet.")}</p>
         </article>
       </section>
+
+      {benchmarkSummary ? (
+        <section className="surface stack-sm">
+          <div className="stack-xs">
+            <p className="eyebrow">Benchmark linkage</p>
+            <h2>Evidence from imported ODM benchmark</h2>
+            <p className="muted">
+              This artifact is linked to benchmark evidence when available, so reviewers can see whether the source run actually emitted a real file and what QA posture it had.
+            </p>
+          </div>
+
+          <div className="grid-cards">
+            <article className="surface-form-shell stack-sm">
+              <dl className="mission-meta-grid">
+                <div className="kv-row">
+                  <dt>Benchmark project</dt>
+                  <dd>{benchmarkSummary.projectName}</dd>
+                </div>
+                <div className="kv-row">
+                  <dt>Run status</dt>
+                  <dd>
+                    <span className={statusClass(benchmarkSummary.status)}>{benchmarkSummary.status}</span>
+                  </dd>
+                </div>
+                <div className="kv-row">
+                  <dt>QA gate</dt>
+                  <dd>
+                    <span className={benchmarkSummary.minimumPass ? "status-pill status-pill--success" : "status-pill status-pill--warning"}>
+                      {benchmarkSummary.minimumPass ? "Minimum pass" : "Needs review"}
+                    </span>
+                  </dd>
+                </div>
+                <div className="kv-row">
+                  <dt>Duration</dt>
+                  <dd>{benchmarkSummary.durationSeconds} sec</dd>
+                </div>
+                <div className="kv-row mission-meta-grid__wide">
+                  <dt>Run log</dt>
+                  <dd>{benchmarkSummary.runLog}</dd>
+                </div>
+              </dl>
+            </article>
+
+            <article className="surface-form-shell stack-sm">
+              <div className="stack-xs">
+                <h3>Artifact-specific benchmark output</h3>
+              </div>
+              {benchmarkOutput ? (
+                <dl className="kv-grid">
+                  <div className="kv-row">
+                    <dt>Mapped output</dt>
+                    <dd>{benchmarkOutput.key.replaceAll("_", " ")}</dd>
+                  </div>
+                  <div className="kv-row">
+                    <dt>Exists</dt>
+                    <dd>{benchmarkOutput.exists ? "Yes" : "No"}</dd>
+                  </div>
+                  <div className="kv-row">
+                    <dt>Non-zero size</dt>
+                    <dd>{benchmarkOutput.nonZeroSize ? "Yes" : "No"}</dd>
+                  </div>
+                  <div className="kv-row">
+                    <dt>Size</dt>
+                    <dd>{benchmarkOutput.sizeBytes} bytes</dd>
+                  </div>
+                  <div className="kv-row">
+                    <dt>Benchmark path</dt>
+                    <dd>{benchmarkOutput.path}</dd>
+                  </div>
+                </dl>
+              ) : (
+                <p className="muted">This artifact kind does not map directly to a benchmark output file.</p>
+              )}
+            </article>
+          </div>
+        </section>
+      ) : null}
 
       <section className="surface stack-sm">
         <div className="stack-xs">

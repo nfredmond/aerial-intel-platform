@@ -14,6 +14,8 @@
 - Added a protected artifact detail route (`/artifacts/[artifactId]`) so output records now have a first-class review/share/export surface instead of being stranded as summary-only cards.
 - Expanded the authenticated write path so operators can draft a mission from the workspace, attach a dataset from mission detail, queue a processing job, and automatically seed placeholder output records for review/export flow development.
 - Added copy-ready share summary and export packet actions on artifact detail so the first review/share/export loop is usable even before signed URLs and client portal delivery are wired.
+- Added benchmark-summary parsing plus a new `scripts/import_odm_benchmark_run.mjs` import path so real ODM benchmark evidence can be written into jobs, outputs, and events instead of relying only on placeholder artifact state.
+- Surfaced benchmark QA posture and benchmark-file evidence on job and artifact detail pages so reviewers can see actual run status, required-output gaps, file sizes, and run-log references.
 - Added the first authenticated write path: queueing a processing job from the mission detail page now writes a real `drone_processing_jobs` row plus a `drone_processing_job_events` audit entry through a server-side action.
 - Added an entitlement-protected `/missions` workspace route so DroneOps now has a real mission pipeline surface beyond the auth dashboard.
 - Added a GIS/drone mission workspace snapshot model with AOI, capture, processing, CRS, and deliverable readiness metadata for the first workflow slice.
