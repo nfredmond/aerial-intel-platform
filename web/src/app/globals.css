@@ -228,6 +228,16 @@ main {
   color: #166534;
 }
 
+.status-pill--info {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.status-pill--warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 .callout {
   border-radius: 0.75rem;
   border: 1px solid;
@@ -313,6 +323,215 @@ main {
   color: #475569;
 }
 
+.stats-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.stat-card {
+  min-height: 100%;
+}
+
+.stat-value {
+  font-size: clamp(1.5rem, 2vw, 2rem);
+  line-height: 1.1;
+}
+
+.mission-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.mission-card {
+  min-height: 100%;
+}
+
+.mission-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.mission-meta-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.mission-meta-grid__wide {
+  grid-column: 1 / -1;
+}
+
+.output-pill-grid {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.output-pill-card {
+  border: 1px solid #dbe3f4;
+  border-radius: 0.85rem;
+  background: #f8fafc;
+  padding: 0.8rem 0.85rem;
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.mission-blocker-list {
+  color: #334155;
+}
+
+.ops-workspace-shell {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 2rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.ops-topbar {
+  display: grid;
+  gap: 1rem;
+  background:
+    linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.96)),
+    rgba(15, 23, 42, 0.96);
+  color: #f8fafc;
+  border-color: rgba(129, 140, 248, 0.18);
+}
+
+.ops-topbar .eyebrow,
+.ops-topbar .muted {
+  color: #cbd5f5;
+}
+
+.ops-topbar h1 {
+  color: #f8fafc;
+}
+
+.ops-topbar-actions {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.ops-command-search {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.ops-command-search input {
+  min-width: min(100%, 320px);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.ops-status-strip {
+  display: grid;
+  gap: 1rem;
+}
+
+.status-chip-card {
+  min-height: 100%;
+}
+
+.ops-main-grid,
+.ops-console-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.ops-rail {
+  align-content: start;
+}
+
+.ops-rail-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.ops-rail-item {
+  border: 1px solid #dbe3f4;
+  border-radius: 0.85rem;
+  background: #f8fafc;
+  padding: 0.7rem 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.ops-rail-item--active {
+  border-color: #93c5fd;
+  background: linear-gradient(135deg, rgba(219, 234, 254, 0.95), rgba(224, 231, 255, 0.95));
+}
+
+.ops-center-column {
+  min-width: 0;
+}
+
+.ops-project-meta {
+  gap: 0.8rem;
+}
+
+.mission-grid--single-column {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.ops-mission-card,
+.ops-list-card,
+.ops-job-card,
+.ops-event-card {
+  border: 1px solid #dbe3f4;
+  border-radius: 0.95rem;
+  background: #f8fafc;
+  padding: 0.95rem;
+}
+
+.ops-mission-header-pills {
+  justify-items: end;
+}
+
+.ops-two-column-list-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.ops-inspector {
+  align-content: start;
+}
+
+.ops-list-card-header,
+.ops-progress-row,
+.ops-job-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.ops-progress-track {
+  position: relative;
+  flex: 1;
+  min-height: 0.7rem;
+  border-radius: 999px;
+  background: #dbeafe;
+  overflow: hidden;
+}
+
+.ops-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+}
+
+.detail-grid {
+  display: grid;
+  gap: 1rem;
+}
+
 @media (min-width: 900px) {
   .auth-layout {
     grid-template-columns: minmax(0, 1fr) minmax(0, 470px);
@@ -326,5 +545,48 @@ main {
 
   .grid-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .mission-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mission-meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .output-pill-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ops-topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+  }
+
+  .ops-status-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .ops-main-grid {
+    grid-template-columns: 280px minmax(0, 1.6fr) 340px;
+    align-items: start;
+  }
+
+  .ops-console-grid {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  }
+
+  .ops-two-column-list-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .detail-grid {
+    grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr);
+    align-items: start;
   }
 }

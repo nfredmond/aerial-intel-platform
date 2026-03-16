@@ -25,6 +25,9 @@ This follows `project_launch_workflow_natford.md`.
 - ✅ Slack project lanes created/mapped:
   - `#aerial-intel-platform-build`
   - `#aerial-intel-platform-ops`
+- ✅ Dedicated Supabase backend created for `aerial-intel-platform`.
+- ✅ Drone auth + aerial-ops schema applied to the new Supabase project via MCP.
+- ✅ First query-backed test workspace seeded (org, membership, entitlement, project, site, mission, dataset, job, outputs, events).
 
 ## 2) Blocked / Pending
 - ✅ Fork-vs-compose legal architecture decision drafted in ADR (requires review/approval).
@@ -38,5 +41,5 @@ This follows `project_launch_workflow_natford.md`.
 4. Review/approve ADR-001 language and lock compliance notes.
 
 ## 4) Readiness Snapshot
-- **Setup completeness:** 90%
-- **Operational readiness:** strong foundation complete; waiting on first benchmark evidence + live showcase implementation
+- **Setup completeness:** 95%
+- **Operational readiness:** backend/auth/schema foundation is now live; waiting on first benchmark evidence, real output-review flows, and live showcase implementation

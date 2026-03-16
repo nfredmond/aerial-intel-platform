@@ -1,6 +1,20 @@
 # Changelog
 
 ## Unreleased
+- Reframed the web app around an `Aerial Operations OS` mission-control shell so the product direction now visibly covers planning, ingest, processing, and delivery instead of stopping at auth.
+- Rebuilt the `/missions` route into a richer operations workspace with a top command bar, left workspace rail, center mission lanes, right contextual inspector, and bottom job/activity console.
+- Expanded the mission workspace snapshot model to include project context, operational status chips, datasets, jobs, output artifacts, and event history representing the next product slices.
+- Added an execution-plan document (`docs/AERIAL_OPERATIONS_OS_EXECUTION_PLAN_2026-03-15.md`) that adapts the new master plan into the current repo, preserving prior good work while setting the next implementation order.
+- Upgraded `docs/ROADMAP.md` and `docs/ARCHITECTURE.md` to reflect the broader aerial operations platform roadmap and the required separation between app, data, compute, raster delivery, and field-companion planes.
+- Added a query-backed `/missions` data loader that reads real aerial-ops records from Supabase when the new tables are present and gracefully falls back to the built-in demo workspace otherwise.
+- Added a seed script (`scripts/seed_aerial_ops_workspace.mjs`) plus a job-event table model so one org can be populated with project/site/mission/dataset/job/output/event records for immediate workspace verification.
+- Created the dedicated Supabase project for `aerial-intel-platform`, applied the auth + aerial-ops schema migrations through Supabase MCP, and seeded the first real query-backed workspace path for the protected `/missions` route.
+- Hardened the trigger helper functions by pinning `search_path` after Supabase advisor feedback.
+- Added mission detail (`/missions/[missionId]`) and job detail (`/jobs/[jobId]`) routes so the seeded workspace can be explored through real database-backed entity pages instead of only the summary workspace shell.
+- Added the first authenticated write path: queueing a processing job from the mission detail page now writes a real `drone_processing_jobs` row plus a `drone_processing_job_events` audit entry through a server-side action.
+- Added an entitlement-protected `/missions` workspace route so DroneOps now has a real mission pipeline surface beyond the auth dashboard.
+- Added a GIS/drone mission workspace snapshot model with AOI, capture, processing, CRS, and deliverable readiness metadata for the first workflow slice.
+- Added mission workspace unit coverage for summary totals and stage/output label formatting.
 - Added a blocked-access "Copy support diagnostics markdown table" action so operators can paste a markdown-ready diagnostics table into ticket systems, docs, and chat threads that render tabular markdown.
 - Added a blocked-access "Copy support escalation line" action so operators can quickly paste a compact ref/snapshot/account/org/reason line into escalation chats and ticket comments.
 - Added a blocked-access "Copy support ticket body" action so operators can paste a support-ready markdown body (header, reference/snapshot, triage summary, diagnostics) into ticket systems and escalation docs.
