@@ -342,7 +342,7 @@ export default async function MissionDetailPage({
                     <span className="muted">{job.engine} · {job.stage}</span>
                   </div>
                   <span className={getJobPillClassName(job.status === "succeeded" ? "completed" : job.status)}>
-                    {formatJobStatus(job.status === "succeeded" ? "completed" : job.status === "queued" ? "queued" : job.status === "running" ? "running" : "needs-review")}
+                    {formatJobStatus(job.status === "succeeded" ? "completed" : job.status === "queued" ? "queued" : job.status === "running" ? "running" : "needs_review")}
                   </span>
                 </div>
                 <div className="ops-progress-row">

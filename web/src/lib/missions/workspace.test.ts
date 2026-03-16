@@ -52,7 +52,7 @@ describe("missions/workspace", () => {
     expect(formatMissionOutputStatus("processing")).toBe("Processing");
     expect(formatMissionOutputStatus("missing")).toBe("Missing");
     expect(formatDatasetStatus("flagged")).toBe("Flagged");
-    expect(formatJobStatus("needs-review")).toBe("Needs review");
+    expect(formatJobStatus("needs_review")).toBe("Needs review");
     expect(formatOutputArtifactStatus("draft")).toBe("Draft");
   });
 });

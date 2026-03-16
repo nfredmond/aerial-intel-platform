@@ -90,7 +90,7 @@ function mapJobStatus(status: JobRow["status"]): JobRecord["status"] {
     return "completed";
   }
 
-  return "needs-review";
+  return "needs_review";
 }
 
 function mapOutputStatus(status: OutputRow["status"]): OutputArtifactRecord["status"] {

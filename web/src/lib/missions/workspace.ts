@@ -67,7 +67,7 @@ export type JobRecord = {
   name: string;
   engine: string;
   stage: string;
-  status: "running" | "queued" | "needs-review" | "completed";
+  status: "running" | "queued" | "needs_review" | "completed";
   progress: number;
   eta: string;
   queuePosition: string;
@@ -274,7 +274,7 @@ const DEMO_JOBS: JobRecord[] = [
     name: "Colgate baseline processing",
     engine: "ODM / future ClusterODM lane",
     stage: "Preflight review",
-    status: "needs-review",
+    status: "needs_review",
     progress: 24,
     eta: "Needs operator decision",
     queuePosition: "Priority review",
@@ -549,7 +549,7 @@ export function formatJobStatus(status: JobRecord["status"]) {
       return "Running";
     case "queued":
       return "Queued";
-    case "needs-review":
+    case "needs_review":
       return "Needs review";
     case "completed":
       return "Completed";
