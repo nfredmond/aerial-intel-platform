@@ -72,6 +72,7 @@ Current Next.js app features:
 - `/dashboard` protected route for account and entitlement context
 - `/missions` protected Aerial Operations OS workspace shell
 - role + entitlement gate (`drone_memberships` + active `drone_entitlements` where `product_id='drone-ops'`)
+- query-backed mission workspace loading from Supabase aerial-ops tables when present, with automatic fallback to the built-in demo workspace when the new migration is empty or not applied yet
 - mission-control layout with a command bar, workspace rail, mission lanes, contextual inspector, and job/activity console
 - blocked state with support contact + prefilled support diagnostics (user ID, organization ID/slug/name, role, membership, entitlement), a generated support reference + UTC snapshot timestamp, support email subjects prefilled with that reference, an "Open in Gmail" quick action, one-click copy actions for the signed-in user ID, signed-in account email, organization ID, organization slug, organization name, support email address, support email link, support Gmail compose link, support reference, support snapshot timestamp, support triage summary, support follow-up line, support escalation line, support call brief, support reference + snapshot line, support diagnostics CSV block, support diagnostics TSV block, support diagnostics key-value block, support diagnostics markdown block, support diagnostics markdown table, support diagnostics JSON line, support log search query, blocked-access reason, operator handoff checklist, operator escalation packet, support ticket title, support ticket header line, support ticket body, support email subject, support email body, support context, support context JSON, and full support email draft text, and ready-to-copy manual fallback text boxes when clipboard access is unavailable
 
@@ -128,3 +129,16 @@ Notes:
 - `--role` defaults to `owner`
 - `--tier` defaults to `starter`
 - If the user already exists, the script reuses that account and leaves password unchanged
+
+## Workspace seed script
+
+To seed a query-backed aerial operations workspace for an existing org:
+
+```bash
+SUPABASE_URL=https://<project-ref>.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
+node scripts/seed_aerial_ops_workspace.mjs \
+  --org-slug acme-drone-co
+```
+
+This creates a starter project/site/mission/dataset/job/output/event set so the `/missions` route can render from real Supabase data instead of the fallback demo snapshot.

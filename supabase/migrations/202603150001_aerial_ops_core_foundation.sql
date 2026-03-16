@@ -105,7 +105,8 @@ create table if not exists public.drone_processing_jobs (
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now()),
   started_at timestamptz,
-  completed_at timestamptz
+  completed_at timestamptz,
+  unique (org_id, external_job_reference)
 );
 
 create table if not exists public.drone_processing_outputs (
