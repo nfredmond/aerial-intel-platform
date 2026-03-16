@@ -8,6 +8,10 @@
 - Upgraded `docs/ROADMAP.md` and `docs/ARCHITECTURE.md` to reflect the broader aerial operations platform roadmap and the required separation between app, data, compute, raster delivery, and field-companion planes.
 - Added a query-backed `/missions` data loader that reads real aerial-ops records from Supabase when the new tables are present and gracefully falls back to the built-in demo workspace otherwise.
 - Added a seed script (`scripts/seed_aerial_ops_workspace.mjs`) plus a job-event table model so one org can be populated with project/site/mission/dataset/job/output/event records for immediate workspace verification.
+- Created the dedicated Supabase project for `aerial-intel-platform`, applied the auth + aerial-ops schema migrations through Supabase MCP, and seeded the first real query-backed workspace path for the protected `/missions` route.
+- Hardened the trigger helper functions by pinning `search_path` after Supabase advisor feedback.
+- Added mission detail (`/missions/[missionId]`) and job detail (`/jobs/[jobId]`) routes so the seeded workspace can be explored through real database-backed entity pages instead of only the summary workspace shell.
+- Added the first authenticated write path: queueing a processing job from the mission detail page now writes a real `drone_processing_jobs` row plus a `drone_processing_job_events` audit entry through a server-side action.
 - Added an entitlement-protected `/missions` workspace route so DroneOps now has a real mission pipeline surface beyond the auth dashboard.
 - Added a GIS/drone mission workspace snapshot model with AOI, capture, processing, CRS, and deliverable readiness metadata for the first workflow slice.
 - Added mission workspace unit coverage for summary totals and stage/output label formatting.

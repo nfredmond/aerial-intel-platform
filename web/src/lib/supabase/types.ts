@@ -178,6 +178,28 @@ export type Database = {
           started_at: string | null;
           completed_at: string | null;
         };
+        Insert: {
+          id?: string;
+          org_id: string;
+          project_id: string;
+          site_id?: string | null;
+          mission_id?: string | null;
+          dataset_id?: string | null;
+          engine?: string;
+          preset_id?: string | null;
+          status?: "queued" | "running" | "succeeded" | "failed" | "canceled" | "needs_review";
+          stage?: string;
+          progress?: number;
+          queue_position?: number | null;
+          input_summary?: Json;
+          output_summary?: Json;
+          external_job_reference?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          started_at?: string | null;
+          completed_at?: string | null;
+        };
       };
       drone_processing_outputs: {
         Row: {
@@ -213,6 +235,14 @@ export type Database = {
           event_type: string;
           payload: Json;
           created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          job_id: string;
+          event_type: string;
+          payload?: Json;
+          created_at?: string;
         };
       };
     };

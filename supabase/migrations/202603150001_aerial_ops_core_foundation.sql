@@ -134,12 +134,15 @@ create table if not exists public.drone_processing_job_events (
 );
 
 create or replace function public.set_drone_updated_at()
-returns trigger as $$
+returns trigger
+language plpgsql
+set search_path = public
+as $$
 begin
   new.updated_at = timezone('utc', now());
   return new;
 end;
-$$ language plpgsql;
+$$;
 
 drop trigger if exists trg_drone_projects_updated_at on public.drone_projects;
 create trigger trg_drone_projects_updated_at

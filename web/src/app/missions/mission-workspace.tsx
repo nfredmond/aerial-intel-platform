@@ -342,6 +342,12 @@ export function MissionWorkspace({ snapshot, source }: MissionWorkspaceProps) {
                         </ul>
                       </div>
                     </div>
+
+                    <div className="header-actions">
+                      <Link href={`/missions/${mission.id}`} className="button button-secondary">
+                        Open mission detail
+                      </Link>
+                    </div>
                   </article>
                 ))}
               </div>
@@ -486,6 +492,11 @@ export function MissionWorkspace({ snapshot, source }: MissionWorkspaceProps) {
                   <span>ETA: {job.eta}</span>
                 </div>
                 <p className="muted">{job.notes}</p>
+                <div className="header-actions">
+                  <Link href={`/jobs/${job.id}`} className="button button-secondary">
+                    View job
+                  </Link>
+                </div>
               </article>
             ))}
           </div>
