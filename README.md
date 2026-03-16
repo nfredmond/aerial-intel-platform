@@ -130,15 +130,14 @@ Notes:
 - `--tier` defaults to `starter`
 - If the user already exists, the script reuses that account and leaves password unchanged
 
-## Workspace seed script
+## Seed a query-backed workspace
 
-To seed a query-backed aerial operations workspace for an existing org:
+After applying migrations and provisioning an org, you can seed one org with a real project/site/mission/dataset/job/output/event set:
 
 ```bash
 SUPABASE_URL=https://<project-ref>.supabase.co \
 SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
-node scripts/seed_aerial_ops_workspace.mjs \
-  --org-slug acme-drone-co
+node scripts/seed_aerial_ops_workspace.mjs --org-slug acme-drone-co
 ```
 
 This creates a starter project/site/mission/dataset/job/output/event set so the `/missions` route can render from real Supabase data instead of the fallback demo snapshot.
