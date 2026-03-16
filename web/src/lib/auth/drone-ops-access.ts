@@ -1,4 +1,4 @@
-import type { User } from "@supabase/supabase-js";
+import { isAuthSessionMissingError, type User } from "@supabase/supabase-js";
 
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database, DroneMembershipRole } from "@/lib/supabase/types";
@@ -18,6 +18,19 @@ export type DroneOpsAccessResult = {
   blockedReason: string | null;
 };
 
+function buildSignedOutAccess(): DroneOpsAccessResult {
+  return {
+    user: null,
+    isAuthenticated: false,
+    hasMembership: false,
+    hasActiveEntitlement: false,
+    role: null,
+    org: null,
+    entitlement: null,
+    blockedReason: "You must sign in to access DroneOps.",
+  };
+}
+
 export async function getDroneOpsAccess(): Promise<DroneOpsAccessResult> {
   const supabase = await createServerSupabaseClient();
 
@@ -27,20 +40,15 @@ export async function getDroneOpsAccess(): Promise<DroneOpsAccessResult> {
   } = await supabase.auth.getUser();
 
   if (userError) {
+    if (isAuthSessionMissingError(userError)) {
+      return buildSignedOutAccess();
+    }
+
     throw userError;
   }
 
   if (!user) {
-    return {
-      user: null,
-      isAuthenticated: false,
-      hasMembership: false,
-      hasActiveEntitlement: false,
-      role: null,
-      org: null,
-      entitlement: null,
-      blockedReason: "You must sign in to access DroneOps.",
-    };
+    return buildSignedOutAccess();
   }
 
   const { data: memberships, error: membershipError } = await supabase
