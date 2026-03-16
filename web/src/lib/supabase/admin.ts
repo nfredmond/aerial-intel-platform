@@ -40,6 +40,45 @@ async function adminRestRequest<T>(path: string, options: RequestInit = {}) {
   return payload as T;
 }
 
+export type MissionInsert = {
+  org_id: string;
+  project_id: string;
+  site_id: string;
+  name: string;
+  slug: string;
+  mission_type: string;
+  status?: string;
+  objective?: string | null;
+  summary?: Json;
+  created_by?: string | null;
+};
+
+export type MissionVersionInsert = {
+  org_id: string;
+  mission_id: string;
+  version_number: number;
+  source_format?: string;
+  status?: string;
+  plan_payload?: Json;
+  validation_summary?: Json;
+  export_summary?: Json;
+  created_by?: string | null;
+};
+
+export type DatasetInsert = {
+  org_id: string;
+  project_id: string;
+  site_id?: string | null;
+  mission_id?: string | null;
+  name: string;
+  slug: string;
+  kind: string;
+  status?: string;
+  captured_at?: string | null;
+  metadata?: Json;
+  created_by?: string | null;
+};
+
 export type ProcessingJobInsert = {
   org_id: string;
   project_id: string;
@@ -60,12 +99,60 @@ export type ProcessingJobInsert = {
   completed_at?: string | null;
 };
 
+export type ProcessingOutputInsert = {
+  org_id: string;
+  job_id: string;
+  mission_id?: string | null;
+  dataset_id?: string | null;
+  kind: string;
+  status?: string;
+  storage_bucket?: string | null;
+  storage_path?: string | null;
+  metadata?: Json;
+};
+
 export type JobEventInsert = {
   org_id: string;
   job_id: string;
   event_type: string;
   payload?: Json;
 };
+
+export async function insertMission(input: MissionInsert) {
+  const rows = await adminRestRequest<Array<{ id: string }>>(
+    "drone_missions?select=id",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+
+  return rows[0] ?? null;
+}
+
+export async function insertMissionVersion(input: MissionVersionInsert) {
+  const rows = await adminRestRequest<Array<{ id: string }>>(
+    "drone_mission_versions?select=id",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+
+  return rows[0] ?? null;
+}
+
+export async function insertDataset(input: DatasetInsert) {
+  const rows = await adminRestRequest<Array<{ id: string }>>(
+    "drone_datasets?select=id",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+
+  return rows[0] ?? null;
+}
 
 export async function insertProcessingJob(input: ProcessingJobInsert) {
   const rows = await adminRestRequest<Array<{ id: string }>>(
@@ -77,6 +164,20 @@ export async function insertProcessingJob(input: ProcessingJobInsert) {
   );
 
   return rows[0] ?? null;
+}
+
+export async function insertProcessingOutputs(inputs: ProcessingOutputInsert[]) {
+  if (inputs.length === 0) {
+    return [] as Array<{ id: string }>;
+  }
+
+  return adminRestRequest<Array<{ id: string }>>(
+    "drone_processing_outputs?select=id",
+    {
+      method: "POST",
+      body: JSON.stringify(inputs),
+    },
+  );
 }
 
 export async function insertJobEvent(input: JobEventInsert) {

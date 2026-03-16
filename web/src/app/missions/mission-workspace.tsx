@@ -14,6 +14,12 @@ import { SignOutForm } from "@/app/dashboard/sign-out-form";
 type MissionWorkspaceProps = {
   snapshot: MissionWorkspaceSnapshot;
   source: "database" | "fallback";
+  canManageOperations: boolean;
+  createMissionAction: (formData: FormData) => Promise<void>;
+  notice?: {
+    tone: "success" | "warning" | "error";
+    message: string;
+  } | null;
 };
 
 function formatDateTime(value: string) {
@@ -109,7 +115,24 @@ function getJobPillClassName(status: string) {
   }
 }
 
-export function MissionWorkspace({ snapshot, source }: MissionWorkspaceProps) {
+function getCalloutClassName(tone: "success" | "warning" | "error") {
+  switch (tone) {
+    case "success":
+      return "callout callout-success";
+    case "warning":
+      return "callout callout-warning";
+    default:
+      return "callout callout-error";
+  }
+}
+
+export function MissionWorkspace({
+  snapshot,
+  source,
+  canManageOperations,
+  createMissionAction,
+  notice,
+}: MissionWorkspaceProps) {
   const selectedMission = snapshot.missions[0] ?? null;
 
   return (
@@ -162,6 +185,8 @@ export function MissionWorkspace({ snapshot, source }: MissionWorkspaceProps) {
             : "This workspace is using the built-in fallback snapshot because the new aerial-ops tables are empty or not applied yet."}
         </p>
       </section>
+
+      {notice ? <section className={getCalloutClassName(notice.tone)}>{notice.message}</section> : null}
 
       <section className="ops-main-grid">
         <aside className="ops-rail surface stack-md">
@@ -384,7 +409,7 @@ export function MissionWorkspace({ snapshot, source }: MissionWorkspaceProps) {
                   <p className="eyebrow">Outputs</p>
                   <div className="stack-xs">
                     {snapshot.outputArtifacts.map((artifact) => (
-                      <article key={artifact.id} className="ops-list-card">
+                      <article key={artifact.id} className="ops-list-card stack-xs">
                         <div className="ops-list-card-header">
                           <div className="stack-xs">
                             <strong>{artifact.name}</strong>
@@ -399,6 +424,11 @@ export function MissionWorkspace({ snapshot, source }: MissionWorkspaceProps) {
                         <p className="muted">
                           {artifact.delivery} · Source: {artifact.sourceJob}
                         </p>
+                        <div className="header-actions">
+                          <Link href={`/artifacts/${artifact.id}`} className="button button-secondary">
+                            Review artifact
+                          </Link>
+                        </div>
                       </article>
                     ))}
                   </div>
@@ -459,6 +489,75 @@ export function MissionWorkspace({ snapshot, source }: MissionWorkspaceProps) {
                 <li key={action}>{action}</li>
               ))}
             </ol>
+          </div>
+
+          <div className="stack-sm surface-form-shell">
+            <div className="stack-xs">
+              <p className="eyebrow">Create mission draft</p>
+              <h3>Quick-start the next v1 lane</h3>
+              <p className="muted">
+                Create a mission record and version from the protected workspace, then attach a dataset and queue processing from the detail page.
+              </p>
+            </div>
+
+            {canManageOperations ? (
+              <form action={createMissionAction} className="stack-sm">
+                <div className="form-grid-2">
+                  <label className="stack-xs">
+                    <span>Mission name</span>
+                    <input name="missionName" type="text" placeholder="e.g. Colgate south slope baseline" required />
+                  </label>
+                  <label className="stack-xs">
+                    <span>Mission type</span>
+                    <select name="missionType" defaultValue={selectedMission?.missionType?.toLowerCase().includes("inspection") ? "inspection" : "corridor"}>
+                      <option value="corridor">Corridor</option>
+                      <option value="polygon">Polygon grid</option>
+                      <option value="inspection">Inspection</option>
+                      <option value="facade">Facade</option>
+                      <option value="orbit">Orbit / POI</option>
+                    </select>
+                  </label>
+                </div>
+
+                <label className="stack-xs">
+                  <span>Objective</span>
+                  <textarea
+                    name="objective"
+                    placeholder="What does this mission need to capture, validate, or deliver?"
+                    defaultValue={selectedMission?.blockers[0] ?? ""}
+                  />
+                </label>
+
+                <div className="form-grid-2">
+                  <label className="stack-xs">
+                    <span>Target device</span>
+                    <input
+                      name="targetDevice"
+                      type="text"
+                      defaultValue={selectedMission?.targetDevice ?? "DJI Mavic 3 Enterprise / Pilot 2"}
+                    />
+                  </label>
+                  <label className="stack-xs">
+                    <span>Target GSD (cm)</span>
+                    <input
+                      name="gsdCm"
+                      type="number"
+                      min="0.5"
+                      step="0.1"
+                      defaultValue={selectedMission ? String(selectedMission.gsdCm) : "2.0"}
+                    />
+                  </label>
+                </div>
+
+                <button type="submit" className="button button-primary">
+                  Draft mission
+                </button>
+              </form>
+            ) : (
+              <p className="muted">
+                Viewer access can review missions but cannot create them.
+              </p>
+            )}
           </div>
         </aside>
       </section>

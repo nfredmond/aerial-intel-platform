@@ -153,12 +153,17 @@ export default async function JobDetailPage({
           </div>
           <div className="stack-xs">
             {detail.outputs.map((output) => (
-              <article key={output.id} className="ops-list-card">
+              <article key={output.id} className="ops-list-card stack-xs">
                 <div className="ops-list-card-header">
                   <strong>{output.kind.replaceAll("_", " ")}</strong>
                   <span className={statusClass(output.status)}>{output.status}</span>
                 </div>
                 <p className="muted">{output.storage_path ?? "Storage path pending"}</p>
+                <div className="header-actions">
+                  <Link href={`/artifacts/${output.id}`} className="button button-secondary">
+                    Review artifact
+                  </Link>
+                </div>
               </article>
             ))}
           </div>

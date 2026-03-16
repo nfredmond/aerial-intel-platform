@@ -43,7 +43,9 @@ label {
   font-weight: 600;
 }
 
-input {
+input,
+select,
+textarea {
   width: 100%;
   border: 1px solid #cbd5e1;
   border-radius: 0.75rem;
@@ -53,7 +55,14 @@ input {
   color: #0f172a;
 }
 
-input:focus {
+textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
   outline: none;
   border-color: #4f46e5;
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.16);
@@ -255,6 +264,12 @@ main {
   border-color: #fde68a;
   color: #92400e;
   background: #fffbeb;
+}
+
+.callout-success {
+  border-color: #86efac;
+  color: #166534;
+  background: #f0fdf4;
 }
 
 .field-label-row {
@@ -532,6 +547,18 @@ main {
   gap: 1rem;
 }
 
+.form-grid-2 {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.surface-form-shell {
+  border: 1px solid #dbe3f4;
+  border-radius: 0.95rem;
+  background: #f8fafc;
+  padding: 0.95rem;
+}
+
 @media (min-width: 900px) {
   .auth-layout {
     grid-template-columns: minmax(0, 1fr) minmax(0, 470px);
@@ -588,5 +615,9 @@ main {
   .detail-grid {
     grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr);
     align-items: start;
+  }
+
+  .form-grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

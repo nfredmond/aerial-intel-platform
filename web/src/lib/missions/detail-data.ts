@@ -37,6 +37,19 @@ export type JobDetail = {
   outputSummary: JsonRecord;
 };
 
+export type ArtifactDetail = {
+  output: OutputRow;
+  job: JobRow | null;
+  mission: MissionRow | null;
+  project: ProjectRow | null;
+  site: SiteRow | null;
+  dataset: DatasetRow | null;
+  events: JobEventRow[];
+  metadata: JsonRecord;
+  inputSummary: JsonRecord;
+  outputSummary: JsonRecord;
+};
+
 function asRecord(value: Json): JsonRecord {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {};
@@ -234,5 +247,111 @@ export async function getJobDetail(
     events: (eventsResult.data ?? []) as JobEventRow[],
     inputSummary: asRecord(jobRow.input_summary),
     outputSummary: asRecord(jobRow.output_summary),
+  };
+}
+
+export async function getArtifactDetail(
+  access: DroneOpsAccessResult,
+  artifactId: string,
+): Promise<ArtifactDetail | null> {
+  if (!access.org?.id) {
+    return null;
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const orgId = access.org.id;
+
+  const { data: output, error: outputError } = await supabase
+    .from("drone_processing_outputs")
+    .select(
+      "id, org_id, job_id, mission_id, dataset_id, kind, status, storage_bucket, storage_path, metadata, created_at, updated_at",
+    )
+    .eq("org_id", orgId)
+    .eq("id", artifactId)
+    .maybeSingle();
+
+  if (outputError || !output) {
+    return null;
+  }
+
+  const outputRow = output as OutputRow;
+
+  const { data: job } = await supabase
+    .from("drone_processing_jobs")
+    .select(
+      "id, org_id, project_id, site_id, mission_id, dataset_id, engine, preset_id, status, stage, progress, queue_position, input_summary, output_summary, external_job_reference, created_by, created_at, updated_at, started_at, completed_at",
+    )
+    .eq("org_id", orgId)
+    .eq("id", outputRow.job_id)
+    .maybeSingle();
+
+  const jobRow = (job as JobRow | null) ?? null;
+
+  const [missionResult, datasetResult, projectResult, siteResult, eventsResult] = await Promise.all([
+    outputRow.mission_id
+      ? supabase
+          .from("drone_missions")
+          .select("id, org_id, project_id, site_id, name, slug, mission_type, status, objective, planning_geometry, summary, created_by, created_at, updated_at, archived_at")
+          .eq("org_id", orgId)
+          .eq("id", outputRow.mission_id)
+          .maybeSingle()
+      : jobRow?.mission_id
+        ? supabase
+            .from("drone_missions")
+            .select("id, org_id, project_id, site_id, name, slug, mission_type, status, objective, planning_geometry, summary, created_by, created_at, updated_at, archived_at")
+            .eq("org_id", orgId)
+            .eq("id", jobRow.mission_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    outputRow.dataset_id
+      ? supabase
+          .from("drone_datasets")
+          .select("id, org_id, project_id, site_id, mission_id, name, slug, kind, status, captured_at, spatial_footprint, metadata, created_by, created_at, updated_at, archived_at")
+          .eq("org_id", orgId)
+          .eq("id", outputRow.dataset_id)
+          .maybeSingle()
+      : jobRow?.dataset_id
+        ? supabase
+            .from("drone_datasets")
+            .select("id, org_id, project_id, site_id, mission_id, name, slug, kind, status, captured_at, spatial_footprint, metadata, created_by, created_at, updated_at, archived_at")
+            .eq("org_id", orgId)
+            .eq("id", jobRow.dataset_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    jobRow?.project_id
+      ? supabase
+          .from("drone_projects")
+          .select("id, org_id, name, slug, status, description, created_by, created_at, updated_at, archived_at")
+          .eq("org_id", orgId)
+          .eq("id", jobRow.project_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    jobRow?.site_id
+      ? supabase
+          .from("drone_sites")
+          .select("id, org_id, project_id, name, slug, description, boundary, center, site_notes, created_by, created_at, updated_at, archived_at")
+          .eq("org_id", orgId)
+          .eq("id", jobRow.site_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("drone_processing_job_events")
+      .select("id, org_id, job_id, event_type, payload, created_at")
+      .eq("org_id", orgId)
+      .eq("job_id", outputRow.job_id)
+      .order("created_at", { ascending: false }),
+  ]);
+
+  return {
+    output: outputRow,
+    job: jobRow,
+    mission: (missionResult.data as MissionRow | null) ?? null,
+    project: (projectResult.data as ProjectRow | null) ?? null,
+    site: (siteResult.data as SiteRow | null) ?? null,
+    dataset: (datasetResult.data as DatasetRow | null) ?? null,
+    events: (eventsResult.data ?? []) as JobEventRow[],
+    metadata: asRecord(outputRow.metadata),
+    inputSummary: asRecord(jobRow?.input_summary ?? null),
+    outputSummary: asRecord(jobRow?.output_summary ?? null),
   };
 }

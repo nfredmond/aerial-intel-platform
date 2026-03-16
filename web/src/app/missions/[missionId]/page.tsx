@@ -10,8 +10,14 @@ import {
   getString,
   getStringArray,
 } from "@/lib/missions/detail-data";
+import { normalizeSlug } from "@/lib/slug";
 import { formatJobStatus, formatOutputArtifactStatus } from "@/lib/missions/workspace";
-import { insertJobEvent, insertProcessingJob } from "@/lib/supabase/admin";
+import {
+  insertDataset,
+  insertJobEvent,
+  insertProcessingJob,
+  insertProcessingOutputs,
+} from "@/lib/supabase/admin";
 
 function formatDateTime(value: string | null) {
   if (!value) return "TBD";
@@ -46,12 +52,56 @@ function getOutputPillClassName(status: string) {
   }
 }
 
+function getCalloutClassName(state: string) {
+  if (state === "1" || state === "created") {
+    return "callout callout-success";
+  }
+
+  if (state === "missing-dataset" || state === "missing-name") {
+    return "callout callout-warning";
+  }
+
+  return "callout callout-error";
+}
+
+function getCalloutMessage(options: {
+  queued?: string;
+  attached?: string;
+  created?: string;
+}) {
+  if (options.created === "1") {
+    return "Mission draft created. Next: attach a dataset, then queue a processing job to produce reviewable artifacts.";
+  }
+
+  if (options.attached) {
+    return options.attached === "1"
+      ? "Dataset attached to this mission. You can now queue processing and seed output placeholders."
+      : options.attached === "missing-name"
+        ? "Dataset name is required before a dataset can be attached."
+        : options.attached === "denied"
+          ? "Viewer access cannot attach datasets."
+          : "The dataset could not be attached. Check server configuration and try again.";
+  }
+
+  if (options.queued) {
+    return options.queued === "1"
+      ? "Processing job queued. Refreshes should now appear in the live job lane for this mission."
+      : options.queued === "missing-dataset"
+        ? "This mission does not have a dataset yet, so a processing job could not be queued."
+        : options.queued === "denied"
+          ? "Viewer access cannot queue processing jobs."
+          : "The processing job could not be queued. Check server configuration and try again.";
+  }
+
+  return null;
+}
+
 export default async function MissionDetailPage({
   params,
   searchParams,
 }: {
   params: Promise<{ missionId: string }>;
-  searchParams: Promise<{ queued?: string }>;
+  searchParams: Promise<{ queued?: string; attached?: string; created?: string }>;
 }) {
   const access = await getDroneOpsAccess();
 
@@ -69,6 +119,68 @@ export default async function MissionDetailPage({
 
   if (!detail) {
     notFound();
+  }
+
+  async function attachDataset(formData: FormData) {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/missions/${missionId}?attached=denied`);
+    }
+
+    const refreshedDetail = await getMissionDetail(refreshedAccess, missionId);
+    if (!refreshedDetail) {
+      redirect("/missions");
+    }
+
+    const datasetNameValue = formData.get("datasetName");
+    const datasetName = typeof datasetNameValue === "string" ? datasetNameValue.trim() : "";
+    if (!datasetName) {
+      redirect(`/missions/${missionId}?attached=missing-name`);
+    }
+
+    const datasetKindValue = formData.get("datasetKind");
+    const datasetKind = typeof datasetKindValue === "string" && datasetKindValue.trim()
+      ? datasetKindValue.trim()
+      : "image";
+
+    const imageCountValue = formData.get("imageCount");
+    const imageCount = Number(imageCountValue);
+
+    try {
+      const slug = `${normalizeSlug(datasetName) || "dataset"}-${refreshedDetail.datasets.length + 1}`;
+
+      await insertDataset({
+        org_id: refreshedAccess.org.id,
+        project_id: refreshedDetail.mission.project_id,
+        site_id: refreshedDetail.mission.site_id,
+        mission_id: refreshedDetail.mission.id,
+        name: datasetName,
+        slug,
+        kind: datasetKind,
+        status: "ready",
+        captured_at: new Date().toISOString(),
+        metadata: {
+          imageCount: Number.isFinite(imageCount) ? imageCount : 0,
+          footprint: "Footprint pending planner/dataset ingest linkage",
+          finding: "Attached from mission detail page. Full preflight ingestion is still pending.",
+        },
+        created_by: refreshedAccess.user.id,
+      });
+    } catch {
+      redirect(`/missions/${missionId}?attached=error`);
+    }
+
+    redirect(`/missions/${missionId}?attached=1`);
   }
 
   async function queueMissionProcessing() {
@@ -126,6 +238,69 @@ export default async function MissionDetailPage({
         redirect(`/missions/${missionId}?queued=error`);
       }
 
+      await insertProcessingOutputs([
+        {
+          org_id: refreshedAccess.org.id,
+          job_id: insertedJob.id,
+          mission_id: refreshedDetail.mission.id,
+          dataset_id: dataset.id,
+          kind: "orthomosaic",
+          status: "pending",
+          storage_bucket: "drone-ops",
+          storage_path: `${refreshedAccess.org.slug}/jobs/${insertedJob.id}/orthomosaic.tif`,
+          metadata: {
+            name: `${refreshedDetail.mission.name} orthomosaic`,
+            format: "COG",
+            delivery: "Review pending",
+          },
+        },
+        {
+          org_id: refreshedAccess.org.id,
+          job_id: insertedJob.id,
+          mission_id: refreshedDetail.mission.id,
+          dataset_id: dataset.id,
+          kind: "dsm",
+          status: "pending",
+          storage_bucket: "drone-ops",
+          storage_path: `${refreshedAccess.org.slug}/jobs/${insertedJob.id}/dsm.tif`,
+          metadata: {
+            name: `${refreshedDetail.mission.name} surface model`,
+            format: "COG",
+            delivery: "Review pending",
+          },
+        },
+        {
+          org_id: refreshedAccess.org.id,
+          job_id: insertedJob.id,
+          mission_id: refreshedDetail.mission.id,
+          dataset_id: dataset.id,
+          kind: "point_cloud",
+          status: "pending",
+          storage_bucket: "drone-ops",
+          storage_path: `${refreshedAccess.org.slug}/jobs/${insertedJob.id}/cloud.laz`,
+          metadata: {
+            name: `${refreshedDetail.mission.name} point cloud`,
+            format: "LAZ",
+            delivery: "Hold for QA",
+          },
+        },
+        {
+          org_id: refreshedAccess.org.id,
+          job_id: insertedJob.id,
+          mission_id: refreshedDetail.mission.id,
+          dataset_id: dataset.id,
+          kind: "report",
+          status: "pending",
+          storage_bucket: "drone-ops",
+          storage_path: `${refreshedAccess.org.slug}/jobs/${insertedJob.id}/mission-brief.pdf`,
+          metadata: {
+            name: `${refreshedDetail.mission.name} mission brief`,
+            format: "PDF",
+            delivery: "Share/export pending",
+          },
+        },
+      ]);
+
       await insertJobEvent({
         org_id: refreshedAccess.org.id,
         job_id: insertedJob.id,
@@ -133,6 +308,16 @@ export default async function MissionDetailPage({
         payload: {
           title: "Manual processing job queued",
           detail: `Queued from mission detail for dataset ${dataset.name}.`,
+        },
+      });
+
+      await insertJobEvent({
+        org_id: refreshedAccess.org.id,
+        job_id: insertedJob.id,
+        event_type: "artifact.generated",
+        payload: {
+          title: "Placeholder outputs staged",
+          detail: "Orthomosaic, DSM, point cloud, and report placeholders were created for downstream review/export flows.",
         },
       });
     } catch {
@@ -144,6 +329,8 @@ export default async function MissionDetailPage({
 
   const blockers = getStringArray(detail.summary.blockers);
   const warnings = getStringArray(detail.summary.warnings);
+  const calloutMessage = getCalloutMessage(resolvedSearchParams);
+  const calloutState = resolvedSearchParams.created ?? resolvedSearchParams.attached ?? resolvedSearchParams.queued;
 
   return (
     <main className="app-shell stack-md">
@@ -152,8 +339,7 @@ export default async function MissionDetailPage({
           <p className="eyebrow">Mission detail</p>
           <h1>{detail.mission.name}</h1>
           <p className="muted">
-            {detail.project?.name ?? "Project pending"} · {detail.site?.name ?? "Site pending"} ·
-            {" "}
+            {detail.project?.name ?? "Project pending"} · {detail.site?.name ?? "Site pending"} ·{" "}
             {detail.mission.mission_type}
           </p>
         </div>
@@ -166,22 +352,8 @@ export default async function MissionDetailPage({
         </div>
       </section>
 
-      {resolvedSearchParams.queued ? (
-        <section
-          className={
-            resolvedSearchParams.queued === "1"
-              ? "callout callout-warning"
-              : "callout callout-error"
-          }
-        >
-          {resolvedSearchParams.queued === "1"
-            ? "Processing job queued. Refreshes should now appear in the live job lane for this mission."
-            : resolvedSearchParams.queued === "missing-dataset"
-              ? "This mission does not have a dataset yet, so a processing job could not be queued."
-              : resolvedSearchParams.queued === "denied"
-                ? "Viewer access cannot queue processing jobs."
-                : "The processing job could not be queued. Check server configuration and try again."}
-        </section>
+      {calloutMessage && calloutState ? (
+        <section className={getCalloutClassName(calloutState)}>{calloutMessage}</section>
       ) : null}
 
       <section className="detail-grid">
@@ -245,9 +417,9 @@ export default async function MissionDetailPage({
         <aside className="surface stack-sm">
           <div className="stack-xs">
             <p className="eyebrow">Live action</p>
-            <h2>Queue a processing refresh</h2>
+            <h2>Attach data and queue processing</h2>
             <p className="muted">
-              This uses the real aerial-ops tables and writes a queued job + event through a server-side action.
+              This mission page now supports the next real v1 loop: attach a dataset, queue a job, and stage output artifacts for review.
             </p>
           </div>
 
@@ -273,6 +445,40 @@ export default async function MissionDetailPage({
               </dd>
             </div>
           </dl>
+
+          <form action={attachDataset} className="stack-sm surface-form-shell">
+            <div className="stack-xs">
+              <h3>Attach dataset</h3>
+              <p className="muted">Use this while the fuller ingest/preflight flow is still under construction.</p>
+            </div>
+            <div className="form-grid-2">
+              <label className="stack-xs">
+                <span>Dataset name</span>
+                <input name="datasetName" type="text" placeholder="e.g. South slope image batch" required />
+              </label>
+              <label className="stack-xs">
+                <span>Dataset kind</span>
+                <select name="datasetKind" defaultValue="image">
+                  <option value="image">Image</option>
+                  <option value="video">Video</option>
+                  <option value="thermal">Thermal</option>
+                  <option value="multispectral">Multispectral</option>
+                  <option value="mission_template">Mission template</option>
+                </select>
+              </label>
+            </div>
+            <label className="stack-xs">
+              <span>Image/frame count</span>
+              <input name="imageCount" type="number" min="0" step="1" defaultValue="0" />
+            </label>
+            <button
+              type="submit"
+              className="button button-secondary"
+              disabled={access.role === "viewer"}
+            >
+              Attach dataset
+            </button>
+          </form>
 
           <form action={queueMissionProcessing}>
             <button
@@ -305,6 +511,7 @@ export default async function MissionDetailPage({
                 <p className="muted">{dataset.kind} · captured {formatDateTime(dataset.captured_at)}</p>
               </article>
             ))}
+            {detail.datasets.length === 0 ? <p className="muted">No datasets attached yet.</p> : null}
           </div>
         </article>
 
@@ -358,6 +565,7 @@ export default async function MissionDetailPage({
                 </div>
               </article>
             ))}
+            {detail.jobs.length === 0 ? <p className="muted">No processing jobs yet.</p> : null}
           </div>
         </article>
 
@@ -368,7 +576,7 @@ export default async function MissionDetailPage({
           </div>
           <div className="stack-xs">
             {detail.outputs.map((output) => (
-              <article key={output.id} className="ops-list-card">
+              <article key={output.id} className="ops-list-card stack-xs">
                 <div className="ops-list-card-header">
                   <strong>{output.kind.replaceAll("_", " ")}</strong>
                   <span
@@ -382,6 +590,11 @@ export default async function MissionDetailPage({
                   </span>
                 </div>
                 <p className="muted">{output.storage_path ?? "Storage path pending"}</p>
+                <div className="header-actions">
+                  <Link href={`/artifacts/${output.id}`} className="button button-secondary">
+                    Review artifact
+                  </Link>
+                </div>
               </article>
             ))}
             {detail.events.slice(0, 6).map((event) => {

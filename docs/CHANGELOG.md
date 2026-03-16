@@ -11,6 +11,9 @@
 - Created the dedicated Supabase project for `aerial-intel-platform`, applied the auth + aerial-ops schema migrations through Supabase MCP, and seeded the first real query-backed workspace path for the protected `/missions` route.
 - Hardened the trigger helper functions by pinning `search_path` after Supabase advisor feedback.
 - Added mission detail (`/missions/[missionId]`) and job detail (`/jobs/[jobId]`) routes so the seeded workspace can be explored through real database-backed entity pages instead of only the summary workspace shell.
+- Added a protected artifact detail route (`/artifacts/[artifactId]`) so output records now have a first-class review/share/export surface instead of being stranded as summary-only cards.
+- Expanded the authenticated write path so operators can draft a mission from the workspace, attach a dataset from mission detail, queue a processing job, and automatically seed placeholder output records for review/export flow development.
+- Added copy-ready share summary and export packet actions on artifact detail so the first review/share/export loop is usable even before signed URLs and client portal delivery are wired.
 - Added the first authenticated write path: queueing a processing job from the mission detail page now writes a real `drone_processing_jobs` row plus a `drone_processing_job_events` audit entry through a server-side action.
 - Added an entitlement-protected `/missions` workspace route so DroneOps now has a real mission pipeline surface beyond the auth dashboard.
 - Added a GIS/drone mission workspace snapshot model with AOI, capture, processing, CRS, and deliverable readiness metadata for the first workflow slice.

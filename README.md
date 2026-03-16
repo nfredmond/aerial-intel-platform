@@ -71,9 +71,13 @@ Current Next.js app features:
 - `/sign-in` email/password auth via Supabase
 - `/dashboard` protected route for account and entitlement context
 - `/missions` protected Aerial Operations OS workspace shell
+- `/missions/[missionId]` mission detail with live actions for dataset attachment and queued processing
+- `/jobs/[jobId]` processing job detail with artifact linkage
+- `/artifacts/[artifactId]` artifact review/share/export surface with copy-ready delivery packets
 - role + entitlement gate (`drone_memberships` + active `drone_entitlements` where `product_id='drone-ops'`)
 - query-backed mission workspace loading from Supabase aerial-ops tables when present, with automatic fallback to the built-in demo workspace when the new migration is empty or not applied yet
 - mission-control layout with a command bar, workspace rail, mission lanes, contextual inspector, and job/activity console
+- authenticated write paths for draft mission creation, dataset attachment, queued processing jobs, and placeholder output staging
 - blocked state with support contact + prefilled support diagnostics (user ID, organization ID/slug/name, role, membership, entitlement), a generated support reference + UTC snapshot timestamp, support email subjects prefilled with that reference, an "Open in Gmail" quick action, one-click copy actions for the signed-in user ID, signed-in account email, organization ID, organization slug, organization name, support email address, support email link, support Gmail compose link, support reference, support snapshot timestamp, support triage summary, support follow-up line, support escalation line, support call brief, support reference + snapshot line, support diagnostics CSV block, support diagnostics TSV block, support diagnostics key-value block, support diagnostics markdown block, support diagnostics markdown table, support diagnostics JSON line, support log search query, blocked-access reason, operator handoff checklist, operator escalation packet, support ticket title, support ticket header line, support ticket body, support email subject, support email body, support context, support context JSON, and full support email draft text, and ready-to-copy manual fallback text boxes when clipboard access is unavailable
 
 ### Local setup
