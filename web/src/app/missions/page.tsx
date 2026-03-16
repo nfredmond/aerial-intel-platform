@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
+import { getMissionWorkspaceSnapshot } from "@/lib/missions/workspace-data";
 
 import { MissionWorkspace } from "./mission-workspace";
 
@@ -18,5 +19,7 @@ export default async function MissionsPage() {
     return <BlockedAccessView access={access} />;
   }
 
-  return <MissionWorkspace access={access} />;
+  const { snapshot, source } = await getMissionWorkspaceSnapshot(access);
+
+  return <MissionWorkspace snapshot={snapshot} source={source} />;
 }

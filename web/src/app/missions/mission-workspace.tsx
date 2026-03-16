@@ -1,8 +1,7 @@
 import Link from "next/link";
 
-import type { DroneOpsAccessResult } from "@/lib/auth/drone-ops-access";
+import type { MissionWorkspaceSnapshot } from "@/lib/missions/workspace";
 import {
-  buildMissionWorkspaceSnapshot,
   formatDatasetStatus,
   formatJobStatus,
   formatMissionOutputStatus,
@@ -13,7 +12,8 @@ import {
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
 
 type MissionWorkspaceProps = {
-  access: DroneOpsAccessResult;
+  snapshot: MissionWorkspaceSnapshot;
+  source: "database" | "fallback";
 };
 
 function formatDateTime(value: string) {
@@ -109,14 +109,8 @@ function getJobPillClassName(status: string) {
   }
 }
 
-export function MissionWorkspace({ access }: MissionWorkspaceProps) {
-  const snapshot = buildMissionWorkspaceSnapshot({
-    orgName: access.org?.name,
-    tierId: access.entitlement?.tier_id,
-    role: access.role,
-  });
-
-  const selectedMission = snapshot.missions[0];
+export function MissionWorkspace({ snapshot, source }: MissionWorkspaceProps) {
+  const selectedMission = snapshot.missions[0] ?? null;
 
   return (
     <main className="ops-workspace-shell">
@@ -158,6 +152,15 @@ export function MissionWorkspace({ access }: MissionWorkspaceProps) {
             <span className={getToneClassName(chip.tone)}>{chip.label}</span>
           </article>
         ))}
+      </section>
+
+      <section className="surface ops-source-banner stack-xs">
+        <p className="eyebrow">Workspace data source</p>
+        <p className="muted">
+          {source === "database"
+            ? "This workspace is loading from real Supabase aerial-ops tables on the protected route."
+            : "This workspace is using the built-in fallback snapshot because the new aerial-ops tables are empty or not applied yet."}
+        </p>
       </section>
 
       <section className="ops-main-grid">
@@ -218,6 +221,9 @@ export function MissionWorkspace({ access }: MissionWorkspaceProps) {
             <div className="header-actions">
               <span className="status-pill status-pill--success">
                 {snapshot.entitlementLabel} access active
+              </span>
+              <span className={source === "database" ? "status-pill status-pill--info" : "status-pill status-pill--warning"}>
+                {source === "database" ? "Query-backed workspace" : "Fallback workspace"}
               </span>
               <Link href="/dashboard" className="button button-secondary">
                 Account context
@@ -399,7 +405,7 @@ export function MissionWorkspace({ access }: MissionWorkspaceProps) {
         <aside className="ops-inspector surface stack-md">
           <div className="stack-xs">
             <p className="eyebrow">Contextual inspector</p>
-            <h2>{selectedMission.name}</h2>
+            <h2>{selectedMission?.name ?? "Mission detail pending"}</h2>
             <p className="muted">
               The right rail now behaves like a mission-control inspector instead of a dead-end detail card.
             </p>
@@ -408,19 +414,19 @@ export function MissionWorkspace({ access }: MissionWorkspaceProps) {
           <dl className="kv-grid">
             <div className="kv-row">
               <dt>Mission type</dt>
-              <dd>{selectedMission.missionType}</dd>
+              <dd>{selectedMission?.missionType ?? "No mission selected"}</dd>
             </div>
             <div className="kv-row">
               <dt>Version</dt>
-              <dd>{selectedMission.versionLabel}</dd>
+              <dd>{selectedMission?.versionLabel ?? "No version yet"}</dd>
             </div>
             <div className="kv-row">
               <dt>Processing profile</dt>
-              <dd>{selectedMission.processingProfile}</dd>
+              <dd>{selectedMission?.processingProfile ?? "No processing profile yet"}</dd>
             </div>
             <div className="kv-row">
               <dt>Coordinate system</dt>
-              <dd>{selectedMission.coordinateSystem}</dd>
+              <dd>{selectedMission?.coordinateSystem ?? "Unknown CRS"}</dd>
             </div>
             <div className="kv-row">
               <dt>Outputs ready</dt>

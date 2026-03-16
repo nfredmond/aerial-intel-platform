@@ -205,6 +205,16 @@ export type Database = {
           updated_at: string;
         };
       };
+      drone_processing_job_events: {
+        Row: {
+          id: string;
+          org_id: string;
+          job_id: string;
+          event_type: string;
+          payload: Json;
+          created_at: string;
+        };
+      };
     };
   };
 };

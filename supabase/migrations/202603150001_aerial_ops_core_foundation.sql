@@ -123,6 +123,15 @@ create table if not exists public.drone_processing_outputs (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+create table if not exists public.drone_processing_job_events (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null references public.drone_orgs(id) on delete cascade,
+  job_id uuid not null references public.drone_processing_jobs(id) on delete cascade,
+  event_type text not null,
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
 create or replace function public.set_drone_updated_at()
 returns trigger as $$
 begin
@@ -178,6 +187,9 @@ create index if not exists idx_drone_processing_jobs_mission_id on public.drone_
 create index if not exists idx_drone_processing_outputs_org_id on public.drone_processing_outputs (org_id);
 create index if not exists idx_drone_processing_outputs_job_id on public.drone_processing_outputs (job_id);
 create index if not exists idx_drone_processing_outputs_mission_id on public.drone_processing_outputs (mission_id);
+create index if not exists idx_drone_processing_job_events_org_id on public.drone_processing_job_events (org_id);
+create index if not exists idx_drone_processing_job_events_job_id on public.drone_processing_job_events (job_id);
+create index if not exists idx_drone_processing_job_events_created_at on public.drone_processing_job_events (created_at desc);
 
 create index if not exists idx_drone_sites_boundary_gist on public.drone_sites using gist (boundary);
 create index if not exists idx_drone_sites_center_gist on public.drone_sites using gist (center);
@@ -191,6 +203,7 @@ alter table public.drone_mission_versions enable row level security;
 alter table public.drone_datasets enable row level security;
 alter table public.drone_processing_jobs enable row level security;
 alter table public.drone_processing_outputs enable row level security;
+alter table public.drone_processing_job_events enable row level security;
 
 create policy "members_can_read_projects"
 on public.drone_projects
@@ -248,6 +261,15 @@ using (
 
 create policy "members_can_read_processing_outputs"
 on public.drone_processing_outputs
+for select
+using (
+  org_id in (
+    select org_id from public.drone_memberships where user_id = auth.uid()
+  )
+);
+
+create policy "members_can_read_processing_job_events"
+on public.drone_processing_job_events
 for select
 using (
   org_id in (
