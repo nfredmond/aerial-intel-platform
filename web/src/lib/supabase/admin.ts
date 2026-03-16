@@ -118,6 +118,13 @@ export type JobEventInsert = {
   payload?: Json;
 };
 
+export type MissionVersionPatch = {
+  status?: string;
+  plan_payload?: Json;
+  validation_summary?: Json;
+  export_summary?: Json;
+};
+
 export async function insertMission(input: MissionInsert) {
   const rows = await adminRestRequest<Array<{ id: string }>>(
     "drone_missions?select=id",
@@ -185,4 +192,16 @@ export async function insertJobEvent(input: JobEventInsert) {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export async function updateMissionVersion(id: string, patch: MissionVersionPatch) {
+  const rows = await adminRestRequest<Array<{ id: string }>>(
+    `drone_mission_versions?id=eq.${encodeURIComponent(id)}&select=id`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    },
+  );
+
+  return rows[0] ?? null;
 }

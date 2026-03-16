@@ -17,6 +17,7 @@ import {
   insertJobEvent,
   insertProcessingJob,
   insertProcessingOutputs,
+  updateMissionVersion,
 } from "@/lib/supabase/admin";
 
 function formatDateTime(value: string | null) {
@@ -57,7 +58,7 @@ function getCalloutClassName(state: string) {
     return "callout callout-success";
   }
 
-  if (state === "missing-dataset" || state === "missing-name") {
+  if (state === "missing-dataset" || state === "missing-name" || state === "missing-version") {
     return "callout callout-warning";
   }
 
@@ -67,6 +68,7 @@ function getCalloutClassName(state: string) {
 function getCalloutMessage(options: {
   queued?: string;
   attached?: string;
+  bundled?: string;
   created?: string;
 }) {
   if (options.created === "1") {
@@ -93,6 +95,16 @@ function getCalloutMessage(options: {
           : "The processing job could not be queued. Check server configuration and try again.";
   }
 
+  if (options.bundled) {
+    return options.bundled === "1"
+      ? "Install bundle generated. The mission now has a field-handoff artifact trail with bundle + brief outputs."
+      : options.bundled === "missing-version"
+        ? "This mission does not have a version yet, so an install bundle could not be generated."
+        : options.bundled === "denied"
+          ? "Viewer access cannot generate install bundles."
+          : "The install bundle could not be generated. Check server configuration and try again.";
+  }
+
   return null;
 }
 
@@ -101,7 +113,7 @@ export default async function MissionDetailPage({
   searchParams,
 }: {
   params: Promise<{ missionId: string }>;
-  searchParams: Promise<{ queued?: string; attached?: string; created?: string }>;
+  searchParams: Promise<{ queued?: string; attached?: string; bundled?: string; created?: string }>;
 }) {
   const access = await getDroneOpsAccess();
 
@@ -327,10 +339,158 @@ export default async function MissionDetailPage({
     redirect(`/missions/${missionId}?queued=1`);
   }
 
+  async function generateInstallBundle() {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/missions/${missionId}?bundled=denied`);
+    }
+
+    const refreshedDetail = await getMissionDetail(refreshedAccess, missionId);
+    const latestVersion = refreshedDetail?.versions[0] ?? null;
+
+    if (!refreshedDetail || !latestVersion) {
+      redirect(`/missions/${missionId}?bundled=missing-version`);
+    }
+
+    const dataset = refreshedDetail.datasets[0] ?? null;
+    const existingExportSummary = (latestVersion.export_summary as Record<string, unknown> | null) ?? {};
+    const existingAvailable = Array.isArray(existingExportSummary.available)
+      ? existingExportSummary.available.filter((value): value is string => typeof value === "string")
+      : [];
+    const mergedAvailable = Array.from(new Set([...existingAvailable, "kmz", "pdf", "install_bundle"]));
+
+    try {
+      const insertedJob = await insertProcessingJob({
+        org_id: refreshedAccess.org.id,
+        project_id: refreshedDetail.mission.project_id,
+        site_id: refreshedDetail.mission.site_id,
+        mission_id: refreshedDetail.mission.id,
+        dataset_id: dataset?.id ?? null,
+        engine: "planner",
+        preset_id: "install-bundle-v1",
+        status: "succeeded",
+        stage: "install_bundle",
+        progress: 100,
+        queue_position: null,
+        input_summary: {
+          name: `${refreshedDetail.mission.name} install bundle`,
+          source: "mission-install-action",
+          versionNumber: latestVersion.version_number,
+        },
+        output_summary: {
+          eta: "Complete",
+          notes: "Install bundle generated from mission detail.",
+        },
+        external_job_reference: null,
+        created_by: refreshedAccess.user.id,
+        started_at: new Date().toISOString(),
+        completed_at: new Date().toISOString(),
+      });
+
+      if (!insertedJob?.id) {
+        redirect(`/missions/${missionId}?bundled=error`);
+      }
+
+      await insertProcessingOutputs([
+        {
+          org_id: refreshedAccess.org.id,
+          job_id: insertedJob.id,
+          mission_id: refreshedDetail.mission.id,
+          dataset_id: dataset?.id ?? null,
+          kind: "install_bundle",
+          status: "ready",
+          storage_bucket: "drone-ops",
+          storage_path: `${refreshedAccess.org.slug}/missions/${refreshedDetail.mission.id}/install/${insertedJob.id}/install-bundle.zip`,
+          metadata: {
+            name: `${refreshedDetail.mission.name} install bundle`,
+            format: "KMZ + PDF brief",
+            delivery: "Field install handoff",
+          },
+        },
+        {
+          org_id: refreshedAccess.org.id,
+          job_id: insertedJob.id,
+          mission_id: refreshedDetail.mission.id,
+          dataset_id: dataset?.id ?? null,
+          kind: "report",
+          status: "ready",
+          storage_bucket: "drone-ops",
+          storage_path: `${refreshedAccess.org.slug}/missions/${refreshedDetail.mission.id}/install/${insertedJob.id}/mission-brief.pdf`,
+          metadata: {
+            name: `${refreshedDetail.mission.name} field brief`,
+            format: "PDF",
+            delivery: "Field install handoff",
+          },
+        },
+      ]);
+
+      await insertJobEvent({
+        org_id: refreshedAccess.org.id,
+        job_id: insertedJob.id,
+        event_type: "install.bundle.ready",
+        payload: {
+          title: "Install bundle generated",
+          detail: `Install helper bundle for mission version v${latestVersion.version_number} is ready for field handoff.`,
+        },
+      });
+
+      await insertJobEvent({
+        org_id: refreshedAccess.org.id,
+        job_id: insertedJob.id,
+        event_type: "artifact.generated",
+        payload: {
+          title: "Install outputs ready",
+          detail: "Install bundle ZIP and mission brief PDF were generated for browser-first field handoff.",
+        },
+      });
+
+      await updateMissionVersion(latestVersion.id, {
+        export_summary: {
+          ...existingExportSummary,
+          available: mergedAvailable,
+          installBundleReady: true,
+          installGeneratedAt: new Date().toISOString(),
+          installHelper: "browser-first handoff with companion fallback",
+        },
+      });
+    } catch {
+      redirect(`/missions/${missionId}?bundled=error`);
+    }
+
+    redirect(`/missions/${missionId}?bundled=1`);
+  }
+
+  const latestVersion = detail.versions[0] ?? null;
+  const latestPlanPayload = ((latestVersion?.plan_payload as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+  const latestValidationSummary = ((latestVersion?.validation_summary as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+  const latestExportSummary = ((latestVersion?.export_summary as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+  const exportTargets = Array.isArray(latestPlanPayload.exportTargets)
+    ? latestPlanPayload.exportTargets.filter((value): value is string => typeof value === "string")
+    : [];
+  const validationChecks = Array.isArray(latestValidationSummary.checks)
+    ? latestValidationSummary.checks.filter((value): value is string => typeof value === "string")
+    : [];
+  const availableExports = Array.isArray(latestExportSummary.available)
+    ? latestExportSummary.available.filter((value): value is string => typeof value === "string")
+    : [];
   const blockers = getStringArray(detail.summary.blockers);
   const warnings = getStringArray(detail.summary.warnings);
   const calloutMessage = getCalloutMessage(resolvedSearchParams);
-  const calloutState = resolvedSearchParams.created ?? resolvedSearchParams.attached ?? resolvedSearchParams.queued;
+  const calloutState =
+    resolvedSearchParams.created
+    ?? resolvedSearchParams.attached
+    ?? resolvedSearchParams.queued
+    ?? resolvedSearchParams.bundled;
 
   return (
     <main className="app-shell stack-md">
@@ -417,9 +577,9 @@ export default async function MissionDetailPage({
         <aside className="surface stack-sm">
           <div className="stack-xs">
             <p className="eyebrow">Live action</p>
-            <h2>Attach data and queue processing</h2>
+            <h2>Attach data, queue processing, and stage install handoff</h2>
             <p className="muted">
-              This mission page now supports the next real v1 loop: attach a dataset, queue a job, and stage output artifacts for review.
+              This mission page now supports the next real v1 loop: attach a dataset, queue a job, and generate install-handoff artifacts for field use.
             </p>
           </div>
 
@@ -492,6 +652,23 @@ export default async function MissionDetailPage({
           {detail.datasets.length === 0 ? (
             <p className="muted">A dataset must exist before a job can be queued.</p>
           ) : null}
+
+          <form action={generateInstallBundle} className="stack-xs surface-form-shell">
+            <div className="stack-xs">
+              <h3>Generate install bundle</h3>
+              <p className="muted">
+                Create the browser-first field handoff package for the latest mission version.
+              </p>
+            </div>
+            <button
+              type="submit"
+              className="button button-secondary"
+              disabled={!latestVersion || access.role === "viewer"}
+            >
+              Generate install bundle
+            </button>
+            {!latestVersion ? <p className="muted">A mission version must exist before install outputs can be staged.</p> : null}
+          </form>
         </aside>
       </section>
 
@@ -531,6 +708,61 @@ export default async function MissionDetailPage({
               </article>
             ))}
           </div>
+        </article>
+      </section>
+
+      <section className="grid-cards">
+        <article className="surface stack-sm info-card">
+          <div className="stack-xs">
+            <p className="eyebrow">Planner + install readiness</p>
+            <h2>Latest mission version</h2>
+          </div>
+          {latestVersion ? (
+            <div className="stack-sm">
+              <dl className="mission-meta-grid">
+                <div className="kv-row">
+                  <dt>Version</dt>
+                  <dd>v{latestVersion.version_number}</dd>
+                </div>
+                <div className="kv-row">
+                  <dt>Status</dt>
+                  <dd>{latestVersion.status}</dd>
+                </div>
+                <div className="kv-row">
+                  <dt>Validation status</dt>
+                  <dd>{typeof latestValidationSummary.status === "string" ? latestValidationSummary.status : "pending"}</dd>
+                </div>
+                <div className="kv-row">
+                  <dt>Install helper</dt>
+                  <dd>{typeof latestExportSummary.installHelper === "string" ? latestExportSummary.installHelper : "Not generated yet"}</dd>
+                </div>
+              </dl>
+
+              <div className="ops-two-column-list-grid">
+                <div className="stack-xs">
+                  <h3>Export targets</h3>
+                  <ul className="action-list mission-blocker-list">
+                    {exportTargets.length > 0 ? exportTargets.map((item) => <li key={item}>{item}</li>) : <li>No export targets recorded.</li>}
+                  </ul>
+                </div>
+                <div className="stack-xs">
+                  <h3>Validation checks</h3>
+                  <ul className="action-list mission-blocker-list">
+                    {validationChecks.length > 0 ? validationChecks.map((item) => <li key={item}>{item}</li>) : <li>No validation checks recorded.</li>}
+                  </ul>
+                </div>
+              </div>
+
+              <div className="stack-xs">
+                <h3>Available exports</h3>
+                <ul className="action-list mission-blocker-list">
+                  {availableExports.length > 0 ? availableExports.map((item) => <li key={item}>{item}</li>) : <li>No exports generated yet.</li>}
+                </ul>
+              </div>
+            </div>
+          ) : (
+            <p className="muted">No mission version exists yet.</p>
+          )}
         </article>
       </section>
 
