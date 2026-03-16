@@ -40,12 +40,12 @@ export function DashboardOverview({ access }: DashboardOverviewProps) {
     <main className="app-shell">
       <section className="surface section-header">
         <div className="stack-sm">
-          <p className="eyebrow">DroneOps Console</p>
+          <p className="eyebrow">Aerial Operations OS</p>
           <h1>Mission dashboard</h1>
           <p className="muted">
             Your account is authenticated and has an active DroneOps entitlement.
-            Use the mission workspace to review field captures, processing readiness,
-            and output status.
+            Use the mission workspace to move beyond auth-only access into planning,
+            ingest, processing, and deliverable review.
           </p>
         </div>
 

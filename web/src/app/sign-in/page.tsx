@@ -16,11 +16,11 @@ export default async function SignInPage() {
   return (
     <main className="auth-layout">
       <section className="auth-side stack-sm">
-        <p className="eyebrow">DroneOps Platform</p>
-        <h2>Secure mission intelligence for licensed teams</h2>
+        <p className="eyebrow">Aerial Operations OS</p>
+        <h2>Secure mission planning, processing, and delivery for field teams</h2>
         <p className="muted">
-          Sign in to access your organization dashboard, entitlement status, and
-          provisioning guidance.
+          Sign in to access your organization workspace, entitlement status, and
+          the new mission-control shell for planning, ingest, and processing.
         </p>
 
         <ul className="auth-trust-list stack-xs">

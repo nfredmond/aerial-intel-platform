@@ -3,8 +3,11 @@ import Link from "next/link";
 import type { DroneOpsAccessResult } from "@/lib/auth/drone-ops-access";
 import {
   buildMissionWorkspaceSnapshot,
+  formatDatasetStatus,
+  formatJobStatus,
   formatMissionOutputStatus,
   formatMissionStage,
+  formatOutputArtifactStatus,
 } from "@/lib/missions/workspace";
 
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
@@ -13,7 +16,20 @@ type MissionWorkspaceProps = {
   access: DroneOpsAccessResult;
 };
 
-function formatCaptureDate(value: string) {
+function formatDateTime(value: string) {
+  const timestamp = new Date(value);
+
+  if (Number.isNaN(timestamp.getTime())) {
+    return "TBD";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(timestamp);
+}
+
+function formatDate(value: string) {
   const timestamp = new Date(value);
 
   if (Number.isNaN(timestamp.getTime())) {
@@ -38,6 +54,17 @@ function formatOneDecimal(value: number) {
   }).format(value);
 }
 
+function getToneClassName(tone: "success" | "info" | "warning") {
+  switch (tone) {
+    case "success":
+      return "status-pill status-pill--success";
+    case "info":
+      return "status-pill status-pill--info";
+    default:
+      return "status-pill status-pill--warning";
+  }
+}
+
 function getStagePillClassName(stage: string) {
   switch (stage) {
     case "ready-for-qa":
@@ -60,6 +87,28 @@ function getOutputPillClassName(status: string) {
   }
 }
 
+function getDatasetPillClassName(status: string) {
+  switch (status) {
+    case "ready":
+      return "status-pill status-pill--success";
+    case "uploading":
+      return "status-pill status-pill--info";
+    default:
+      return "status-pill status-pill--warning";
+  }
+}
+
+function getJobPillClassName(status: string) {
+  switch (status) {
+    case "running":
+      return "status-pill status-pill--info";
+    case "completed":
+      return "status-pill status-pill--success";
+    default:
+      return "status-pill status-pill--warning";
+  }
+}
+
 export function MissionWorkspace({ access }: MissionWorkspaceProps) {
   const snapshot = buildMissionWorkspaceSnapshot({
     orgName: access.org?.name,
@@ -67,65 +116,316 @@ export function MissionWorkspace({ access }: MissionWorkspaceProps) {
     role: access.role,
   });
 
+  const selectedMission = snapshot.missions[0];
+
   return (
-    <main className="app-shell stack-md">
-      <section className="surface section-header">
-        <div className="stack-sm">
-          <p className="eyebrow">DroneOps Workspace</p>
+    <main className="ops-workspace-shell">
+      <section className="ops-topbar surface">
+        <div className="stack-xs">
+          <p className="eyebrow">Aerial Operations OS</p>
           <h1>{snapshot.workspaceLabel}</h1>
           <p className="muted">
-            Entitlement-active route for mission planning, processing visibility,
-            and QA triage. This is the first real workflow surface beyond sign-in.
+            Mission-control shell for planning, ingest, processing, install, and
+            deliverable review. This now reflects the upgraded product direction,
+            not just an auth dashboard.
           </p>
         </div>
 
-        <div className="header-actions">
-          <span className="status-pill status-pill--success">
-            {snapshot.entitlementLabel} access active
-          </span>
+        <div className="ops-topbar-actions">
+          <label className="ops-command-search" htmlFor="ops-command-search">
+            <span className="eyebrow">Command</span>
+            <input
+              id="ops-command-search"
+              name="ops-command-search"
+              type="text"
+              value="Search missions, datasets, jobs, or commands"
+              readOnly
+              aria-readonly="true"
+            />
+          </label>
           <Link href="/dashboard" className="button button-secondary">
-            Back to dashboard
+            Dashboard
           </Link>
           <SignOutForm label="Sign out" variant="secondary" />
         </div>
       </section>
 
-      <section className="stats-grid">
-        <article className="surface stat-card stack-xs">
-          <span className="eyebrow">Active missions</span>
-          <strong className="stat-value">{formatWholeNumber(snapshot.totals.missionCount)}</strong>
-          <p className="muted">Current field or processing lanes inside the workspace.</p>
-        </article>
-
-        <article className="surface stat-card stack-xs">
-          <span className="eyebrow">Mapped area</span>
-          <strong className="stat-value">{formatWholeNumber(snapshot.totals.totalAcres)} acres</strong>
-          <p className="muted">Combined AOI coverage across the current mission set.</p>
-        </article>
-
-        <article className="surface stat-card stack-xs">
-          <span className="eyebrow">Outputs ready</span>
-          <strong className="stat-value">{formatWholeNumber(snapshot.totals.readyOutputCount)}</strong>
-          <p className="muted">
-            Deliverables already generated and ready for QA or packaging.
-          </p>
-        </article>
-
-        <article className="surface stat-card stack-xs">
-          <span className="eyebrow">Attention required</span>
-          <strong className="stat-value">
-            {formatWholeNumber(snapshot.totals.missionsNeedingAttention)} missions
-          </strong>
-          <p className="muted">
-            Missions with blockers, pending processing, or capture planning still open.
-          </p>
-        </article>
+      <section className="ops-status-strip">
+        {snapshot.statusChips.map((chip) => (
+          <article key={`${chip.label}-${chip.value}`} className="surface status-chip-card stack-xs">
+            <span className="eyebrow">{chip.label}</span>
+            <strong>{chip.value}</strong>
+            <span className={getToneClassName(chip.tone)}>{chip.label}</span>
+          </article>
+        ))}
       </section>
 
-      <section className="grid-cards">
-        <article className="surface info-card stack-sm">
-          <h2>Queue health</h2>
+      <section className="ops-main-grid">
+        <aside className="ops-rail surface stack-md">
+          <div className="stack-xs">
+            <p className="eyebrow">Workspace rail</p>
+            <h2>Projects and operations</h2>
+            <p className="muted">
+              The old app stopped at auth. This shell starts introducing the multi-lane
+              operations model from the new master plan.
+            </p>
+          </div>
+
+          {snapshot.rail.map((section) => (
+            <div key={section.label} className="stack-xs">
+              <h3>{section.label}</h3>
+              <ul className="ops-rail-list">
+                {section.items.map((item) => (
+                  <li key={`${section.label}-${item.label}`} className={item.active ? "ops-rail-item ops-rail-item--active" : "ops-rail-item"}>
+                    <span>{item.label}</span>
+                    <span className="muted">{item.meta}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </aside>
+
+        <section className="ops-center-column stack-md">
+          <article className="surface section-header">
+            <div className="stack-sm">
+              <div className="stack-xs">
+                <p className="eyebrow">Current project</p>
+                <h2>{snapshot.currentProject.name}</h2>
+                <p className="muted">{snapshot.currentProject.objective}</p>
+              </div>
+
+              <dl className="kv-grid ops-project-meta">
+                <div className="kv-row">
+                  <dt>Sites in focus</dt>
+                  <dd>{snapshot.currentProject.site}</dd>
+                </div>
+                <div className="kv-row">
+                  <dt>Terrain source</dt>
+                  <dd>{snapshot.currentProject.terrainSource}</dd>
+                </div>
+                <div className="kv-row">
+                  <dt>Coordinate system</dt>
+                  <dd>{snapshot.currentProject.coordinateSystem}</dd>
+                </div>
+                <div className="kv-row">
+                  <dt>Collaboration status</dt>
+                  <dd>{snapshot.currentProject.collaborationStatus}</dd>
+                </div>
+              </dl>
+            </div>
+
+            <div className="header-actions">
+              <span className="status-pill status-pill--success">
+                {snapshot.entitlementLabel} access active
+              </span>
+              <Link href="/dashboard" className="button button-secondary">
+                Account context
+              </Link>
+            </div>
+          </article>
+
+          <section className="stats-grid">
+            <article className="surface stat-card stack-xs">
+              <span className="eyebrow">Active missions</span>
+              <strong className="stat-value">{formatWholeNumber(snapshot.totals.missionCount)}</strong>
+              <p className="muted">Planning, processing, and repeat-capture lanes currently surfaced.</p>
+            </article>
+            <article className="surface stat-card stack-xs">
+              <span className="eyebrow">Mapped area</span>
+              <strong className="stat-value">{formatWholeNumber(snapshot.totals.totalAcres)} acres</strong>
+              <p className="muted">Current pilot coverage across corridor, inspection, and event planning work.</p>
+            </article>
+            <article className="surface stat-card stack-xs">
+              <span className="eyebrow">Tracked datasets</span>
+              <strong className="stat-value">{formatWholeNumber(snapshot.totals.datasetCount)}</strong>
+              <p className="muted">Upload/preflight lanes that should graduate into real ingest sessions next.</p>
+            </article>
+            <article className="surface stat-card stack-xs">
+              <span className="eyebrow">Active jobs</span>
+              <strong className="stat-value">{formatWholeNumber(snapshot.totals.activeJobCount)}</strong>
+              <p className="muted">Processing, validation, and install-bundle work visible in the bottom console.</p>
+            </article>
+          </section>
+
+          <section className="grid-cards">
+            <article className="surface info-card stack-sm">
+              <h2>Mission lanes</h2>
+              <div className="mission-grid mission-grid--single-column">
+                {snapshot.missions.map((mission) => (
+                  <article key={mission.id} className="ops-mission-card stack-sm">
+                    <div className="mission-card-header">
+                      <div className="stack-xs">
+                        <p className="eyebrow">{mission.siteName}</p>
+                        <h3>{mission.name}</h3>
+                        <p className="muted">
+                          {mission.missionType} · {mission.versionLabel} · updated {formatDateTime(mission.lastUpdated)}
+                        </p>
+                      </div>
+                      <div className="stack-xs ops-mission-header-pills">
+                        <span className={getStagePillClassName(mission.stage)}>
+                          {formatMissionStage(mission.stage)}
+                        </span>
+                        <span className="status-pill status-pill--info">Health {mission.healthScore}</span>
+                      </div>
+                    </div>
+
+                    <dl className="mission-meta-grid">
+                      <div className="kv-row">
+                        <dt>Capture date</dt>
+                        <dd>{formatDate(mission.captureDate)}</dd>
+                      </div>
+                      <div className="kv-row">
+                        <dt>AOI size</dt>
+                        <dd>{formatWholeNumber(mission.areaAcres)} acres</dd>
+                      </div>
+                      <div className="kv-row">
+                        <dt>Target GSD</dt>
+                        <dd>{formatOneDecimal(mission.gsdCm)} cm</dd>
+                      </div>
+                      <div className="kv-row">
+                        <dt>Images</dt>
+                        <dd>{formatWholeNumber(mission.imageCount)}</dd>
+                      </div>
+                      <div className="kv-row mission-meta-grid__wide">
+                        <dt>Device target</dt>
+                        <dd>{mission.targetDevice}</dd>
+                      </div>
+                      <div className="kv-row mission-meta-grid__wide">
+                        <dt>Battery/install plan</dt>
+                        <dd>{mission.batteryPlan}</dd>
+                      </div>
+                      <div className="kv-row mission-meta-grid__wide">
+                        <dt>Compatibility</dt>
+                        <dd>{mission.compatibility}</dd>
+                      </div>
+                    </dl>
+
+                    <div className="stack-xs">
+                      <h3>Output readiness</h3>
+                      <div className="output-pill-grid">
+                        {mission.outputs.map((output) => (
+                          <div key={`${mission.id}-${output.key}`} className="output-pill-card">
+                            <div className="stack-xs">
+                              <strong>{output.label}</strong>
+                              <span className="muted">{output.format}</span>
+                            </div>
+                            <span className={getOutputPillClassName(output.status)}>
+                              {formatMissionOutputStatus(output.status)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="ops-two-column-list-grid">
+                      <div className="stack-xs">
+                        <h3>Current blocker</h3>
+                        <ul className="action-list mission-blocker-list">
+                          {mission.blockers.map((blocker) => (
+                            <li key={blocker}>{blocker}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div className="stack-xs">
+                        <h3>Validation gaps</h3>
+                        <ul className="action-list mission-blocker-list">
+                          {mission.warnings.map((warning) => (
+                            <li key={warning}>{warning}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </article>
+
+            <article className="surface info-card stack-sm">
+              <h2>Ingest and deliverables</h2>
+              <div className="stack-sm">
+                <div className="stack-xs">
+                  <p className="eyebrow">Datasets</p>
+                  <div className="stack-xs">
+                    {snapshot.datasets.map((dataset) => (
+                      <article key={dataset.id} className="ops-list-card">
+                        <div className="ops-list-card-header">
+                          <div className="stack-xs">
+                            <strong>{dataset.name}</strong>
+                            <span className="muted">
+                              {dataset.kind} · {formatWholeNumber(dataset.imageCount)} frames · {dataset.footprint}
+                            </span>
+                          </div>
+                          <span className={getDatasetPillClassName(dataset.status)}>
+                            {formatDatasetStatus(dataset.status)}
+                          </span>
+                        </div>
+                        <p className="muted">
+                          Captured {formatDateTime(dataset.capturedAt)} · {dataset.finding}
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="stack-xs">
+                  <p className="eyebrow">Outputs</p>
+                  <div className="stack-xs">
+                    {snapshot.outputArtifacts.map((artifact) => (
+                      <article key={artifact.id} className="ops-list-card">
+                        <div className="ops-list-card-header">
+                          <div className="stack-xs">
+                            <strong>{artifact.name}</strong>
+                            <span className="muted">
+                              {artifact.kind} · {artifact.format}
+                            </span>
+                          </div>
+                          <span className={getOutputPillClassName(artifact.status)}>
+                            {formatOutputArtifactStatus(artifact.status)}
+                          </span>
+                        </div>
+                        <p className="muted">
+                          {artifact.delivery} · Source: {artifact.sourceJob}
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </article>
+          </section>
+        </section>
+
+        <aside className="ops-inspector surface stack-md">
+          <div className="stack-xs">
+            <p className="eyebrow">Contextual inspector</p>
+            <h2>{selectedMission.name}</h2>
+            <p className="muted">
+              The right rail now behaves like a mission-control inspector instead of a dead-end detail card.
+            </p>
+          </div>
+
           <dl className="kv-grid">
+            <div className="kv-row">
+              <dt>Mission type</dt>
+              <dd>{selectedMission.missionType}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Version</dt>
+              <dd>{selectedMission.versionLabel}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Processing profile</dt>
+              <dd>{selectedMission.processingProfile}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Coordinate system</dt>
+              <dd>{selectedMission.coordinateSystem}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Outputs ready</dt>
+              <dd>{formatWholeNumber(snapshot.totals.readyOutputCount)}</dd>
+            </div>
             <div className="kv-row">
               <dt>Outputs in progress</dt>
               <dd>{formatWholeNumber(snapshot.totals.outputsInProgressCount)}</dd>
@@ -135,104 +435,74 @@ export function MissionWorkspace({ access }: MissionWorkspaceProps) {
               <dd>{formatWholeNumber(snapshot.totals.outputsMissingCount)}</dd>
             </div>
             <div className="kv-row">
-              <dt>Signed-in role</dt>
-              <dd>{access.role ?? "Unknown"}</dd>
-            </div>
-            <div className="kv-row">
-              <dt>Organization</dt>
-              <dd>{access.org?.name ?? "Unknown"}</dd>
+              <dt>Missions needing attention</dt>
+              <dd>{formatWholeNumber(snapshot.totals.missionsNeedingAttention)}</dd>
             </div>
           </dl>
-        </article>
 
-        <article className="surface info-card stack-sm">
-          <h2>Recommended next actions</h2>
-          <ol className="stack-xs action-list">
-            {snapshot.nextActions.map((action) => (
-              <li key={action}>{action}</li>
-            ))}
-          </ol>
-        </article>
+          <div className="stack-xs">
+            <h3>Next shipping actions</h3>
+            <ol className="action-list">
+              {snapshot.nextActions.map((action) => (
+                <li key={action}>{action}</li>
+              ))}
+            </ol>
+          </div>
+        </aside>
       </section>
 
-      <section className="stack-sm">
-        <div className="stack-xs">
-          <p className="eyebrow">Mission pipeline</p>
-          <h2>Field-to-delivery visibility</h2>
-          <p className="muted">
-            Each mission card is structured around the workflows Nathaniel will need next:
-            AOI context, capture status, processing profile, and output readiness.
-          </p>
-        </div>
+      <section className="ops-console-grid">
+        <article className="surface stack-sm">
+          <div className="stack-xs">
+            <p className="eyebrow">Job console</p>
+            <h2>Processing and validation lanes</h2>
+          </div>
+          <div className="stack-sm">
+            {snapshot.jobs.map((job) => (
+              <article key={job.id} className="ops-job-card stack-xs">
+                <div className="ops-list-card-header">
+                  <div className="stack-xs">
+                    <strong>{job.name}</strong>
+                    <span className="muted">
+                      {job.engine} · {job.stage} · started {formatDateTime(job.startedAt)}
+                    </span>
+                  </div>
+                  <span className={getJobPillClassName(job.status)}>{formatJobStatus(job.status)}</span>
+                </div>
+                <div className="ops-progress-row">
+                  <div className="ops-progress-track" aria-hidden="true">
+                    <span className="ops-progress-fill" style={{ width: `${job.progress}%` }} />
+                  </div>
+                  <strong>{job.progress}%</strong>
+                </div>
+                <div className="ops-job-meta muted">
+                  <span>{job.queuePosition}</span>
+                  <span>ETA: {job.eta}</span>
+                </div>
+                <p className="muted">{job.notes}</p>
+              </article>
+            ))}
+          </div>
+        </article>
 
-        <div className="mission-grid">
-          {snapshot.missions.map((mission) => (
-            <article key={mission.id} className="surface mission-card stack-sm">
-              <div className="mission-card-header">
-                <div className="stack-xs">
-                  <p className="eyebrow">{mission.siteName}</p>
-                  <h3>{mission.name}</h3>
+        <article className="surface stack-sm">
+          <div className="stack-xs">
+            <p className="eyebrow">Activity feed</p>
+            <h2>Event history</h2>
+          </div>
+          <div className="stack-xs">
+            {snapshot.activity.map((event) => (
+              <article key={event.id} className="ops-event-card stack-xs">
+                <div className="ops-list-card-header">
+                  <strong>{event.title}</strong>
+                  <span className="muted">{event.type}</span>
                 </div>
-                <span className={getStagePillClassName(mission.stage)}>
-                  {formatMissionStage(mission.stage)}
-                </span>
-              </div>
-
-              <dl className="mission-meta-grid">
-                <div className="kv-row">
-                  <dt>Capture date</dt>
-                  <dd>{formatCaptureDate(mission.captureDate)}</dd>
-                </div>
-                <div className="kv-row">
-                  <dt>AOI size</dt>
-                  <dd>{formatWholeNumber(mission.areaAcres)} acres</dd>
-                </div>
-                <div className="kv-row">
-                  <dt>Images</dt>
-                  <dd>{formatWholeNumber(mission.imageCount)}</dd>
-                </div>
-                <div className="kv-row">
-                  <dt>Target GSD</dt>
-                  <dd>{formatOneDecimal(mission.gsdCm)} cm</dd>
-                </div>
-                <div className="kv-row mission-meta-grid__wide">
-                  <dt>Coordinate system</dt>
-                  <dd>{mission.coordinateSystem}</dd>
-                </div>
-                <div className="kv-row mission-meta-grid__wide">
-                  <dt>Processing profile</dt>
-                  <dd>{mission.processingProfile}</dd>
-                </div>
-              </dl>
-
-              <div className="stack-xs">
-                <h3>Output status</h3>
-                <div className="output-pill-grid">
-                  {mission.outputs.map((output) => (
-                    <div key={`${mission.id}-${output.key}`} className="output-pill-card">
-                      <div className="stack-xs">
-                        <strong>{output.label}</strong>
-                        <span className="muted">{output.format}</span>
-                      </div>
-                      <span className={getOutputPillClassName(output.status)}>
-                        {formatMissionOutputStatus(output.status)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="stack-xs">
-                <h3>Current blocker</h3>
-                <ul className="stack-xs action-list mission-blocker-list">
-                  {mission.blockers.map((blocker) => (
-                    <li key={blocker}>{blocker}</li>
-                  ))}
-                </ul>
-              </div>
-            </article>
-          ))}
-        </div>
+                <p className="muted">{event.detail}</p>
+                <span className="eyebrow">{formatDateTime(event.at)}</span>
+              </article>
+            ))}
+          </div>
+        </article>
       </section>
     </main>
   );

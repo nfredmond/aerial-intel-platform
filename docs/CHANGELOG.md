@@ -1,6 +1,11 @@
 # Changelog
 
 ## Unreleased
+- Reframed the web app around an `Aerial Operations OS` mission-control shell so the product direction now visibly covers planning, ingest, processing, and delivery instead of stopping at auth.
+- Rebuilt the `/missions` route into a richer operations workspace with a top command bar, left workspace rail, center mission lanes, right contextual inspector, and bottom job/activity console.
+- Expanded the mission workspace snapshot model to include project context, operational status chips, datasets, jobs, output artifacts, and event history representing the next product slices.
+- Added an execution-plan document (`docs/AERIAL_OPERATIONS_OS_EXECUTION_PLAN_2026-03-15.md`) that adapts the new master plan into the current repo, preserving prior good work while setting the next implementation order.
+- Upgraded `docs/ROADMAP.md` and `docs/ARCHITECTURE.md` to reflect the broader aerial operations platform roadmap and the required separation between app, data, compute, raster delivery, and field-companion planes.
 - Added an entitlement-protected `/missions` workspace route so DroneOps now has a real mission pipeline surface beyond the auth dashboard.
 - Added a GIS/drone mission workspace snapshot model with AOI, capture, processing, CRS, and deliverable readiness metadata for the first workflow slice.
 - Added mission workspace unit coverage for summary totals and stage/output label formatting.

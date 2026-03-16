@@ -1,16 +1,18 @@
-# Nat Ford Aerial Intelligence Platform (ODM+)
+# Nat Ford Aerial Intelligence Platform (Aerial Operations OS)
 
-Project slug: 
-default branch: main
+Project slug: `aerial-intel-platform`  
+default branch: `main`
 
-See project charter and docs folder for current scope and architecture.
+See the charter and docs folder for current scope and architecture. The repo is now evolving from a narrow DroneOps auth MVP into a broader **Aerial Operations OS** covering mission planning, ingest, processing, delivery, and repeat capture workflows.
 
 ## Current Implementation Tracks
 
 - ODM benchmark harness (`scripts/run_odm_benchmark.sh`)
 - Auth delivery readiness plan (`docs/AUTH_DELIVERY_READINESS_2026-03-03.md`)
+- Aerial Operations OS execution plan (`docs/AERIAL_OPERATIONS_OS_EXECUTION_PLAN_2026-03-15.md`)
 - Supabase auth/entitlement schema scaffold (`supabase/migrations/202603040001_droneops_auth_foundation.sql`)
-- DroneOps auth MVP web app (`web/`)
+- Core aerial-ops domain schema scaffold (`supabase/migrations/202603150001_aerial_ops_core_foundation.sql`)
+- Mission-control web shell with protected dashboard + `/missions` workspace (`web/`)
 
 ## Quickstart (Benchmark Script)
 
@@ -62,13 +64,15 @@ Example override:
 ODM_IMAGE=opendronemap/odm:3.5.5 ODM_ARGS="--project-path /datasets site-a-baseline --orthophoto-resolution 2" ./scripts/run_odm_benchmark.sh ./sample-datasets/site-a site-a-baseline
 ```
 
-## DroneOps Auth MVP (web)
+## Web app (current mission-control shell)
 
-Minimal Next.js app with:
+Current Next.js app features:
 
 - `/sign-in` email/password auth via Supabase
-- `/dashboard` protected route
+- `/dashboard` protected route for account and entitlement context
+- `/missions` protected Aerial Operations OS workspace shell
 - role + entitlement gate (`drone_memberships` + active `drone_entitlements` where `product_id='drone-ops'`)
+- mission-control layout with a command bar, workspace rail, mission lanes, contextual inspector, and job/activity console
 - blocked state with support contact + prefilled support diagnostics (user ID, organization ID/slug/name, role, membership, entitlement), a generated support reference + UTC snapshot timestamp, support email subjects prefilled with that reference, an "Open in Gmail" quick action, one-click copy actions for the signed-in user ID, signed-in account email, organization ID, organization slug, organization name, support email address, support email link, support Gmail compose link, support reference, support snapshot timestamp, support triage summary, support follow-up line, support escalation line, support call brief, support reference + snapshot line, support diagnostics CSV block, support diagnostics TSV block, support diagnostics key-value block, support diagnostics markdown block, support diagnostics markdown table, support diagnostics JSON line, support log search query, blocked-access reason, operator handoff checklist, operator escalation packet, support ticket title, support ticket header line, support ticket body, support email subject, support email body, support context, support context JSON, and full support email draft text, and ready-to-copy manual fallback text boxes when clipboard access is unavailable
 
 ### Local setup
@@ -96,7 +100,7 @@ npm run build
 
 ### Required web environment variables
 
-Set these in `web/.env.local`:
+Copy `web/.env.example` to `web/.env.local` and set:
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
