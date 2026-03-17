@@ -6,6 +6,10 @@ import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-button";
 import { GeometryPreviewCard } from "@/components/geometry-preview-card";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
+import {
+  buildCoverageRosterSummary,
+  getCoverageRoster,
+} from "@/lib/coverage-roster";
 import { formatGeoJsonSurface, parseGeoJsonSurface } from "@/lib/geojson";
 import {
   buildMissionGisBrief,
@@ -868,6 +872,19 @@ export default async function MissionDetailPage({
     missionStatus: detail.mission.status,
     insight: missionSpatialInsight,
   });
+  const coverageRoster = getCoverageRoster({
+    missionGeometry,
+    datasets: detail.datasets.map((dataset) => ({
+      id: dataset.id,
+      name: dataset.name,
+      status: dataset.status,
+      spatialFootprint: (dataset.spatial_footprint as Json | null) ?? null,
+    })),
+  });
+  const coverageRosterSummary = buildCoverageRosterSummary({
+    missionName: detail.mission.name,
+    items: coverageRoster,
+  });
   const missionGeometryInsight = getMissionGeometryInsight({
     geometry: missionGeometry,
     fallbackAreaAcres: getNumber(detail.summary.areaAcres),
@@ -1273,6 +1290,28 @@ export default async function MissionDetailPage({
               </Link>
             )) : <p className="muted">Attach a dataset first to compare footprints.</p>}
           </div>
+        </article>
+
+        <article className="surface stack-sm info-card">
+          <div className="stack-xs">
+            <p className="eyebrow">Dataset coverage roster</p>
+            <h2>All attached dataset comparisons</h2>
+            <p className="muted">A mission-wide ranking of attached datasets by planned-versus-captured coverage comparability and estimated extent overlap.</p>
+          </div>
+          <ul className="action-list mission-blocker-list">
+            {coverageRoster.length > 0 ? coverageRoster.map((item) => (
+              <li key={item.id}>
+                <strong>{item.name}</strong> — {item.coveragePercent !== null ? `${item.coveragePercent}% covered` : "Coverage unavailable"}; {item.overlapAreaAcres !== null ? `${item.overlapAreaAcres} acres overlap` : "No overlap estimate"}. {item.summary}
+              </li>
+            )) : <li>No datasets attached yet.</li>}
+          </ul>
+          <SupportContextCopyButton
+            text={coverageRosterSummary}
+            buttonLabel="Copy coverage roster"
+            successMessage="Coverage roster copied. Paste it into notes, Slack, or QA docs."
+            fallbackAriaLabel="Mission coverage roster"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this coverage roster into notes, chat, or a QA checklist."
+          />
         </article>
 
         <GeometryPreviewCard
