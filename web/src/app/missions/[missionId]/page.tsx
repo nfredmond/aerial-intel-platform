@@ -9,6 +9,10 @@ import {
   buildMissionGisBrief,
 } from "@/lib/gis-briefs";
 import {
+  getMissionGeometryInsight,
+  getTerrainInsight,
+} from "@/lib/geometry-insights";
+import {
   getMissionSpatialInsight,
 } from "@/lib/gis-insights";
 import {
@@ -744,6 +748,17 @@ export default async function MissionDetailPage({
     missionStatus: detail.mission.status,
     insight: missionSpatialInsight,
   });
+  const missionGeometryInsight = getMissionGeometryInsight({
+    geometry: detail.mission.planning_geometry,
+    fallbackAreaAcres: getNumber(detail.summary.areaAcres),
+    missionType: detail.mission.mission_type,
+  });
+  const terrainInsight = getTerrainInsight({
+    areaAcres: getNumber(detail.summary.areaAcres),
+    gsdCm: getNumber(detail.summary.gsdCm),
+    missionType: detail.mission.mission_type,
+    warnings,
+  });
   const calloutState =
     resolvedSearchParams.created
     ?? resolvedSearchParams.attached
@@ -1026,6 +1041,54 @@ export default async function MissionDetailPage({
               </article>
             ))}
           </div>
+        </article>
+      </section>
+
+      <section className="grid-cards">
+        <article className="surface stack-sm info-card">
+          <div className="stack-xs">
+            <p className="eyebrow">Geometry intelligence</p>
+            <h2>AOI footprint posture</h2>
+          </div>
+          <div className="ops-list-card-header">
+            <p className="muted">{missionGeometryInsight.summary}</p>
+            <span className={missionGeometryInsight.hasGeometry ? "status-pill status-pill--success" : "status-pill status-pill--warning"}>
+              {missionGeometryInsight.hasGeometry ? "Geometry attached" : "Geometry missing"}
+            </span>
+          </div>
+          <dl className="kv-grid">
+            <div className="kv-row">
+              <dt>Area</dt>
+              <dd>{missionGeometryInsight.areaAcres ? `${missionGeometryInsight.areaAcres} acres` : "Unknown"}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Footprint extent</dt>
+              <dd>{missionGeometryInsight.bboxLabel}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Shape class</dt>
+              <dd>{missionGeometryInsight.shapeClass}</dd>
+            </div>
+          </dl>
+          <ul className="action-list mission-blocker-list">
+            {missionGeometryInsight.recommendations.map((item) => <li key={item}>{item}</li>)}
+          </ul>
+        </article>
+
+        <article className="surface stack-sm info-card">
+          <div className="stack-xs">
+            <p className="eyebrow">Terrain intelligence</p>
+            <h2>Topographic risk posture</h2>
+          </div>
+          <div className="ops-list-card-header">
+            <p className="muted">{terrainInsight.summary}</p>
+            <span className={terrainInsight.riskLevel === "low" ? "status-pill status-pill--success" : terrainInsight.riskLevel === "moderate" ? "status-pill status-pill--info" : "status-pill status-pill--warning"}>
+              Score {terrainInsight.score}
+            </span>
+          </div>
+          <ul className="action-list mission-blocker-list">
+            {terrainInsight.recommendations.map((item) => <li key={item}>{item}</li>)}
+          </ul>
         </article>
       </section>
 

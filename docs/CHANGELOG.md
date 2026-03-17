@@ -24,6 +24,7 @@
 - Added mission-detail approval/install/delivery controls so the latest mission version can be approved, confirmed installed, and the mission itself marked delivered with delivery metadata captured in the mission summary.
 - Added explainable GIS spatial-intelligence scoring on mission and dataset detail pages, using planning/GIS heuristics (capture density, CRS posture, overlap, GCPs, blockers/warnings, export readiness) to surface recommendations without fake certainty.
 - Added GIS copilot brief generation on mission and dataset pages so users can copy structured plain-English spatial QA summaries and next actions into chat, docs, or delivery notes.
+- Added geometry-aware AOI/footprint posture plus terrain-risk cards that use real GeoJSON geometry when available and degrade gracefully to summary-based heuristics when geometry is still missing.
 - Added the first authenticated write path: queueing a processing job from the mission detail page now writes a real `drone_processing_jobs` row plus a `drone_processing_job_events` audit entry through a server-side action.
 - Added an entitlement-protected `/missions` workspace route so DroneOps now has a real mission pipeline surface beyond the auth dashboard.
 - Added a GIS/drone mission workspace snapshot model with AOI, capture, processing, CRS, and deliverable readiness metadata for the first workflow slice.

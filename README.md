@@ -71,8 +71,8 @@ Current Next.js app features:
 - `/sign-in` email/password auth via Supabase
 - `/dashboard` protected route for account and entitlement context
 - `/missions` protected Aerial Operations OS workspace shell
-- `/missions/[missionId]` mission detail with live actions for dataset attachment, queued processing, install-bundle generation, approval/install/delivery state updates, explainable GIS spatial-intelligence scoring, and copyable GIS copilot briefs
-- `/datasets/[datasetId]` dataset preflight review surface for capture findings, readiness approval, GIS spatial-intelligence scoring, and copyable GIS copilot briefs
+- `/missions/[missionId]` mission detail with live actions for dataset attachment, queued processing, install-bundle generation, approval/install/delivery state updates, explainable GIS spatial-intelligence scoring, copyable GIS copilot briefs, and geometry/terrain posture cards
+- `/datasets/[datasetId]` dataset preflight review surface for capture findings, readiness approval, GIS spatial-intelligence scoring, copyable GIS copilot briefs, and coverage-footprint posture cards
 - `/jobs/[jobId]` processing job detail with artifact linkage, retry/cancel controls, and imported log-tail visibility
 - `/artifacts/[artifactId]` artifact review/share/export surface with copy-ready delivery packets
 - role + entitlement gate (`drone_memberships` + active `drone_entitlements` where `product_id='drone-ops'`)
