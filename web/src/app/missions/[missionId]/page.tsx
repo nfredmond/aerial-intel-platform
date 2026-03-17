@@ -11,6 +11,10 @@ import {
   buildMissionGisBrief,
 } from "@/lib/gis-briefs";
 import {
+  buildMissionReadinessChecklist,
+  getMissionReadinessSummary,
+} from "@/lib/mission-readiness";
+import {
   buildMissionOverlayChecklist,
   getMissionOverlayPlan,
 } from "@/lib/overlay-recommendations";
@@ -898,6 +902,24 @@ export default async function MissionDetailPage({
       : [],
   );
   const reviewedOverlayCount = overlayPlan.recommendations.filter((item) => checkedOverlayIds.has(item.id)).length;
+  const readinessSummary = getMissionReadinessSummary({
+    hasMissionGeometry: missionGeometryInsight.hasGeometry,
+    datasetCount: detail.datasets.length,
+    primaryDatasetHasGeometry: Boolean(primaryDatasetGeometry),
+    primaryDatasetReady: primaryDataset?.status === "ready",
+    jobCount: detail.jobs.length,
+    readyOutputCount: detail.outputs.filter((output) => output.status === "ready").length,
+    installBundleReady: availableExports.includes("install_bundle"),
+    versionApproved: Boolean(latestVersion && ["approved", "installed"].includes(latestVersion.status)),
+    installConfirmed: Boolean(typeof latestExportSummary.installConfirmedAt === "string" || latestVersion?.status === "installed"),
+    overlayReviewedCount: reviewedOverlayCount,
+    overlayTotalCount: overlayPlan.recommendations.length,
+    delivered: detail.mission.status === "delivered",
+  });
+  const readinessChecklist = buildMissionReadinessChecklist({
+    missionName: detail.mission.name,
+    steps: readinessSummary.steps,
+  });
   const calloutState =
     resolvedSearchParams.created
     ?? resolvedSearchParams.attached
@@ -988,6 +1010,33 @@ export default async function MissionDetailPage({
                 {warnings.length > 0 ? warnings.map((item) => <li key={item}>{item}</li>) : <li>No warnings recorded.</li>}
               </ul>
             </div>
+          </div>
+
+          <div className="surface-form-shell stack-sm">
+            <div className="ops-list-card-header">
+              <div className="stack-xs">
+                <h3>Mission readiness tracker</h3>
+                <p className="muted">A single progress view across geometry, datasets, QA, outputs, overlays, install, and delivery.</p>
+              </div>
+              <span className={readinessSummary.percent >= 85 ? "status-pill status-pill--success" : readinessSummary.percent >= 60 ? "status-pill status-pill--info" : "status-pill status-pill--warning"}>
+                {readinessSummary.percent}% ready
+              </span>
+            </div>
+            <p className="muted">{readinessSummary.summary}</p>
+            <ul className="action-list mission-blocker-list">
+              {readinessSummary.steps.map((step) => (
+                <li key={step.id}>
+                  <strong>{step.done ? "✓" : "○"} {step.label}</strong> — {step.detail}
+                </li>
+              ))}
+            </ul>
+            <SupportContextCopyButton
+              text={readinessChecklist}
+              buttonLabel="Copy readiness checklist"
+              successMessage="Mission readiness checklist copied. Paste it into notes, Slack, or a delivery checklist."
+              fallbackAriaLabel="Mission readiness checklist"
+              fallbackHintMessage="Press Ctrl/Cmd+C, then paste this readiness checklist into docs, chat, or a handoff note."
+            />
           </div>
 
           <div className="surface-form-shell stack-sm">
