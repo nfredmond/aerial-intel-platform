@@ -133,6 +133,9 @@ export function MissionWorkspace({
   const handoffQueue = snapshot.outputArtifacts.filter(
     (artifact) => artifact.status === "ready" && artifact.handoffStage !== "exported",
   );
+  const reviewQueue = handoffQueue.filter((artifact) => artifact.handoffStage === "pending_review");
+  const shareQueue = handoffQueue.filter((artifact) => artifact.handoffStage === "reviewed");
+  const exportQueue = handoffQueue.filter((artifact) => artifact.handoffStage === "shared");
 
   return (
     <main className="ops-workspace-shell">
@@ -315,65 +318,101 @@ export function MissionWorkspace({
 
                 <div className="stack-xs">
                   <p className="eyebrow">Artifact handoff queue</p>
-                  <div className="stack-xs">
+                  <div className="stack-sm">
                     {handoffQueue.length > 0 ? (
-                      handoffQueue.map((artifact) => (
-                        <article key={`${artifact.id}-handoff`} className="ops-list-card stack-xs">
+                      [
+                        {
+                          id: "review",
+                          title: "Review lane",
+                          detail: "Ready artifacts waiting for QA/reviewer confirmation before sharing.",
+                          items: reviewQueue,
+                        },
+                        {
+                          id: "share",
+                          title: "Share lane",
+                          detail: "Reviewed artifacts ready for stakeholder or client-facing handoff.",
+                          items: shareQueue,
+                        },
+                        {
+                          id: "export",
+                          title: "Export lane",
+                          detail: "Shared artifacts that still need final packaged delivery traceability.",
+                          items: exportQueue,
+                        },
+                      ].map((lane) => (
+                        <section key={lane.id} className="surface-form-shell stack-xs">
                           <div className="ops-list-card-header">
                             <div className="stack-xs">
-                              <strong>{artifact.name}</strong>
-                              <span className="muted">
-                                {artifact.kind} · {artifact.format}
-                              </span>
+                              <strong>{lane.title}</strong>
+                              <span className="muted">{lane.detail}</span>
                             </div>
-                            <span className={getHandoffPillClassName(artifact.handoffStage)}>
-                              {artifact.handoffLabel}
+                            <span className={lane.items.length > 0 ? "status-pill status-pill--warning" : "status-pill status-pill--success"}>
+                              {lane.items.length}
                             </span>
                           </div>
-                          <p className="muted">{artifact.nextAction}</p>
-                          {artifact.handoffNotePreview ? (
-                            <p className="muted">Note: {artifact.handoffNotePreview}</p>
-                          ) : null}
-                          <p className="muted">{artifact.delivery} · Source: {artifact.sourceJob}</p>
-                          <div className="header-actions">
-                            {canManageOperations ? (
-                              <form action={advanceArtifactHandoffAction}>
-                                <input type="hidden" name="artifactId" value={artifact.id} />
-                                <input
-                                  type="hidden"
-                                  name="targetAction"
-                                  value={artifact.handoffStage === "pending_review" ? "reviewed" : artifact.handoffStage === "reviewed" ? "shared" : "exported"}
-                                />
-                                <button type="submit" className="button button-primary">
-                                  {artifact.handoffStage === "pending_review"
-                                    ? "Mark reviewed"
-                                    : artifact.handoffStage === "reviewed"
-                                      ? "Mark shared"
-                                      : "Mark exported"}
-                                </button>
-                              </form>
-                            ) : null}
-                            <Link href={`/artifacts/${artifact.id}`} className="button button-secondary">
-                              Open handoff
-                            </Link>
-                          </div>
-                          <div className="header-actions">
-                            <SupportContextCopyButton
-                              text={artifact.shareSummary}
-                              buttonLabel="Copy share summary"
-                              successMessage="Share summary copied from the workspace queue."
-                              fallbackAriaLabel={`Share summary for ${artifact.name}`}
-                              fallbackHintMessage="Press Ctrl/Cmd+C, then paste this share summary into chat, docs, or email."
-                            />
-                            <SupportContextCopyButton
-                              text={artifact.exportPacket}
-                              buttonLabel="Copy export packet"
-                              successMessage="Export packet copied from the workspace queue."
-                              fallbackAriaLabel={`Export packet for ${artifact.name}`}
-                              fallbackHintMessage="Press Ctrl/Cmd+C, then paste this export packet into docs, tickets, or a delivery note."
-                            />
-                          </div>
-                        </article>
+                          {lane.items.length > 0 ? (
+                            lane.items.map((artifact) => (
+                              <article key={`${artifact.id}-handoff`} className="ops-list-card stack-xs">
+                                <div className="ops-list-card-header">
+                                  <div className="stack-xs">
+                                    <strong>{artifact.name}</strong>
+                                    <span className="muted">
+                                      {artifact.kind} · {artifact.format}
+                                    </span>
+                                  </div>
+                                  <span className={getHandoffPillClassName(artifact.handoffStage)}>
+                                    {artifact.handoffLabel}
+                                  </span>
+                                </div>
+                                <p className="muted">{artifact.nextAction}</p>
+                                {artifact.handoffNotePreview ? (
+                                  <p className="muted">Note: {artifact.handoffNotePreview}</p>
+                                ) : null}
+                                <p className="muted">{artifact.delivery} · Source: {artifact.sourceJob}</p>
+                                <div className="header-actions">
+                                  {canManageOperations ? (
+                                    <form action={advanceArtifactHandoffAction}>
+                                      <input type="hidden" name="artifactId" value={artifact.id} />
+                                      <input
+                                        type="hidden"
+                                        name="targetAction"
+                                        value={artifact.handoffStage === "pending_review" ? "reviewed" : artifact.handoffStage === "reviewed" ? "shared" : "exported"}
+                                      />
+                                      <button type="submit" className="button button-primary">
+                                        {artifact.handoffStage === "pending_review"
+                                          ? "Mark reviewed"
+                                          : artifact.handoffStage === "reviewed"
+                                            ? "Mark shared"
+                                            : "Mark exported"}
+                                      </button>
+                                    </form>
+                                  ) : null}
+                                  <Link href={`/artifacts/${artifact.id}`} className="button button-secondary">
+                                    Open handoff
+                                  </Link>
+                                </div>
+                                <div className="header-actions">
+                                  <SupportContextCopyButton
+                                    text={artifact.shareSummary}
+                                    buttonLabel="Copy share summary"
+                                    successMessage="Share summary copied from the workspace queue."
+                                    fallbackAriaLabel={`Share summary for ${artifact.name}`}
+                                    fallbackHintMessage="Press Ctrl/Cmd+C, then paste this share summary into chat, docs, or email."
+                                  />
+                                  <SupportContextCopyButton
+                                    text={artifact.exportPacket}
+                                    buttonLabel="Copy export packet"
+                                    successMessage="Export packet copied from the workspace queue."
+                                    fallbackAriaLabel={`Export packet for ${artifact.name}`}
+                                    fallbackHintMessage="Press Ctrl/Cmd+C, then paste this export packet into docs, tickets, or a delivery note."
+                                  />
+                                </div>
+                              </article>
+                            ))
+                          ) : (
+                            <p className="muted">No artifacts currently waiting in this lane.</p>
+                          )}
+                        </section>
                       ))
                     ) : (
                       <p className="muted">All ready artifacts are currently exported or no ready artifacts exist yet.</p>
