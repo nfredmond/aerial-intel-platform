@@ -3,7 +3,11 @@ import { notFound, redirect } from "next/navigation";
 
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
+import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-button";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
+import {
+  buildMissionGisBrief,
+} from "@/lib/gis-briefs";
 import {
   getMissionSpatialInsight,
 } from "@/lib/gis-insights";
@@ -729,6 +733,17 @@ export default async function MissionDetailPage({
     versionStatus: latestVersion?.status,
     missionStatus: detail.mission.status,
   });
+  const missionGisBrief = buildMissionGisBrief({
+    missionName: detail.mission.name,
+    projectName: detail.project?.name ?? "Project pending",
+    missionType: detail.mission.mission_type,
+    areaAcres: getNumber(detail.summary.areaAcres),
+    imageCount: getNumber(detail.summary.imageCount),
+    coordinateSystem: getString(detail.summary.coordinateSystem, "Unknown CRS"),
+    versionStatus: latestVersion?.status ?? "draft",
+    missionStatus: detail.mission.status,
+    insight: missionSpatialInsight,
+  });
   const calloutState =
     resolvedSearchParams.created
     ?? resolvedSearchParams.attached
@@ -833,6 +848,13 @@ export default async function MissionDetailPage({
             <ul className="action-list mission-blocker-list">
               {missionSpatialInsight.recommendations.map((item) => <li key={item}>{item}</li>)}
             </ul>
+            <SupportContextCopyButton
+              text={missionGisBrief}
+              buttonLabel="Copy GIS copilot brief"
+              successMessage="GIS copilot brief copied. Paste it into notes, Slack, or client-safe QA docs."
+              fallbackAriaLabel="Mission GIS copilot brief"
+              fallbackHintMessage="Press Ctrl/Cmd+C, then paste this GIS brief into docs, chat, or a delivery checklist."
+            />
           </div>
         </article>
 

@@ -3,7 +3,9 @@ import { notFound, redirect } from "next/navigation";
 
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
+import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-button";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
+import { buildDatasetGisBrief } from "@/lib/gis-briefs";
 import { getDatasetSpatialInsight } from "@/lib/gis-insights";
 import { getDatasetDetail } from "@/lib/missions/detail-data";
 import { updateDataset } from "@/lib/supabase/admin";
@@ -139,6 +141,18 @@ export default async function DatasetDetailPage({
     reviewed: preflight.reviewed === true,
     findings,
   });
+  const datasetGisBrief = buildDatasetGisBrief({
+    datasetName: detail.dataset.name,
+    projectName: detail.project?.name ?? "Project pending",
+    missionName: detail.mission?.name ?? "Mission pending",
+    datasetKind: detail.dataset.kind,
+    status: detail.dataset.status,
+    imageCount: typeof metadata.imageCount === "number" ? metadata.imageCount : 0,
+    overlapFront: typeof preflight.overlapFront === "number" ? preflight.overlapFront : undefined,
+    overlapSide: typeof preflight.overlapSide === "number" ? preflight.overlapSide : undefined,
+    gcpCaptured: preflight.gcpCaptured === true,
+    insight: datasetSpatialInsight,
+  });
   const callout = getCalloutMessage(resolvedSearchParams.reviewed);
 
   return (
@@ -259,6 +273,13 @@ export default async function DatasetDetailPage({
           <ul className="action-list mission-blocker-list">
             {datasetSpatialInsight.recommendations.map((item) => <li key={item}>{item}</li>)}
           </ul>
+          <SupportContextCopyButton
+            text={datasetGisBrief}
+            buttonLabel="Copy GIS copilot brief"
+            successMessage="Dataset GIS copilot brief copied. Paste it into notes, Slack, or QA docs."
+            fallbackAriaLabel="Dataset GIS copilot brief"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this GIS brief into docs, chat, or a review checklist."
+          />
         </article>
 
         <article className="surface stack-sm info-card">
