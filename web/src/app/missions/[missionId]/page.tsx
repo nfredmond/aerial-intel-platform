@@ -5,6 +5,7 @@ import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-button";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
+import { formatGeoJsonSurface, parseGeoJsonSurface } from "@/lib/geojson";
 import {
   buildMissionGisBrief,
 } from "@/lib/gis-briefs";
@@ -36,6 +37,7 @@ import {
   updateMission,
   updateMissionVersion,
 } from "@/lib/supabase/admin";
+import type { Json } from "@/lib/supabase/types";
 
 function formatDateTime(value: string | null) {
   if (!value) return "TBD";
@@ -133,6 +135,7 @@ function getCalloutMessage(options: {
   approved?: string;
   installed?: string;
   delivered?: string;
+  aoi?: string;
   created?: string;
 }) {
   if (options.created === "1") {
@@ -197,6 +200,16 @@ function getCalloutMessage(options: {
         : "Mission delivery could not be recorded. Check server configuration and try again.";
   }
 
+  if (options.aoi) {
+    return options.aoi === "1"
+      ? "Mission AOI geometry saved. Geometry, coverage, and overlay analysis now use the attached GeoJSON shape."
+      : options.aoi === "denied"
+        ? "Viewer access cannot update mission AOI geometry."
+        : options.aoi === "invalid"
+          ? "AOI geometry must be valid GeoJSON Polygon or MultiPolygon JSON."
+          : "Mission AOI geometry could not be updated. Check server configuration and try again.";
+  }
+
   return null;
 }
 
@@ -205,7 +218,7 @@ export default async function MissionDetailPage({
   searchParams,
 }: {
   params: Promise<{ missionId: string }>;
-  searchParams: Promise<{ queued?: string; attached?: string; bundled?: string; approved?: string; installed?: string; delivered?: string; created?: string }>;
+  searchParams: Promise<{ queued?: string; attached?: string; bundled?: string; approved?: string; installed?: string; delivered?: string; aoi?: string; created?: string }>;
 }) {
   const access = await getDroneOpsAccess();
 
@@ -578,6 +591,45 @@ export default async function MissionDetailPage({
     redirect(`/missions/${missionId}?bundled=1`);
   }
 
+  async function attachMissionGeometry(formData: FormData) {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/missions/${missionId}?aoi=denied`);
+    }
+
+    const refreshedDetail = await getMissionDetail(refreshedAccess, missionId);
+    if (!refreshedDetail) {
+      redirect("/missions");
+    }
+
+    const geometryValue = formData.get("aoiGeometryJson");
+    const geometryText = typeof geometryValue === "string" ? geometryValue.trim() : "";
+
+    try {
+      const geometry = parseGeoJsonSurface(geometryText);
+      await updateMission(refreshedDetail.mission.id, {
+        planning_geometry: geometry,
+      });
+    } catch (error) {
+      if (error instanceof SyntaxError || error instanceof Error) {
+        redirect(`/missions/${missionId}?aoi=invalid`);
+      }
+      redirect(`/missions/${missionId}?aoi=error`);
+    }
+
+    redirect(`/missions/${missionId}?aoi=1`);
+  }
+
   async function approveMissionVersion() {
     "use server";
 
@@ -730,6 +782,10 @@ export default async function MissionDetailPage({
   const warnings = getStringArray(detail.summary.warnings);
   const calloutMessage = getCalloutMessage(resolvedSearchParams);
   const deliverySummary = ((detail.summary.delivery as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+  const missionGeometry = (detail.mission.planning_geometry as Json | null) ?? null;
+  const primaryDataset = detail.datasets[0] ?? null;
+  const primaryDatasetGeometry = (primaryDataset?.spatial_footprint as Json | null | undefined) ?? null;
+  const aoiGeometryJson = formatGeoJsonSurface(missionGeometry);
   const missionSpatialInsight = getMissionSpatialInsight({
     missionType: detail.mission.mission_type,
     areaAcres: getNumber(detail.summary.areaAcres),
@@ -754,14 +810,13 @@ export default async function MissionDetailPage({
     insight: missionSpatialInsight,
   });
   const missionGeometryInsight = getMissionGeometryInsight({
-    geometry: detail.mission.planning_geometry,
+    geometry: missionGeometry,
     fallbackAreaAcres: getNumber(detail.summary.areaAcres),
     missionType: detail.mission.mission_type,
   });
-  const primaryDataset = detail.datasets[0] ?? null;
   const coverageComparisonInsight = getCoverageComparisonInsight({
-    missionGeometry: detail.mission.planning_geometry,
-    datasetGeometry: primaryDataset?.spatial_footprint,
+    missionGeometry,
+    datasetGeometry: primaryDatasetGeometry,
   });
   const terrainInsight = getTerrainInsight({
     areaAcres: getNumber(detail.summary.areaAcres),
@@ -789,7 +844,8 @@ export default async function MissionDetailPage({
     ?? resolvedSearchParams.bundled
     ?? resolvedSearchParams.approved
     ?? resolvedSearchParams.installed
-    ?? resolvedSearchParams.delivered;
+    ?? resolvedSearchParams.delivered
+    ?? resolvedSearchParams.aoi;
 
   return (
     <main className="app-shell stack-md">
@@ -899,9 +955,9 @@ export default async function MissionDetailPage({
         <aside className="surface stack-sm">
           <div className="stack-xs">
             <p className="eyebrow">Live action</p>
-            <h2>Attach data, queue processing, and stage install handoff</h2>
+            <h2>Attach data, geometry, queue processing, and stage install handoff</h2>
             <p className="muted">
-              This mission page now supports the next real v1 loop: attach a dataset, queue a job, and generate install-handoff artifacts for field use.
+              This mission page now supports the next real v1 loop: attach a dataset, attach AOI geometry, queue a job, and generate install-handoff artifacts for field use.
             </p>
           </div>
 
@@ -973,6 +1029,20 @@ export default async function MissionDetailPage({
               disabled={access.role === "viewer"}
             >
               Attach dataset
+            </button>
+          </form>
+
+          <form action={attachMissionGeometry} className="stack-sm surface-form-shell">
+            <div className="stack-xs">
+              <h3>Attach AOI geometry</h3>
+              <p className="muted">Paste GeoJSON Polygon or MultiPolygon to power AOI, terrain, overlay, and coverage analytics.</p>
+            </div>
+            <label className="stack-xs">
+              <span>GeoJSON</span>
+              <textarea name="aoiGeometryJson" defaultValue={aoiGeometryJson} placeholder='{"type":"Polygon","coordinates":[...]}' required />
+            </label>
+            <button type="submit" className="button button-secondary" disabled={access.role === "viewer"}>
+              Save AOI geometry
             </button>
           </form>
 

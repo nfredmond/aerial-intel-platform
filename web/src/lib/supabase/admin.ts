@@ -121,6 +121,7 @@ export type JobEventInsert = {
 export type MissionPatch = {
   status?: string;
   objective?: string | null;
+  planning_geometry?: Json | null;
   summary?: Json;
 };
 
@@ -133,6 +134,7 @@ export type MissionVersionPatch = {
 
 export type DatasetPatch = {
   status?: string;
+  spatial_footprint?: Json | null;
   metadata?: Json;
   captured_at?: string | null;
 };

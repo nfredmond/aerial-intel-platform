@@ -5,11 +5,13 @@ import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-button";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
+import { formatGeoJsonSurface, parseGeoJsonSurface } from "@/lib/geojson";
 import { buildDatasetGisBrief } from "@/lib/gis-briefs";
 import { getCoverageComparisonInsight, getDatasetCoverageInsight } from "@/lib/geometry-insights";
 import { getDatasetSpatialInsight } from "@/lib/gis-insights";
 import { getDatasetDetail } from "@/lib/missions/detail-data";
 import { updateDataset } from "@/lib/supabase/admin";
+import type { Json } from "@/lib/supabase/types";
 
 function formatDateTime(value: string | null) {
   if (!value) return "TBD";
@@ -33,27 +35,57 @@ function getStatusClassName(status: string) {
   }
 }
 
-function getCalloutMessage(reviewed?: string) {
-  if (!reviewed) return null;
+function getCalloutMessage(input: { reviewed?: string; geometry?: string }) {
+  if (input.reviewed) {
+    if (input.reviewed === "1") {
+      return {
+        tone: "success",
+        text: "Dataset preflight marked reviewed and promoted to ready.",
+      } as const;
+    }
 
-  if (reviewed === "1") {
-    return {
-      tone: "success",
-      text: "Dataset preflight marked reviewed and promoted to ready.",
-    } as const;
-  }
+    if (input.reviewed === "denied") {
+      return {
+        tone: "error",
+        text: "Viewer access cannot update dataset preflight status.",
+      } as const;
+    }
 
-  if (reviewed === "denied") {
     return {
       tone: "error",
-      text: "Viewer access cannot update dataset preflight status.",
+      text: "The dataset preflight status could not be updated.",
     } as const;
   }
 
-  return {
-    tone: "error",
-    text: "The dataset preflight status could not be updated.",
-  } as const;
+  if (input.geometry) {
+    if (input.geometry === "1") {
+      return {
+        tone: "success",
+        text: "Dataset footprint geometry saved. Coverage comparison and footprint intelligence now use the attached GeoJSON shape.",
+      } as const;
+    }
+
+    if (input.geometry === "denied") {
+      return {
+        tone: "error",
+        text: "Viewer access cannot update dataset footprint geometry.",
+      } as const;
+    }
+
+    if (input.geometry === "invalid") {
+      return {
+        tone: "error",
+        text: "Geometry must be valid GeoJSON Polygon or MultiPolygon JSON.",
+      } as const;
+    }
+
+    return {
+      tone: "error",
+      text: "The dataset footprint geometry could not be updated.",
+    } as const;
+  }
+
+  return null;
 }
 
 export default async function DatasetDetailPage({
@@ -61,7 +93,7 @@ export default async function DatasetDetailPage({
   searchParams,
 }: {
   params: Promise<{ datasetId: string }>;
-  searchParams: Promise<{ reviewed?: string }>;
+  searchParams: Promise<{ reviewed?: string; geometry?: string }>;
 }) {
   const access = await getDroneOpsAccess();
 
@@ -127,6 +159,45 @@ export default async function DatasetDetailPage({
     redirect(`/datasets/${datasetId}?reviewed=1`);
   }
 
+  async function attachDatasetGeometry(formData: FormData) {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/datasets/${datasetId}?geometry=denied`);
+    }
+
+    const refreshedDetail = await getDatasetDetail(refreshedAccess, datasetId);
+    if (!refreshedDetail) {
+      redirect("/missions");
+    }
+
+    const geometryValue = formData.get("geometryJson");
+    const geometryText = typeof geometryValue === "string" ? geometryValue.trim() : "";
+
+    try {
+      const geometry = parseGeoJsonSurface(geometryText);
+      await updateDataset(refreshedDetail.dataset.id, {
+        spatial_footprint: geometry,
+      });
+    } catch (error) {
+      if (error instanceof SyntaxError || error instanceof Error) {
+        redirect(`/datasets/${datasetId}?geometry=invalid`);
+      }
+      redirect(`/datasets/${datasetId}?geometry=error`);
+    }
+
+    redirect(`/datasets/${datasetId}?geometry=1`);
+  }
+
   const metadata = (detail.dataset.metadata as Record<string, unknown> | null) ?? {};
   const preflight = (metadata.preflight as Record<string, unknown> | null) ?? {};
   const findings = Array.isArray(preflight.findings)
@@ -154,15 +225,18 @@ export default async function DatasetDetailPage({
     gcpCaptured: preflight.gcpCaptured === true,
     insight: datasetSpatialInsight,
   });
+  const datasetGeometry = (detail.dataset.spatial_footprint as Json | null) ?? null;
+  const missionGeometry = (detail.mission?.planning_geometry as Json | null | undefined) ?? null;
   const datasetCoverageInsight = getDatasetCoverageInsight({
-    geometry: detail.dataset.spatial_footprint,
+    geometry: datasetGeometry,
     status: detail.dataset.status,
   });
   const coverageComparisonInsight = getCoverageComparisonInsight({
-    missionGeometry: detail.mission?.planning_geometry,
-    datasetGeometry: detail.dataset.spatial_footprint,
+    missionGeometry,
+    datasetGeometry,
   });
-  const callout = getCalloutMessage(resolvedSearchParams.reviewed);
+  const geometryJson = formatGeoJsonSurface(datasetGeometry);
+  const callout = getCalloutMessage({ reviewed: resolvedSearchParams.reviewed, geometry: resolvedSearchParams.geometry });
 
   return (
     <main className="app-shell stack-md">
@@ -254,6 +328,20 @@ export default async function DatasetDetailPage({
           {detail.dataset.status === "ready" ? (
             <p className="muted">This dataset is already marked ready.</p>
           ) : null}
+
+          <form action={attachDatasetGeometry} className="stack-sm surface-form-shell">
+            <div className="stack-xs">
+              <h3>Attach footprint geometry</h3>
+              <p className="muted">Paste GeoJSON Polygon or MultiPolygon to power coverage and footprint analytics.</p>
+            </div>
+            <label className="stack-xs">
+              <span>GeoJSON</span>
+              <textarea name="geometryJson" defaultValue={geometryJson} placeholder='{"type":"Polygon","coordinates":[...]}' required />
+            </label>
+            <button type="submit" className="button button-secondary" disabled={access.role === "viewer"}>
+              Save footprint geometry
+            </button>
+          </form>
         </aside>
       </section>
 
