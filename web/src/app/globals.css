@@ -596,6 +596,10 @@ main {
   background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
 }
 
+.geometry-preview--compact {
+  max-height: 220px;
+}
+
 .preview-controls {
   display: flex;
   flex-wrap: wrap;
