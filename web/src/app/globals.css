@@ -643,6 +643,18 @@ main {
   background: linear-gradient(90deg, #2563eb 0%, #16a34a 100%);
 }
 
+.mission-inline-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.mission-readiness-shell {
+  margin-bottom: 0.2rem;
+}
+
 .preview-legend {
   display: flex;
   flex-wrap: wrap;

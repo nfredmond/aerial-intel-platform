@@ -126,6 +126,27 @@ function getCalloutClassName(tone: "success" | "warning" | "error") {
   }
 }
 
+function getMissionReadyOutputCount(mission: MissionWorkspaceSnapshot["missions"][number]) {
+  return mission.outputs.filter((output) => output.status === "ready").length;
+}
+
+function getMissionReadinessPercent(mission: MissionWorkspaceSnapshot["missions"][number]) {
+  const outputPercent = mission.outputs.length > 0
+    ? (getMissionReadyOutputCount(mission) / mission.outputs.length) * 50
+    : 0;
+  const blockerPoints = mission.blockers.length === 0 ? 20 : Math.max(0, 20 - mission.blockers.length * 10);
+  const warningPoints = mission.warnings.length === 0 ? 10 : Math.max(0, 10 - mission.warnings.length * 5);
+  const stagePoints = mission.stage === "ready-for-qa" ? 20 : mission.stage === "processing" ? 10 : 0;
+
+  return Math.max(0, Math.min(100, Math.round(outputPercent + blockerPoints + warningPoints + stagePoints)));
+}
+
+function getMissionReadinessTone(percent: number) {
+  if (percent >= 80) return "status-pill status-pill--success";
+  if (percent >= 60) return "status-pill status-pill--info";
+  return "status-pill status-pill--warning";
+}
+
 export function MissionWorkspace({
   snapshot,
   source,
@@ -283,7 +304,11 @@ export function MissionWorkspace({
             <article className="surface info-card stack-sm">
               <h2>Mission lanes</h2>
               <div className="mission-grid mission-grid--single-column">
-                {snapshot.missions.map((mission) => (
+                {snapshot.missions.map((mission) => {
+                  const readyOutputCount = getMissionReadyOutputCount(mission);
+                  const readinessPercent = getMissionReadinessPercent(mission);
+
+                  return (
                   <article key={mission.id} className="ops-mission-card stack-sm">
                     <div className="mission-card-header">
                       <div className="stack-xs">
@@ -298,6 +323,22 @@ export function MissionWorkspace({
                           {formatMissionStage(mission.stage)}
                         </span>
                         <span className="status-pill status-pill--info">Health {mission.healthScore}</span>
+                      </div>
+                    </div>
+
+                    <div className="surface-form-shell stack-sm mission-readiness-shell">
+                      <div className="ops-list-card-header">
+                        <strong>Mission readiness</strong>
+                        <span className={getMissionReadinessTone(readinessPercent)}>{readinessPercent}% ready</span>
+                      </div>
+                      <div className="status-meter" aria-hidden="true">
+                        <span className="status-meter-fill" style={{ width: `${readinessPercent}%` }} />
+                      </div>
+                      <div className="mission-inline-stats">
+                        <span><strong>{readyOutputCount}/{mission.outputs.length}</strong> outputs ready</span>
+                        <span><strong>{mission.blockers.length}</strong> blockers</span>
+                        <span><strong>{mission.warnings.length}</strong> warnings</span>
+                        <span><strong>{mission.healthScore}</strong> health</span>
                       </div>
                     </div>
 
@@ -374,7 +415,7 @@ export function MissionWorkspace({
                       </Link>
                     </div>
                   </article>
-                ))}
+                );})}
               </div>
             </article>
 

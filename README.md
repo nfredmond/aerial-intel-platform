@@ -71,7 +71,7 @@ Current Next.js app features:
 
 - `/sign-in` email/password auth via Supabase
 - `/dashboard` protected route for account and entitlement context
-- `/missions` protected Aerial Operations OS workspace shell
+- `/missions` protected Aerial Operations OS workspace shell with visual mission readiness strips on each mission card
 - `/missions/[missionId]` mission detail with live actions for dataset attachment, AOI geometry attachment, queued processing, install-bundle generation, approval/install/delivery state updates, explainable GIS spatial-intelligence scoring, copyable GIS copilot briefs, geometry/terrain posture cards, planned-vs-captured coverage comparison, GIS overlay/constraint planning, in-app geometry preview, interactive preview layer toggles, multi-dataset comparison targeting, mission-wide dataset coverage roster, overlay-review tracking, a mission readiness checklist, sample GeoJSON helpers, live draft-geometry preview/validation, and a visual mission dashboard
 - `/datasets/[datasetId]` dataset preflight review surface for capture findings, readiness approval, footprint geometry attachment, GIS spatial-intelligence scoring, copyable GIS copilot briefs, coverage-footprint posture cards, planned-vs-captured coverage comparison, in-app geometry preview, sample GeoJSON helpers, and live draft-geometry preview/validation
 - `/jobs/[jobId]` processing job detail with artifact linkage, retry/cancel controls, and imported log-tail visibility
