@@ -17,6 +17,7 @@ import {
   insertJobEvent,
   insertProcessingJob,
   insertProcessingOutputs,
+  updateMission,
   updateMissionVersion,
 } from "@/lib/supabase/admin";
 
@@ -113,6 +114,9 @@ function getCalloutMessage(options: {
   queued?: string;
   attached?: string;
   bundled?: string;
+  approved?: string;
+  installed?: string;
+  delivered?: string;
   created?: string;
 }) {
   if (options.created === "1") {
@@ -149,6 +153,34 @@ function getCalloutMessage(options: {
           : "The install bundle could not be generated. Check server configuration and try again.";
   }
 
+  if (options.approved) {
+    return options.approved === "1"
+      ? "Latest mission version approved. This mission is now marked validated for handoff."
+      : options.approved === "missing-version"
+        ? "No mission version exists yet, so approval could not be recorded."
+        : options.approved === "denied"
+          ? "Viewer access cannot approve mission versions."
+          : "Mission approval could not be recorded. Check server configuration and try again.";
+  }
+
+  if (options.installed) {
+    return options.installed === "1"
+      ? "Install confirmed. The latest mission version is now marked installed."
+      : options.installed === "missing-version"
+        ? "No mission version exists yet, so install confirmation could not be recorded."
+        : options.installed === "denied"
+          ? "Viewer access cannot confirm install state."
+          : "Install confirmation could not be recorded. Check server configuration and try again.";
+  }
+
+  if (options.delivered) {
+    return options.delivered === "1"
+      ? "Mission marked delivered. Delivery metadata has been written into the mission summary."
+      : options.delivered === "denied"
+        ? "Viewer access cannot mark missions delivered."
+        : "Mission delivery could not be recorded. Check server configuration and try again.";
+  }
+
   return null;
 }
 
@@ -157,7 +189,7 @@ export default async function MissionDetailPage({
   searchParams,
 }: {
   params: Promise<{ missionId: string }>;
-  searchParams: Promise<{ queued?: string; attached?: string; bundled?: string; created?: string }>;
+  searchParams: Promise<{ queued?: string; attached?: string; bundled?: string; approved?: string; installed?: string; delivered?: string; created?: string }>;
 }) {
   const access = await getDroneOpsAccess();
 
@@ -530,6 +562,141 @@ export default async function MissionDetailPage({
     redirect(`/missions/${missionId}?bundled=1`);
   }
 
+  async function approveMissionVersion() {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/missions/${missionId}?approved=denied`);
+    }
+
+    const refreshedDetail = await getMissionDetail(refreshedAccess, missionId);
+    const latestVersion = refreshedDetail?.versions[0] ?? null;
+
+    if (!refreshedDetail || !latestVersion) {
+      redirect(`/missions/${missionId}?approved=missing-version`);
+    }
+
+    const existingValidationSummary = (latestVersion.validation_summary as Record<string, unknown> | null) ?? {};
+
+    try {
+      await updateMissionVersion(latestVersion.id, {
+        status: "approved",
+        validation_summary: {
+          ...existingValidationSummary,
+          status: "approved",
+          approvedAt: new Date().toISOString(),
+          approvedByUserId: refreshedAccess.user.id,
+          approvedByEmail: refreshedAccess.user.email,
+        },
+      });
+
+      await updateMission(refreshedDetail.mission.id, {
+        status: "validated",
+        summary: {
+          ...refreshedDetail.summary,
+          versionApproval: {
+            approvedAt: new Date().toISOString(),
+            approvedByUserId: refreshedAccess.user.id,
+          },
+        },
+      });
+    } catch {
+      redirect(`/missions/${missionId}?approved=error`);
+    }
+
+    redirect(`/missions/${missionId}?approved=1`);
+  }
+
+  async function confirmInstall() {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/missions/${missionId}?installed=denied`);
+    }
+
+    const refreshedDetail = await getMissionDetail(refreshedAccess, missionId);
+    const latestVersion = refreshedDetail?.versions[0] ?? null;
+
+    if (!refreshedDetail || !latestVersion) {
+      redirect(`/missions/${missionId}?installed=missing-version`);
+    }
+
+    const existingExportSummary = (latestVersion.export_summary as Record<string, unknown> | null) ?? {};
+
+    try {
+      await updateMissionVersion(latestVersion.id, {
+        status: "installed",
+        export_summary: {
+          ...existingExportSummary,
+          installConfirmedAt: new Date().toISOString(),
+          installConfirmedByUserId: refreshedAccess.user.id,
+        },
+      });
+    } catch {
+      redirect(`/missions/${missionId}?installed=error`);
+    }
+
+    redirect(`/missions/${missionId}?installed=1`);
+  }
+
+  async function markMissionDelivered() {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/missions/${missionId}?delivered=denied`);
+    }
+
+    const refreshedDetail = await getMissionDetail(refreshedAccess, missionId);
+    if (!refreshedDetail) {
+      redirect(`/missions/${missionId}?delivered=error`);
+    }
+
+    try {
+      await updateMission(refreshedDetail.mission.id, {
+        status: "delivered",
+        summary: {
+          ...refreshedDetail.summary,
+          delivery: {
+            deliveredAt: new Date().toISOString(),
+            deliveredByUserId: refreshedAccess.user.id,
+            deliveredByEmail: refreshedAccess.user.email,
+          },
+        },
+      });
+    } catch {
+      redirect(`/missions/${missionId}?delivered=error`);
+    }
+
+    redirect(`/missions/${missionId}?delivered=1`);
+  }
+
   const latestVersion = detail.versions[0] ?? null;
   const latestPlanPayload = ((latestVersion?.plan_payload as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
   const latestValidationSummary = ((latestVersion?.validation_summary as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
@@ -546,11 +713,15 @@ export default async function MissionDetailPage({
   const blockers = getStringArray(detail.summary.blockers);
   const warnings = getStringArray(detail.summary.warnings);
   const calloutMessage = getCalloutMessage(resolvedSearchParams);
+  const deliverySummary = ((detail.summary.delivery as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
   const calloutState =
     resolvedSearchParams.created
     ?? resolvedSearchParams.attached
     ?? resolvedSearchParams.queued
-    ?? resolvedSearchParams.bundled;
+    ?? resolvedSearchParams.bundled
+    ?? resolvedSearchParams.approved
+    ?? resolvedSearchParams.installed
+    ?? resolvedSearchParams.delivered;
 
   return (
     <main className="app-shell stack-md">
@@ -853,10 +1024,59 @@ export default async function MissionDetailPage({
                   {availableExports.length > 0 ? availableExports.map((item) => <li key={item}>{item}</li>) : <li>No exports generated yet.</li>}
                 </ul>
               </div>
+
+              <div className="stack-xs surface-form-shell">
+                <h3>Approval + delivery controls</h3>
+                <div className="header-actions">
+                  <form action={approveMissionVersion}>
+                    <button type="submit" className="button button-secondary" disabled={access.role === "viewer" || latestVersion.status === "approved" || latestVersion.status === "installed"}>
+                      Approve version
+                    </button>
+                  </form>
+                  <form action={confirmInstall}>
+                    <button type="submit" className="button button-secondary" disabled={access.role === "viewer" || latestVersion.status === "installed" || !availableExports.includes("install_bundle")}>
+                      Confirm install
+                    </button>
+                  </form>
+                  <form action={markMissionDelivered}>
+                    <button type="submit" className="button button-primary" disabled={access.role === "viewer" || detail.mission.status === "delivered"}>
+                      Mark delivered
+                    </button>
+                  </form>
+                </div>
+                {!availableExports.includes("install_bundle") ? (
+                  <p className="muted">Generate an install bundle before confirming install state.</p>
+                ) : null}
+              </div>
             </div>
           ) : (
             <p className="muted">No mission version exists yet.</p>
           )}
+        </article>
+
+        <article className="surface stack-sm info-card">
+          <div className="stack-xs">
+            <p className="eyebrow">Delivery status</p>
+            <h2>Client handoff posture</h2>
+          </div>
+          <dl className="kv-grid">
+            <div className="kv-row">
+              <dt>Mission status</dt>
+              <dd>{detail.mission.status}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Delivered at</dt>
+              <dd>{typeof deliverySummary.deliveredAt === "string" ? formatDateTime(deliverySummary.deliveredAt) : "Not delivered"}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Delivered by</dt>
+              <dd>{typeof deliverySummary.deliveredByEmail === "string" ? deliverySummary.deliveredByEmail : "Not recorded"}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Ready artifacts</dt>
+              <dd>{detail.outputs.filter((output) => output.status === "ready").length}</dd>
+            </div>
+          </dl>
         </article>
       </section>
 

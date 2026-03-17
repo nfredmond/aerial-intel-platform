@@ -21,6 +21,7 @@
 - Added capture-preflight metadata on dataset attachment plus a new `/datasets/[datasetId]` review page so flagged datasets can be inspected and explicitly promoted to ready before processing.
 - Added job-detail operator controls for retry/cancel plus imported log-tail visibility so v1 better covers the “watch status and logs” milestone from the execution plan.
 - Extended benchmark import to persist run-log path and recent log lines into the job record so imported benchmark jobs expose actionable log context in-product.
+- Added mission-detail approval/install/delivery controls so the latest mission version can be approved, confirmed installed, and the mission itself marked delivered with delivery metadata captured in the mission summary.
 - Added the first authenticated write path: queueing a processing job from the mission detail page now writes a real `drone_processing_jobs` row plus a `drone_processing_job_events` audit entry through a server-side action.
 - Added an entitlement-protected `/missions` workspace route so DroneOps now has a real mission pipeline surface beyond the auth dashboard.
 - Added a GIS/drone mission workspace snapshot model with AOI, capture, processing, CRS, and deliverable readiness metadata for the first workflow slice.
