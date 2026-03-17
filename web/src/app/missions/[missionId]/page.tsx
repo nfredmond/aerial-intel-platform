@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-button";
+import { GeometryPreviewCard } from "@/components/geometry-preview-card";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import { formatGeoJsonSurface, parseGeoJsonSurface } from "@/lib/geojson";
 import {
@@ -1138,6 +1139,13 @@ export default async function MissionDetailPage({
       </section>
 
       <section className="grid-cards">
+        <GeometryPreviewCard
+          title="Mission AOI and dataset footprint"
+          subtitle="Quick in-app visual preview of the planned AOI and the first attached dataset footprint."
+          missionGeometry={missionGeometry}
+          datasetGeometry={primaryDatasetGeometry}
+        />
+
         <article className="surface stack-sm info-card">
           <div className="stack-xs">
             <p className="eyebrow">Geometry intelligence</p>

@@ -583,6 +583,35 @@ main {
   word-break: break-word;
 }
 
+.geometry-preview {
+  width: 100%;
+  height: auto;
+  border: 1px solid #dbe3f4;
+  border-radius: 1rem;
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+}
+
+.preview-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+}
+
+.preview-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.preview-legend-swatch {
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 999px;
+  display: inline-block;
+}
+
 @media (min-width: 900px) {
   .auth-layout {
     grid-template-columns: minmax(0, 1fr) minmax(0, 470px);

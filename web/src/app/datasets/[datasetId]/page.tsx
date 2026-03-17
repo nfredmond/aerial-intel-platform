@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-button";
+import { GeometryPreviewCard } from "@/components/geometry-preview-card";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import { formatGeoJsonSurface, parseGeoJsonSurface } from "@/lib/geojson";
 import { buildDatasetGisBrief } from "@/lib/gis-briefs";
@@ -346,6 +347,13 @@ export default async function DatasetDetailPage({
       </section>
 
       <section className="grid-cards">
+        <GeometryPreviewCard
+          title="Mission AOI and dataset footprint"
+          subtitle="Quick visual preview of the current dataset footprint against the mission AOI when both geometries are attached."
+          missionGeometry={missionGeometry}
+          datasetGeometry={datasetGeometry}
+        />
+
         <article className="surface stack-sm info-card">
           <div className="stack-xs">
             <p className="eyebrow">Preflight findings</p>
