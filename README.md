@@ -2,7 +2,7 @@
 
 Project slug: `aerial-intel-platform`  
 default branch: `main`  
-Vercel project: `natford/aerial-intel-platform` (linked on 2026-03-16 for direct `main` production shipping)
+Vercel project: `natford/aerial-intel-platform` (linked on 2026-03-16 for direct `main` production shipping; corrected to `web/` root on 2026-03-16)
 
 See the charter and docs folder for current scope and architecture. The repo is now evolving from a narrow DroneOps auth MVP into a broader **Aerial Operations OS** covering mission planning, ingest, processing, delivery, and repeat capture workflows.
 
