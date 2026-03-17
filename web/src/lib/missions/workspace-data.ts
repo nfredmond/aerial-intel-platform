@@ -1,6 +1,6 @@
 import { formatEntitlementTier } from "@/lib/auth/access-insights";
 import type { DroneOpsAccessResult } from "@/lib/auth/drone-ops-access";
-import { getArtifactHandoff } from "@/lib/artifact-handoff";
+import { getArtifactHandoff, summarizeArtifactHandoffs } from "@/lib/artifact-handoff";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
 
@@ -277,6 +277,19 @@ function buildWorkspaceFromRows(params: {
     const summary = asRecord(mission.summary);
     const version = latestVersionByMissionId.get(mission.id);
     const site = sitesById.get(mission.site_id);
+    const missionOutputs = outputsByMissionId.get(mission.id) ?? [];
+    const blockers = asStringArray(summary.blockers);
+    const warnings = asStringArray(summary.warnings);
+    const handoffCounts = summarizeArtifactHandoffs(missionOutputs.map((output) => asRecord(output.metadata)));
+    const readyOutputCount = missionOutputs.filter((output) => output.status === "ready").length;
+
+    if (readyOutputCount > 0 && handoffCounts.pendingReviewCount > 0) {
+      warnings.push(`${handoffCounts.pendingReviewCount} artifact(s) still pending review in the handoff lane.`);
+    }
+
+    if (readyOutputCount > 0 && handoffCounts.sharedCount + handoffCounts.exportedCount === 0) {
+      warnings.push("No artifacts have been shared or exported yet.");
+    }
 
     return {
       id: mission.id,
@@ -296,9 +309,9 @@ function buildWorkspaceFromRows(params: {
       batteryPlan: asString(summary.batteryPlan, "Battery plan not set"),
       compatibility: asString(summary.compatibility, "Compatibility not yet assessed"),
       healthScore: asNumber(summary.healthScore, 0),
-      outputs: buildMissionOutputs(outputsByMissionId.get(mission.id) ?? []),
-      blockers: asStringArray(summary.blockers),
-      warnings: asStringArray(summary.warnings),
+      outputs: buildMissionOutputs(missionOutputs),
+      blockers,
+      warnings: Array.from(new Set(warnings)),
     };
   });
 
