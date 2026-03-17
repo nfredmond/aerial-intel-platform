@@ -602,6 +602,10 @@ main {
   gap: 0.9rem;
 }
 
+.dataset-switcher-wrap {
+  flex-wrap: wrap;
+}
+
 .preview-legend {
   display: flex;
   flex-wrap: wrap;

@@ -32,6 +32,7 @@
 - Added overlay-review tracking on mission detail so recommended GIS layers can be marked reviewed, counted, and saved as part of the mission’s planning QA state.
 - Upgraded the in-app geometry preview into an interactive layer viewer with toggles for AOI and dataset footprint visibility, plus component-level tests for the preview behavior.
 - Added a mission readiness tracker and copyable readiness checklist that roll up geometry, datasets, processing, outputs, install bundle, approval, overlay review, install confirmation, and delivery into one operational progress surface.
+- Added multi-dataset comparison targeting on mission detail so operators can switch which attached dataset drives geometry preview and planned-vs-captured coverage analysis instead of being locked to the first dataset only.
 - Added the first authenticated write path: queueing a processing job from the mission detail page now writes a real `drone_processing_jobs` row plus a `drone_processing_job_events` audit entry through a server-side action.
 - Added an entitlement-protected `/missions` workspace route so DroneOps now has a real mission pipeline surface beyond the auth dashboard.
 - Added a GIS/drone mission workspace snapshot model with AOI, capture, processing, CRS, and deliverable readiness metadata for the first workflow slice.

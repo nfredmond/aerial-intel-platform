@@ -232,7 +232,7 @@ export default async function MissionDetailPage({
   searchParams,
 }: {
   params: Promise<{ missionId: string }>;
-  searchParams: Promise<{ queued?: string; attached?: string; bundled?: string; approved?: string; installed?: string; delivered?: string; aoi?: string; overlay?: string; created?: string }>;
+  searchParams: Promise<{ queued?: string; attached?: string; bundled?: string; approved?: string; installed?: string; delivered?: string; aoi?: string; overlay?: string; created?: string; dataset?: string }>;
 }) {
   const access = await getDroneOpsAccess();
 
@@ -841,8 +841,9 @@ export default async function MissionDetailPage({
   const calloutMessage = getCalloutMessage(resolvedSearchParams);
   const deliverySummary = ((detail.summary.delivery as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
   const missionGeometry = (detail.mission.planning_geometry as Json | null) ?? null;
-  const primaryDataset = detail.datasets[0] ?? null;
-  const primaryDatasetGeometry = (primaryDataset?.spatial_footprint as Json | null | undefined) ?? null;
+  const defaultDataset = detail.datasets[0] ?? null;
+  const selectedDataset = detail.datasets.find((dataset) => dataset.id === resolvedSearchParams.dataset) ?? defaultDataset;
+  const selectedDatasetGeometry = (selectedDataset?.spatial_footprint as Json | null | undefined) ?? null;
   const aoiGeometryJson = formatGeoJsonSurface(missionGeometry);
   const missionSpatialInsight = getMissionSpatialInsight({
     missionType: detail.mission.mission_type,
@@ -874,7 +875,7 @@ export default async function MissionDetailPage({
   });
   const coverageComparisonInsight = getCoverageComparisonInsight({
     missionGeometry,
-    datasetGeometry: primaryDatasetGeometry,
+    datasetGeometry: selectedDatasetGeometry,
   });
   const terrainInsight = getTerrainInsight({
     areaAcres: getNumber(detail.summary.areaAcres),
@@ -905,8 +906,8 @@ export default async function MissionDetailPage({
   const readinessSummary = getMissionReadinessSummary({
     hasMissionGeometry: missionGeometryInsight.hasGeometry,
     datasetCount: detail.datasets.length,
-    primaryDatasetHasGeometry: Boolean(primaryDatasetGeometry),
-    primaryDatasetReady: primaryDataset?.status === "ready",
+    primaryDatasetHasGeometry: Boolean(selectedDatasetGeometry),
+    primaryDatasetReady: selectedDataset?.status === "ready",
     jobCount: detail.jobs.length,
     readyOutputCount: detail.outputs.filter((output) => output.status === "ready").length,
     installBundleReady: availableExports.includes("install_bundle"),
@@ -1221,6 +1222,12 @@ export default async function MissionDetailPage({
                     <Link href={`/datasets/${dataset.id}`} className="button button-secondary">
                       Review dataset
                     </Link>
+                    <Link
+                      href={`/missions/${detail.mission.id}?dataset=${dataset.id}`}
+                      className={dataset.id === selectedDataset?.id ? "button button-primary" : "button button-secondary"}
+                    >
+                      {dataset.id === selectedDataset?.id ? "Active comparison dataset" : "Use for comparison"}
+                    </Link>
                   </div>
                 </article>
               );
@@ -1249,11 +1256,30 @@ export default async function MissionDetailPage({
       </section>
 
       <section className="grid-cards">
+        <article className="surface stack-sm info-card">
+          <div className="stack-xs">
+            <p className="eyebrow">Dataset comparison target</p>
+            <h2>Choose active dataset</h2>
+            <p className="muted">Use this to drive the preview map and planned-vs-captured coverage comparison with any attached dataset.</p>
+          </div>
+          <div className="header-actions dataset-switcher-wrap">
+            {detail.datasets.length > 0 ? detail.datasets.map((dataset) => (
+              <Link
+                key={dataset.id}
+                href={`/missions/${detail.mission.id}?dataset=${dataset.id}`}
+                className={dataset.id === selectedDataset?.id ? "button button-primary" : "button button-secondary"}
+              >
+                {dataset.name}
+              </Link>
+            )) : <p className="muted">Attach a dataset first to compare footprints.</p>}
+          </div>
+        </article>
+
         <GeometryPreviewCard
           title="Mission AOI and dataset footprint"
-          subtitle="Quick in-app visual preview of the planned AOI and the first attached dataset footprint."
+          subtitle={`Quick in-app visual preview of the planned AOI and ${selectedDataset ? `the selected dataset footprint (${selectedDataset.name})` : "the selected dataset footprint"}.`}
           missionGeometry={missionGeometry}
-          datasetGeometry={primaryDatasetGeometry}
+          datasetGeometry={selectedDatasetGeometry}
         />
 
         <article className="surface stack-sm info-card">
@@ -1302,7 +1328,7 @@ export default async function MissionDetailPage({
           <dl className="kv-grid">
             <div className="kv-row">
               <dt>Reference dataset</dt>
-              <dd>{primaryDataset?.name ?? "No dataset attached"}</dd>
+              <dd>{selectedDataset?.name ?? "No dataset attached"}</dd>
             </div>
             <div className="kv-row">
               <dt>Overlap area</dt>
