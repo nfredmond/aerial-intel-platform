@@ -29,7 +29,9 @@ describe("missions/workspace", () => {
     expect(snapshot.totals.readyOutputCount).toBe(2);
     expect(snapshot.totals.outputsInProgressCount).toBe(4);
     expect(snapshot.totals.outputsMissingCount).toBe(6);
-    expect(snapshot.nextActions[0]).toContain("QA-ready mission");
+    expect(snapshot.totals.handoffBacklogCount).toBe(2);
+    expect(snapshot.totals.exportedArtifactCount).toBe(0);
+    expect(snapshot.nextActions[0]).toContain("artifact handoff backlog");
     expect(snapshot.nextActions.at(-1)).toContain("stand up project/site/mission/dataset/job tables");
   });
 

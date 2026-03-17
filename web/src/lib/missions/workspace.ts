@@ -123,6 +123,8 @@ export type MissionWorkspaceSnapshot = {
     missionsNeedingAttention: number;
     datasetCount: number;
     activeJobCount: number;
+    handoffBacklogCount: number;
+    exportedArtifactCount: number;
   };
   nextActions: string[];
 };
@@ -422,6 +424,10 @@ export function buildMissionWorkspaceSnapshot(options: {
   ).length;
   const datasetCount = datasets.length;
   const activeJobCount = jobs.filter((job) => job.status !== "completed").length;
+  const handoffBacklogCount = outputArtifacts.filter(
+    (artifact) => artifact.status === "ready" && artifact.handoffStage !== "exported",
+  ).length;
+  const exportedArtifactCount = outputArtifacts.filter((artifact) => artifact.handoffStage === "exported").length;
 
   const workspaceName = options.orgName?.trim()
     ? `${options.orgName} mission workspace`
@@ -448,8 +454,8 @@ export function buildMissionWorkspaceSnapshot(options: {
       tone: "success",
     },
     {
-      label: "Install readiness",
-      value: "PDF brief + KMZ pending",
+      label: "Handoff lane",
+      value: "2 queued · 0 exported",
       tone: "warning",
     },
   ];
@@ -482,6 +488,9 @@ export function buildMissionWorkspaceSnapshot(options: {
   ];
 
   const nextActions = [
+    outputArtifacts.find((artifact) => artifact.status === "ready" && artifact.handoffStage !== "exported")
+      ? "Clear the artifact handoff backlog from the workspace queue so reviewed deliverables actually move into shared/exported state." 
+      : null,
     missions.find((mission) => mission.stage === "ready-for-qa")
       ? "Ship the next QA-ready mission slice by turning the downtown corridor run into the first real artifact review screen with COG/point-cloud status." 
       : null,
@@ -523,6 +532,8 @@ export function buildMissionWorkspaceSnapshot(options: {
       missionsNeedingAttention,
       datasetCount,
       activeJobCount,
+      handoffBacklogCount,
+      exportedArtifactCount,
     },
     nextActions,
   };

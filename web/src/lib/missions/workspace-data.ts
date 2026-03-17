@@ -185,6 +185,8 @@ function buildStatusChips(options: {
   queuedJobs: number;
   readyOutputs: number;
   draftOutputs: number;
+  handoffBacklog: number;
+  exportedArtifacts: number;
 }): StatusChip[] {
   return [
     {
@@ -203,9 +205,9 @@ function buildStatusChips(options: {
       tone: options.readyOutputs > 0 ? "success" : "warning",
     },
     {
-      label: "Data posture",
-      value: "Supabase-backed workspace",
-      tone: "info",
+      label: "Handoff lane",
+      value: `${options.handoffBacklog} queued · ${options.exportedArtifacts} exported`,
+      tone: options.handoffBacklog > 0 ? "warning" : options.exportedArtifacts > 0 ? "success" : "info",
     },
   ];
 }
@@ -385,6 +387,10 @@ function buildWorkspaceFromRows(params: {
   const runningJobs = jobs.filter((job) => job.status === "running").length;
   const queuedJobs = jobs.filter((job) => job.status === "queued").length;
   const draftOutputs = outputRows.filter((output) => output.status !== "ready").length;
+  const handoffBacklogCount = outputRows.filter(
+    (output) => output.status === "ready" && output.handoffStage !== "exported",
+  ).length;
+  const exportedArtifactCount = outputRows.filter((output) => output.handoffStage === "exported").length;
 
   const projectName = primaryProject?.name ?? `${access.org?.name ?? "DroneOps"} aerial operations`;
   const currentSiteName = sites[0]?.name ?? "No site selected yet";
@@ -416,6 +422,8 @@ function buildWorkspaceFromRows(params: {
       queuedJobs,
       readyOutputs: readyOutputCount,
       draftOutputs,
+      handoffBacklog: handoffBacklogCount,
+      exportedArtifacts: exportedArtifactCount,
     }),
     missions: missionRows,
     datasets: datasetRows,
@@ -431,15 +439,20 @@ function buildWorkspaceFromRows(params: {
       missionsNeedingAttention,
       datasetCount: datasetRows.length,
       activeJobCount: jobsRows.filter((job) => job.status !== "completed").length,
+      handoffBacklogCount,
+      exportedArtifactCount,
     },
     nextActions: [
+      handoffBacklogCount > 0
+        ? `Clear the artifact handoff queue: ${handoffBacklogCount} ready artifact(s) still need review/share/export follow-through.`
+        : null,
       "Replace fallback/demo data completely by applying the new migration and seeding at least one project/site/mission/job set.",
       "Wire job-event writes from processing orchestration so the activity console reflects real status transitions.",
       "Promote the first query-backed mission into a real output review flow with artifact detail pages and share/export actions.",
       access.role === "owner" || access.role === "admin"
         ? "Lock write policies and mutation routes once the schema is exercised with real planner and job flows."
         : "Escalate schema or data gaps to your org owner before promising operational readiness.",
-    ],
+    ].filter((value): value is string => Boolean(value)),
   };
 }
 

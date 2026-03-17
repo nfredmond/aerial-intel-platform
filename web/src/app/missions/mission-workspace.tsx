@@ -262,6 +262,11 @@ export function MissionWorkspace({
               <strong className="stat-value">{formatWholeNumber(snapshot.totals.activeJobCount)}</strong>
               <p className="muted">Processing, validation, and install-bundle work visible in the bottom console.</p>
             </article>
+            <article className="surface stat-card stack-xs">
+              <span className="eyebrow">Handoff backlog</span>
+              <strong className="stat-value">{formatWholeNumber(snapshot.totals.handoffBacklogCount)}</strong>
+              <p className="muted">Ready artifacts that still need review/share/export follow-through.</p>
+            </article>
           </section>
 
           <MissionBoardClient missions={snapshot.missions} />
@@ -401,6 +406,14 @@ export function MissionWorkspace({
             <div className="kv-row">
               <dt>Missions needing attention</dt>
               <dd>{formatWholeNumber(snapshot.totals.missionsNeedingAttention)}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Handoff backlog</dt>
+              <dd>{formatWholeNumber(snapshot.totals.handoffBacklogCount)}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Exported artifacts</dt>
+              <dd>{formatWholeNumber(snapshot.totals.exportedArtifactCount)}</dd>
             </div>
           </dl>
 
