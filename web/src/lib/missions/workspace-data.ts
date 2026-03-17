@@ -358,7 +358,10 @@ function buildWorkspaceFromRows(params: {
       kind: output.kind.replaceAll("_", " "),
       status: mapOutputStatus(output.status),
       format: asString(metadata.format, output.kind === "orthomosaic" || output.kind === "dsm" || output.kind === "dem" ? "COG" : "Derived artifact"),
-      delivery: `Handoff: ${handoff.stageLabel} · ${asString(metadata.delivery, output.storage_path ?? "Storage path pending")}`,
+      delivery: asString(metadata.delivery, output.storage_path ?? "Storage path pending"),
+      handoffStage: handoff.stage,
+      handoffLabel: handoff.stageLabel,
+      nextAction: handoff.nextAction,
       sourceJob: jobs.find((job) => job.id === output.job_id)?.engine ?? "Unknown job",
     };
   });

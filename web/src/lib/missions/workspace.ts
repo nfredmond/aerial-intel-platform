@@ -82,6 +82,9 @@ export type OutputArtifactRecord = {
   status: "ready" | "processing" | "draft";
   format: string;
   delivery: string;
+  handoffStage: "pending_review" | "reviewed" | "shared" | "exported";
+  handoffLabel: string;
+  nextAction: string;
   sourceJob: string;
 };
 
@@ -303,6 +306,9 @@ const DEMO_OUTPUTS: OutputArtifactRecord[] = [
     status: "ready",
     format: "COG + map tiles",
     delivery: "Internal QA share",
+    handoffStage: "reviewed",
+    handoffLabel: "Reviewed",
+    nextAction: "Share the reviewed artifact summary with the client or field handoff lane.",
     sourceJob: "GV corridor dense cloud refresh",
   },
   {
@@ -312,6 +318,9 @@ const DEMO_OUTPUTS: OutputArtifactRecord[] = [
     status: "ready",
     format: "COG",
     delivery: "Ready for TiTiler publishing",
+    handoffStage: "shared",
+    handoffLabel: "Shared",
+    nextAction: "Export/package the artifact and record final delivery traceability.",
     sourceJob: "GV corridor dense cloud refresh",
   },
   {
@@ -321,6 +330,9 @@ const DEMO_OUTPUTS: OutputArtifactRecord[] = [
     status: "processing",
     format: "LAZ / COPC target",
     delivery: "Hold for QA",
+    handoffStage: "pending_review",
+    handoffLabel: "Pending review",
+    nextAction: "Wait for processing readiness, then review artifact quality and GIS posture.",
     sourceJob: "GV corridor dense cloud refresh",
   },
   {
@@ -330,6 +342,9 @@ const DEMO_OUTPUTS: OutputArtifactRecord[] = [
     status: "draft",
     format: "KMZ + PDF brief",
     delivery: "Needs controller validation",
+    handoffStage: "pending_review",
+    handoffLabel: "Pending review",
+    nextAction: "Complete install-bundle QA and validate the controller handoff steps.",
     sourceJob: "Colgate baseline processing",
   },
 ];

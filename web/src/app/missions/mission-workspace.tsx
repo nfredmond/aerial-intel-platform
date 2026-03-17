@@ -85,6 +85,18 @@ function getOutputPillClassName(status: string) {
   }
 }
 
+function getHandoffPillClassName(stage: string) {
+  switch (stage) {
+    case "exported":
+      return "status-pill status-pill--success";
+    case "shared":
+    case "reviewed":
+      return "status-pill status-pill--info";
+    default:
+      return "status-pill status-pill--warning";
+  }
+}
+
 function getCalloutClassName(tone: "success" | "warning" | "error") {
   switch (tone) {
     case "success":
@@ -104,6 +116,9 @@ export function MissionWorkspace({
   notice,
 }: MissionWorkspaceProps) {
   const selectedMission = snapshot.missions[0] ?? null;
+  const handoffQueue = snapshot.outputArtifacts.filter(
+    (artifact) => artifact.status === "ready" && artifact.handoffStage !== "exported",
+  );
 
   return (
     <main className="ops-workspace-shell">
@@ -280,6 +295,38 @@ export function MissionWorkspace({
                 </div>
 
                 <div className="stack-xs">
+                  <p className="eyebrow">Artifact handoff queue</p>
+                  <div className="stack-xs">
+                    {handoffQueue.length > 0 ? (
+                      handoffQueue.map((artifact) => (
+                        <article key={`${artifact.id}-handoff`} className="ops-list-card stack-xs">
+                          <div className="ops-list-card-header">
+                            <div className="stack-xs">
+                              <strong>{artifact.name}</strong>
+                              <span className="muted">
+                                {artifact.kind} · {artifact.format}
+                              </span>
+                            </div>
+                            <span className={getHandoffPillClassName(artifact.handoffStage)}>
+                              {artifact.handoffLabel}
+                            </span>
+                          </div>
+                          <p className="muted">{artifact.nextAction}</p>
+                          <p className="muted">{artifact.delivery} · Source: {artifact.sourceJob}</p>
+                          <div className="header-actions">
+                            <Link href={`/artifacts/${artifact.id}`} className="button button-secondary">
+                              Open handoff
+                            </Link>
+                          </div>
+                        </article>
+                      ))
+                    ) : (
+                      <p className="muted">All ready artifacts are currently exported or no ready artifacts exist yet.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="stack-xs">
                   <p className="eyebrow">Outputs</p>
                   <div className="stack-xs">
                     {snapshot.outputArtifacts.map((artifact) => (
@@ -296,8 +343,9 @@ export function MissionWorkspace({
                           </span>
                         </div>
                         <p className="muted">
-                          {artifact.delivery} · Source: {artifact.sourceJob}
+                          Handoff: {artifact.handoffLabel} · {artifact.delivery}
                         </p>
+                        <p className="muted">Next: {artifact.nextAction}</p>
                         <div className="header-actions">
                           <Link href={`/artifacts/${artifact.id}`} className="button button-secondary">
                             Review artifact

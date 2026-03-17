@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased
-- Added stateful artifact handoff controls on `/artifacts/[artifactId]` so ready outputs can now be marked reviewed, shared, and exported with audit events and delivery-timeline metadata instead of relying on copy-only packets, surfaced the current handoff stage back up into job, mission, and workspace output cards, and added aggregate handoff counts on job/mission detail so delivery posture is visible before drilling into each artifact.
+- Added stateful artifact handoff controls on `/artifacts/[artifactId]` so ready outputs can now be marked reviewed, shared, and exported with audit events and delivery-timeline metadata instead of relying on copy-only packets, surfaced the current handoff stage back up into job, mission, and workspace output cards, added aggregate handoff counts on job/mission detail so delivery posture is visible before drilling into each artifact, and introduced a workspace-level artifact handoff queue so pending review/share/export work is visible directly from the main ops shell.
 - Reframed the web app around an `Aerial Operations OS` mission-control shell so the product direction now visibly covers planning, ingest, processing, and delivery instead of stopping at auth.
 - Rebuilt the `/missions` route into a richer operations workspace with a top command bar, left workspace rail, center mission lanes, right contextual inspector, and bottom job/activity console.
 - Expanded the mission workspace snapshot model to include project context, operational status chips, datasets, jobs, output artifacts, and event history representing the next product slices.
