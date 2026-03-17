@@ -16,6 +16,7 @@ type MissionWorkspaceProps = {
   source: "database" | "fallback";
   canManageOperations: boolean;
   createMissionAction: (formData: FormData) => Promise<void>;
+  advanceArtifactHandoffAction: (formData: FormData) => Promise<void>;
   notice?: {
     tone: "success" | "warning" | "error";
     message: string;
@@ -113,6 +114,7 @@ export function MissionWorkspace({
   source,
   canManageOperations,
   createMissionAction,
+  advanceArtifactHandoffAction,
   notice,
 }: MissionWorkspaceProps) {
   const selectedMission = snapshot.missions[0] ?? null;
@@ -319,6 +321,23 @@ export function MissionWorkspace({
                           <p className="muted">{artifact.nextAction}</p>
                           <p className="muted">{artifact.delivery} · Source: {artifact.sourceJob}</p>
                           <div className="header-actions">
+                            {canManageOperations ? (
+                              <form action={advanceArtifactHandoffAction}>
+                                <input type="hidden" name="artifactId" value={artifact.id} />
+                                <input
+                                  type="hidden"
+                                  name="targetAction"
+                                  value={artifact.handoffStage === "pending_review" ? "reviewed" : artifact.handoffStage === "reviewed" ? "shared" : "exported"}
+                                />
+                                <button type="submit" className="button button-primary">
+                                  {artifact.handoffStage === "pending_review"
+                                    ? "Mark reviewed"
+                                    : artifact.handoffStage === "reviewed"
+                                      ? "Mark shared"
+                                      : "Mark exported"}
+                                </button>
+                              </form>
+                            ) : null}
                             <Link href={`/artifacts/${artifact.id}`} className="button button-secondary">
                               Open handoff
                             </Link>
