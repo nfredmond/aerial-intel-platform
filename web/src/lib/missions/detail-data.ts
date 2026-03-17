@@ -50,6 +50,17 @@ export type ArtifactDetail = {
   outputSummary: JsonRecord;
 };
 
+export type DatasetDetail = {
+  dataset: DatasetRow;
+  mission: MissionRow | null;
+  project: ProjectRow | null;
+  site: SiteRow | null;
+  jobs: JobRow[];
+  outputs: OutputRow[];
+  events: JobEventRow[];
+  metadata: JsonRecord;
+};
+
 function asRecord(value: Json): JsonRecord {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {};
@@ -247,6 +258,95 @@ export async function getJobDetail(
     events: (eventsResult.data ?? []) as JobEventRow[],
     inputSummary: asRecord(jobRow.input_summary),
     outputSummary: asRecord(jobRow.output_summary),
+  };
+}
+
+export async function getDatasetDetail(
+  access: DroneOpsAccessResult,
+  datasetId: string,
+): Promise<DatasetDetail | null> {
+  if (!access.org?.id) {
+    return null;
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const orgId = access.org.id;
+
+  const { data: dataset, error: datasetError } = await supabase
+    .from("drone_datasets")
+    .select(
+      "id, org_id, project_id, site_id, mission_id, name, slug, kind, status, captured_at, spatial_footprint, metadata, created_by, created_at, updated_at, archived_at",
+    )
+    .eq("org_id", orgId)
+    .eq("id", datasetId)
+    .maybeSingle();
+
+  if (datasetError || !dataset) {
+    return null;
+  }
+
+  const datasetRow = dataset as DatasetRow;
+
+  const [missionResult, projectResult, siteResult, jobsResult] = await Promise.all([
+    datasetRow.mission_id
+      ? supabase
+          .from("drone_missions")
+          .select("id, org_id, project_id, site_id, name, slug, mission_type, status, objective, planning_geometry, summary, created_by, created_at, updated_at, archived_at")
+          .eq("org_id", orgId)
+          .eq("id", datasetRow.mission_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("drone_projects")
+      .select("id, org_id, name, slug, status, description, created_by, created_at, updated_at, archived_at")
+      .eq("org_id", orgId)
+      .eq("id", datasetRow.project_id)
+      .maybeSingle(),
+    datasetRow.site_id
+      ? supabase
+          .from("drone_sites")
+          .select("id, org_id, project_id, name, slug, description, boundary, center, site_notes, created_by, created_at, updated_at, archived_at")
+          .eq("org_id", orgId)
+          .eq("id", datasetRow.site_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("drone_processing_jobs")
+      .select("id, org_id, project_id, site_id, mission_id, dataset_id, engine, preset_id, status, stage, progress, queue_position, input_summary, output_summary, external_job_reference, created_by, created_at, updated_at, started_at, completed_at")
+      .eq("org_id", orgId)
+      .eq("dataset_id", datasetRow.id)
+      .order("updated_at", { ascending: false }),
+  ]);
+
+  const jobs = (jobsResult.data ?? []) as JobRow[];
+  const jobIds = jobs.map((job) => job.id);
+
+  const [outputsResult, eventsResult] = jobIds.length
+    ? await Promise.all([
+        supabase
+          .from("drone_processing_outputs")
+          .select("id, org_id, job_id, mission_id, dataset_id, kind, status, storage_bucket, storage_path, metadata, created_at, updated_at")
+          .eq("org_id", orgId)
+          .in("job_id", jobIds)
+          .order("updated_at", { ascending: false }),
+        supabase
+          .from("drone_processing_job_events")
+          .select("id, org_id, job_id, event_type, payload, created_at")
+          .eq("org_id", orgId)
+          .in("job_id", jobIds)
+          .order("created_at", { ascending: false }),
+      ])
+    : [{ data: [] as OutputRow[] }, { data: [] as JobEventRow[] }];
+
+  return {
+    dataset: datasetRow,
+    mission: (missionResult.data as MissionRow | null) ?? null,
+    project: (projectResult.data as ProjectRow | null) ?? null,
+    site: (siteResult.data as SiteRow | null) ?? null,
+    jobs,
+    outputs: (outputsResult.data ?? []) as OutputRow[],
+    events: (eventsResult.data ?? []) as JobEventRow[],
+    metadata: asRecord(datasetRow.metadata),
   };
 }
 

@@ -65,6 +65,50 @@ function getCalloutClassName(state: string) {
   return "callout callout-error";
 }
 
+function buildPreflightSummary(input: {
+  imageCount: number;
+  overlapFront: number;
+  overlapSide: number;
+  gcpCaptured: boolean;
+  datasetKind: string;
+}) {
+  const findings: string[] = [];
+  let status: "ready" | "preflight_flagged" = "ready";
+
+  if (input.imageCount < 100) {
+    findings.push("Low image count for robust reconstruction; confirm coverage before processing.");
+    status = "preflight_flagged";
+  }
+
+  if (input.overlapFront < 75) {
+    findings.push("Front overlap is below 75%; corridor continuity may be weak.");
+    status = "preflight_flagged";
+  }
+
+  if (input.overlapSide < 65) {
+    findings.push("Side overlap is below 65%; orthomosaic seam risk is elevated.");
+    status = "preflight_flagged";
+  }
+
+  if (!input.gcpCaptured) {
+    findings.push("No GCPs recorded; relative mapping is fine, but survey-grade claims should stay qualified.");
+  }
+
+  if (input.datasetKind !== "image") {
+    findings.push(`Dataset kind is ${input.datasetKind}; preflight assumptions are image-first and may need manual review.`);
+  }
+
+  if (findings.length === 0) {
+    findings.push("Capture pattern meets baseline overlap and count checks.");
+  }
+
+  return {
+    status,
+    findings,
+    reviewed: false,
+  };
+}
+
 function getCalloutMessage(options: {
   queued?: string;
   attached?: string;
@@ -167,6 +211,16 @@ export default async function MissionDetailPage({
 
     const imageCountValue = formData.get("imageCount");
     const imageCount = Number(imageCountValue);
+    const overlapFront = Number(formData.get("overlapFront"));
+    const overlapSide = Number(formData.get("overlapSide"));
+    const gcpCaptured = formData.get("gcpCaptured") === "on";
+    const preflight = buildPreflightSummary({
+      imageCount: Number.isFinite(imageCount) ? imageCount : 0,
+      overlapFront: Number.isFinite(overlapFront) ? overlapFront : 80,
+      overlapSide: Number.isFinite(overlapSide) ? overlapSide : 70,
+      gcpCaptured,
+      datasetKind,
+    });
 
     try {
       const slug = `${normalizeSlug(datasetName) || "dataset"}-${refreshedDetail.datasets.length + 1}`;
@@ -179,12 +233,18 @@ export default async function MissionDetailPage({
         name: datasetName,
         slug,
         kind: datasetKind,
-        status: "ready",
+        status: preflight.status,
         captured_at: new Date().toISOString(),
         metadata: {
           imageCount: Number.isFinite(imageCount) ? imageCount : 0,
           footprint: "Footprint pending planner/dataset ingest linkage",
           finding: "Attached from mission detail page. Full preflight ingestion is still pending.",
+          preflight: {
+            ...preflight,
+            overlapFront: Number.isFinite(overlapFront) ? overlapFront : 80,
+            overlapSide: Number.isFinite(overlapSide) ? overlapSide : 70,
+            gcpCaptured,
+          },
         },
         created_by: refreshedAccess.user.id,
       });
@@ -631,6 +691,20 @@ export default async function MissionDetailPage({
               <span>Image/frame count</span>
               <input name="imageCount" type="number" min="0" step="1" defaultValue="0" />
             </label>
+            <div className="form-grid-2">
+              <label className="stack-xs">
+                <span>Front overlap (%)</span>
+                <input name="overlapFront" type="number" min="0" max="100" step="1" defaultValue="80" />
+              </label>
+              <label className="stack-xs">
+                <span>Side overlap (%)</span>
+                <input name="overlapSide" type="number" min="0" max="100" step="1" defaultValue="70" />
+              </label>
+            </div>
+            <label className="stack-xs checkbox-row">
+              <input name="gcpCaptured" type="checkbox" value="on" />
+              <span>Ground control collected</span>
+            </label>
             <button
               type="submit"
               className="button button-secondary"
@@ -679,15 +753,35 @@ export default async function MissionDetailPage({
             <h2>Mission ingest lane</h2>
           </div>
           <div className="stack-xs">
-            {detail.datasets.map((dataset) => (
-              <article key={dataset.id} className="ops-list-card">
-                <div className="ops-list-card-header">
-                  <strong>{dataset.name}</strong>
-                  <span className="status-pill status-pill--info">{dataset.status}</span>
-                </div>
-                <p className="muted">{dataset.kind} · captured {formatDateTime(dataset.captured_at)}</p>
-              </article>
-            ))}
+            {detail.datasets.map((dataset) => {
+              const datasetMetadata = (dataset.metadata as Record<string, unknown> | null) ?? {};
+              const preflight = (datasetMetadata.preflight as Record<string, unknown> | null) ?? {};
+              const findings = Array.isArray(preflight.findings)
+                ? preflight.findings.filter((value): value is string => typeof value === "string")
+                : [];
+
+              return (
+                <article key={dataset.id} className="ops-list-card stack-xs">
+                  <div className="ops-list-card-header">
+                    <strong>{dataset.name}</strong>
+                    <span className={dataset.status === "preflight_flagged" ? "status-pill status-pill--warning" : "status-pill status-pill--success"}>
+                      {dataset.status}
+                    </span>
+                  </div>
+                  <p className="muted">{dataset.kind} · captured {formatDateTime(dataset.captured_at)}</p>
+                  {findings.length > 0 ? (
+                    <ul className="action-list mission-blocker-list">
+                      {findings.slice(0, 2).map((item) => <li key={item}>{item}</li>)}
+                    </ul>
+                  ) : null}
+                  <div className="header-actions">
+                    <Link href={`/datasets/${dataset.id}`} className="button button-secondary">
+                      Review dataset
+                    </Link>
+                  </div>
+                </article>
+              );
+            })}
             {detail.datasets.length === 0 ? <p className="muted">No datasets attached yet.</p> : null}
           </div>
         </article>

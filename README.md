@@ -72,6 +72,7 @@ Current Next.js app features:
 - `/dashboard` protected route for account and entitlement context
 - `/missions` protected Aerial Operations OS workspace shell
 - `/missions/[missionId]` mission detail with live actions for dataset attachment, queued processing, and install-bundle generation
+- `/datasets/[datasetId]` dataset preflight review surface for capture findings and readiness approval
 - `/jobs/[jobId]` processing job detail with artifact linkage
 - `/artifacts/[artifactId]` artifact review/share/export surface with copy-ready delivery packets
 - role + entitlement gate (`drone_memberships` + active `drone_entitlements` where `product_id='drone-ops'`)
