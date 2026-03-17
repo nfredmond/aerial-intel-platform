@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  getCoverageComparisonInsight,
   getDatasetCoverageInsight,
   getMissionGeometryInsight,
   getTerrainInsight,
@@ -37,6 +38,35 @@ describe("geometry-insights", () => {
     expect(insight.hasGeometry).toBe(false);
     expect(insight.summary).toContain("not attached yet");
     expect(insight.recommendations.length).toBeGreaterThan(0);
+  });
+
+  it("compares planned AOI against captured footprint extents", () => {
+    const comparison = getCoverageComparisonInsight({
+      missionGeometry: {
+        type: "Polygon",
+        coordinates: [[
+          [-121.0, 39.0],
+          [-121.0, 39.02],
+          [-120.98, 39.02],
+          [-120.98, 39.0],
+          [-121.0, 39.0],
+        ]],
+      },
+      datasetGeometry: {
+        type: "Polygon",
+        coordinates: [[
+          [-121.0, 39.0],
+          [-121.0, 39.015],
+          [-120.985, 39.015],
+          [-120.985, 39.0],
+          [-121.0, 39.0],
+        ]],
+      },
+    });
+
+    expect(comparison.comparable).toBe(true);
+    expect(comparison.coveragePercent).toBeGreaterThan(0);
+    expect(comparison.summary).toContain("coverage");
   });
 
   it("raises terrain concern when terrain warnings are present", () => {

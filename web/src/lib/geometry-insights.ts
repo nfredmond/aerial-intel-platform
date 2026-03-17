@@ -48,6 +48,14 @@ export type TerrainInsight = {
   recommendations: string[];
 };
 
+export type CoverageComparisonInsight = {
+  comparable: boolean;
+  coveragePercent: number | null;
+  overlapAreaAcres: number | null;
+  summary: string;
+  recommendations: string[];
+};
+
 function clampScore(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
@@ -176,6 +184,12 @@ function getGeometryMetrics(geometry: SupportedGeometry) {
     areaAcres: squareMetersToAcres(Math.max(0, areaSquareMeters)),
     bboxLabel: `${widthMeters.toFixed(0)} m × ${heightMeters.toFixed(0)} m`,
     shapeClass: aspectRatio >= 3 ? "elongated" : "compact",
+    minLon,
+    maxLon,
+    minLat,
+    maxLat,
+    widthMeters,
+    heightMeters,
   } as const;
 }
 
@@ -282,6 +296,85 @@ export function getDatasetCoverageInsight(input: DatasetCoverageInput): Geometry
     bboxLabel: metrics.bboxLabel,
     shapeClass: metrics.shapeClass,
     summary: "Dataset footprint geometry is attached, so coverage QA can start using actual spatial extent instead of only metadata hints.",
+    recommendations,
+  };
+}
+
+export function getCoverageComparisonInsight(input: {
+  missionGeometry: unknown;
+  datasetGeometry: unknown;
+}): CoverageComparisonInsight {
+  const missionGeometry = asSupportedGeometry(input.missionGeometry);
+  const datasetGeometry = asSupportedGeometry(input.datasetGeometry);
+
+  if (!missionGeometry || !datasetGeometry) {
+    return {
+      comparable: false,
+      coveragePercent: null,
+      overlapAreaAcres: null,
+      summary: "Coverage comparison needs both mission AOI geometry and dataset footprint geometry before the app can compare planned versus captured extent.",
+      recommendations: [
+        "Attach both planning AOI geometry and dataset footprint geometry to unlock planned-versus-captured coverage QA.",
+      ],
+    };
+  }
+
+  const missionMetrics = getGeometryMetrics(missionGeometry);
+  const datasetMetrics = getGeometryMetrics(datasetGeometry);
+
+  if (!missionMetrics || !datasetMetrics) {
+    return {
+      comparable: false,
+      coveragePercent: null,
+      overlapAreaAcres: null,
+      summary: "Coverage comparison could not be derived because one of the geometries was unreadable for extent metrics.",
+      recommendations: [
+        "Verify both geometries are valid GeoJSON Polygon or MultiPolygon shapes.",
+      ],
+    };
+  }
+
+  const overlapWidthMeters = Math.max(0, Math.min(missionMetrics.maxLon, datasetMetrics.maxLon) - Math.max(missionMetrics.minLon, datasetMetrics.minLon));
+  const overlapHeightDegrees = Math.max(0, Math.min(missionMetrics.maxLat, datasetMetrics.maxLat) - Math.max(missionMetrics.minLat, datasetMetrics.minLat));
+
+  const meanLatitude = (Math.max(missionMetrics.minLat, datasetMetrics.minLat) + Math.min(missionMetrics.maxLat, datasetMetrics.maxLat)) / 2;
+  const metersPerDegreeLat = 111_320;
+  const metersPerDegreeLon = Math.cos((meanLatitude * Math.PI) / 180) * 111_320;
+  const overlapAreaSquareMeters = overlapWidthMeters * metersPerDegreeLon * overlapHeightDegrees * metersPerDegreeLat;
+  const overlapAreaAcres = squareMetersToAcres(Math.max(0, overlapAreaSquareMeters));
+  const coveragePercent = missionMetrics.areaAcres > 0
+    ? Math.max(0, Math.min(100, (overlapAreaAcres / missionMetrics.areaAcres) * 100))
+    : null;
+
+  const recommendations: string[] = [];
+
+  if (coveragePercent === null) {
+    recommendations.push("Mission AOI area is unavailable, so captured-versus-planned coverage percent could not be derived.");
+  } else if (coveragePercent >= 90) {
+    recommendations.push("Captured footprint appears to cover most of the planned AOI extent, which is a strong sign for delivery completeness.");
+  } else if (coveragePercent >= 70) {
+    recommendations.push("Coverage looks materially present but still worth checking for edge gaps and missed end sections before delivery claims.");
+  } else {
+    recommendations.push("Captured footprint appears to miss a meaningful share of the planned AOI extent; review re-fly needs before production processing promises.");
+  }
+
+  if (datasetMetrics.areaAcres > missionMetrics.areaAcres * 1.2) {
+    recommendations.push("Captured footprint appears broader than the mission AOI, so inspect for excess context capture and unnecessary processing area.");
+  }
+
+  const summary = coveragePercent === null
+    ? "Coverage percentage is unavailable because the mission AOI area could not be computed."
+    : coveragePercent >= 90
+      ? "Planned-versus-captured coverage looks strong based on the current AOI and footprint extents."
+      : coveragePercent >= 70
+        ? "Planned-versus-captured coverage looks partial but potentially workable, pending map review."
+        : "Planned-versus-captured coverage looks weak from the current extents and should stay in explicit GIS QA review.";
+
+  return {
+    comparable: true,
+    coveragePercent: Number(coveragePercent?.toFixed(1) ?? 0),
+    overlapAreaAcres: Number(overlapAreaAcres.toFixed(1)),
+    summary,
     recommendations,
   };
 }

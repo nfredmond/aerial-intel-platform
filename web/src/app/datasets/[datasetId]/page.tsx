@@ -6,7 +6,7 @@ import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-button";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import { buildDatasetGisBrief } from "@/lib/gis-briefs";
-import { getDatasetCoverageInsight } from "@/lib/geometry-insights";
+import { getCoverageComparisonInsight, getDatasetCoverageInsight } from "@/lib/geometry-insights";
 import { getDatasetSpatialInsight } from "@/lib/gis-insights";
 import { getDatasetDetail } from "@/lib/missions/detail-data";
 import { updateDataset } from "@/lib/supabase/admin";
@@ -158,6 +158,10 @@ export default async function DatasetDetailPage({
     geometry: detail.dataset.spatial_footprint,
     status: detail.dataset.status,
   });
+  const coverageComparisonInsight = getCoverageComparisonInsight({
+    missionGeometry: detail.mission?.planning_geometry,
+    datasetGeometry: detail.dataset.spatial_footprint,
+  });
   const callout = getCalloutMessage(resolvedSearchParams.reviewed);
 
   return (
@@ -291,6 +295,30 @@ export default async function DatasetDetailPage({
           </dl>
           <ul className="action-list mission-blocker-list">
             {datasetCoverageInsight.recommendations.map((item) => <li key={item}>{item}</li>)}
+          </ul>
+        </article>
+
+        <article className="surface stack-sm info-card">
+          <div className="stack-xs">
+            <p className="eyebrow">Coverage comparison</p>
+            <h2>Planned vs captured extent</h2>
+          </div>
+          <div className="ops-list-card-header">
+            <p className="muted">{coverageComparisonInsight.summary}</p>
+            <span className={coverageComparisonInsight.comparable ? "status-pill status-pill--info" : "status-pill status-pill--warning"}>
+              {coverageComparisonInsight.comparable && coverageComparisonInsight.coveragePercent !== null
+                ? `${coverageComparisonInsight.coveragePercent}% covered`
+                : "Need both geometries"}
+            </span>
+          </div>
+          <dl className="kv-grid">
+            <div className="kv-row">
+              <dt>Overlap area</dt>
+              <dd>{coverageComparisonInsight.overlapAreaAcres !== null ? `${coverageComparisonInsight.overlapAreaAcres} acres` : "Unknown"}</dd>
+            </div>
+          </dl>
+          <ul className="action-list mission-blocker-list">
+            {coverageComparisonInsight.recommendations.map((item) => <li key={item}>{item}</li>)}
           </ul>
         </article>
 
