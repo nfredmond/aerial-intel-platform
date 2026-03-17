@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-button";
+import { GeometryJsonField } from "@/components/geometry-json-field";
 import { GeometryPreviewCard } from "@/components/geometry-preview-card";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import {
@@ -1166,10 +1167,13 @@ export default async function MissionDetailPage({
               <h3>Attach AOI geometry</h3>
               <p className="muted">Paste GeoJSON Polygon or MultiPolygon to power AOI, terrain, overlay, and coverage analytics.</p>
             </div>
-            <label className="stack-xs">
-              <span>GeoJSON</span>
-              <textarea name="aoiGeometryJson" defaultValue={aoiGeometryJson} placeholder='{"type":"Polygon","coordinates":[...]}' required />
-            </label>
+            <GeometryJsonField
+              name="aoiGeometryJson"
+              label="GeoJSON"
+              mode="mission"
+              defaultValue={aoiGeometryJson}
+              placeholder='{"type":"Polygon","coordinates":[...]}'
+            />
             <button type="submit" className="button button-secondary" disabled={access.role === "viewer"}>
               Save AOI geometry
             </button>

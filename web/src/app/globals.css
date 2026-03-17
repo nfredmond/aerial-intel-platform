@@ -606,6 +606,12 @@ main {
   flex-wrap: wrap;
 }
 
+.sample-button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
 .preview-legend {
   display: flex;
   flex-wrap: wrap;

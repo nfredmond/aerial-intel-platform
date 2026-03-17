@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-button";
+import { GeometryJsonField } from "@/components/geometry-json-field";
 import { GeometryPreviewCard } from "@/components/geometry-preview-card";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import { formatGeoJsonSurface, parseGeoJsonSurface } from "@/lib/geojson";
@@ -335,10 +336,13 @@ export default async function DatasetDetailPage({
               <h3>Attach footprint geometry</h3>
               <p className="muted">Paste GeoJSON Polygon or MultiPolygon to power coverage and footprint analytics.</p>
             </div>
-            <label className="stack-xs">
-              <span>GeoJSON</span>
-              <textarea name="geometryJson" defaultValue={geometryJson} placeholder='{"type":"Polygon","coordinates":[...]}' required />
-            </label>
+            <GeometryJsonField
+              name="geometryJson"
+              label="GeoJSON"
+              mode="dataset"
+              defaultValue={geometryJson}
+              placeholder='{"type":"Polygon","coordinates":[...]}'
+            />
             <button type="submit" className="button button-secondary" disabled={access.role === "viewer"}>
               Save footprint geometry
             </button>
