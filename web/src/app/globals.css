@@ -565,8 +565,13 @@ main {
   gap: 0.7rem;
 }
 
+.checkbox-row--start {
+  align-items: flex-start;
+}
+
 .checkbox-row input {
   width: auto;
+  margin-top: 0.15rem;
 }
 
 .log-panel {

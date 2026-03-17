@@ -137,6 +137,7 @@ function getCalloutMessage(options: {
   installed?: string;
   delivered?: string;
   aoi?: string;
+  overlay?: string;
   created?: string;
 }) {
   if (options.created === "1") {
@@ -211,6 +212,14 @@ function getCalloutMessage(options: {
           : "Mission AOI geometry could not be updated. Check server configuration and try again.";
   }
 
+  if (options.overlay) {
+    return options.overlay === "1"
+      ? "Overlay review saved. The mission now tracks which GIS layers have already been checked."
+      : options.overlay === "denied"
+        ? "Viewer access cannot update overlay review state."
+        : "Overlay review could not be updated. Check server configuration and try again.";
+  }
+
   return null;
 }
 
@@ -219,7 +228,7 @@ export default async function MissionDetailPage({
   searchParams,
 }: {
   params: Promise<{ missionId: string }>;
-  searchParams: Promise<{ queued?: string; attached?: string; bundled?: string; approved?: string; installed?: string; delivered?: string; aoi?: string; created?: string }>;
+  searchParams: Promise<{ queued?: string; attached?: string; bundled?: string; approved?: string; installed?: string; delivered?: string; aoi?: string; overlay?: string; created?: string }>;
 }) {
   const access = await getDroneOpsAccess();
 
@@ -631,6 +640,50 @@ export default async function MissionDetailPage({
     redirect(`/missions/${missionId}?aoi=1`);
   }
 
+  async function saveOverlayReview(formData: FormData) {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/missions/${missionId}?overlay=denied`);
+    }
+
+    const refreshedDetail = await getMissionDetail(refreshedAccess, missionId);
+    if (!refreshedDetail) {
+      redirect("/missions");
+    }
+
+    const checkedIds = formData
+      .getAll("overlayIds")
+      .filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+
+    try {
+      await updateMission(refreshedDetail.mission.id, {
+        summary: {
+          ...refreshedDetail.summary,
+          overlayReview: {
+            checkedIds,
+            savedAt: new Date().toISOString(),
+            savedByUserId: refreshedAccess.user.id,
+            savedByEmail: refreshedAccess.user.email,
+          },
+        },
+      });
+    } catch {
+      redirect(`/missions/${missionId}?overlay=error`);
+    }
+
+    redirect(`/missions/${missionId}?overlay=1`);
+  }
+
   async function approveMissionVersion() {
     "use server";
 
@@ -838,6 +891,13 @@ export default async function MissionDetailPage({
     projectName: detail.project?.name ?? "Project pending",
     recommendations: overlayPlan.recommendations,
   });
+  const overlayReviewSummary = ((detail.summary.overlayReview as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+  const checkedOverlayIds = new Set(
+    Array.isArray(overlayReviewSummary.checkedIds)
+      ? overlayReviewSummary.checkedIds.filter((value): value is string => typeof value === "string")
+      : [],
+  );
+  const reviewedOverlayCount = overlayPlan.recommendations.filter((item) => checkedOverlayIds.has(item.id)).length;
   const calloutState =
     resolvedSearchParams.created
     ?? resolvedSearchParams.attached
@@ -846,7 +906,8 @@ export default async function MissionDetailPage({
     ?? resolvedSearchParams.approved
     ?? resolvedSearchParams.installed
     ?? resolvedSearchParams.delivered
-    ?? resolvedSearchParams.aoi;
+    ?? resolvedSearchParams.aoi
+    ?? resolvedSearchParams.overlay;
 
   return (
     <main className="app-shell stack-md">
@@ -1211,11 +1272,31 @@ export default async function MissionDetailPage({
           </div>
           <div className="ops-list-card-header">
             <p className="muted">{overlayPlan.summary}</p>
-            <span className="status-pill status-pill--info">{overlayPlan.recommendations.length} layers</span>
+            <span className="status-pill status-pill--info">{reviewedOverlayCount}/{overlayPlan.recommendations.length} reviewed</span>
           </div>
-          <ul className="action-list mission-blocker-list">
-            {overlayPlan.recommendations.map((item) => <li key={item.id}><strong>{item.label}</strong> ({item.priority}) — {item.rationale}</li>)}
-          </ul>
+          <form action={saveOverlayReview} className="stack-sm surface-form-shell">
+            <div className="stack-xs">
+              {overlayPlan.recommendations.map((item) => (
+                <label key={item.id} className="stack-xs checkbox-row checkbox-row--start">
+                  <input
+                    name="overlayIds"
+                    type="checkbox"
+                    value={item.id}
+                    defaultChecked={checkedOverlayIds.has(item.id)}
+                  />
+                  <span>
+                    <strong>{item.label}</strong> ({item.priority}) — {item.rationale}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <button type="submit" className="button button-secondary" disabled={access.role === "viewer"}>
+              Save overlay review
+            </button>
+            {typeof overlayReviewSummary.savedAt === "string" ? (
+              <p className="muted">Last saved {formatDateTime(overlayReviewSummary.savedAt)} by {typeof overlayReviewSummary.savedByEmail === "string" ? overlayReviewSummary.savedByEmail : "an operator"}.</p>
+            ) : null}
+          </form>
           <SupportContextCopyButton
             text={overlayChecklist}
             buttonLabel="Copy overlay checklist"
