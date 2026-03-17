@@ -606,6 +606,20 @@ main {
   gap: 0.9rem;
 }
 
+.preview-toolbar {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.preview-pan-row {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.preview-zoom-field {
+  max-width: 220px;
+}
+
 .dataset-switcher-wrap {
   flex-wrap: wrap;
 }

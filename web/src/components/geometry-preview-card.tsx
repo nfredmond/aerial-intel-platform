@@ -12,6 +12,11 @@ type GeometryPreviewCardProps = {
   datasetGeometry?: Json | null;
 };
 
+const VIEW_WIDTH = 320;
+const VIEW_HEIGHT = 220;
+const VIEW_CENTER_X = VIEW_WIDTH / 2;
+const VIEW_CENTER_Y = VIEW_HEIGHT / 2;
+
 export function GeometryPreviewCard({
   title,
   subtitle,
@@ -20,6 +25,9 @@ export function GeometryPreviewCard({
 }: GeometryPreviewCardProps) {
   const [showMissionGeometry, setShowMissionGeometry] = useState(true);
   const [showDatasetGeometry, setShowDatasetGeometry] = useState(true);
+  const [zoom, setZoom] = useState(1);
+  const [offsetX, setOffsetX] = useState(0);
+  const [offsetY, setOffsetY] = useState(0);
 
   const preview = useMemo(
     () => getGeoJsonPreviewModel([
@@ -41,6 +49,34 @@ export function GeometryPreviewCard({
 
   const hasMissionGeometry = Boolean(missionGeometry);
   const hasDatasetGeometry = Boolean(datasetGeometry);
+
+  function resetView() {
+    setZoom(1);
+    setOffsetX(0);
+    setOffsetY(0);
+  }
+
+  function focusMission() {
+    setShowMissionGeometry(true);
+    setShowDatasetGeometry(false);
+    resetView();
+    setZoom(1.15);
+  }
+
+  function focusDataset() {
+    setShowMissionGeometry(false);
+    setShowDatasetGeometry(true);
+    resetView();
+    setZoom(1.15);
+  }
+
+  function focusAll() {
+    setShowMissionGeometry(hasMissionGeometry);
+    setShowDatasetGeometry(hasDatasetGeometry);
+    resetView();
+  }
+
+  const transform = `translate(${offsetX} ${offsetY}) translate(${VIEW_CENTER_X} ${VIEW_CENTER_Y}) scale(${zoom}) translate(${-VIEW_CENTER_X} ${-VIEW_CENTER_Y})`;
 
   return (
     <article className="surface stack-sm info-card">
@@ -71,20 +107,59 @@ export function GeometryPreviewCard({
         </label>
       </div>
 
+      <div className="preview-toolbar">
+        <div className="sample-button-row">
+          <button type="button" className="button button-secondary" onClick={focusAll}>
+            Fit all
+          </button>
+          <button type="button" className="button button-secondary" onClick={focusMission} disabled={!hasMissionGeometry}>
+            Focus AOI
+          </button>
+          <button type="button" className="button button-secondary" onClick={focusDataset} disabled={!hasDatasetGeometry}>
+            Focus footprint
+          </button>
+          <button type="button" className="button button-secondary" onClick={resetView}>
+            Reset view
+          </button>
+        </div>
+
+        <div className="preview-pan-row">
+          <label className="stack-xs preview-zoom-field">
+            <span>Zoom</span>
+            <input
+              type="range"
+              min="1"
+              max="2"
+              step="0.05"
+              value={zoom}
+              onChange={(event) => setZoom(Number(event.target.value))}
+            />
+          </label>
+          <div className="sample-button-row">
+            <button type="button" className="button button-secondary" onClick={() => setOffsetY((value) => value + 10)}>Pan up</button>
+            <button type="button" className="button button-secondary" onClick={() => setOffsetX((value) => value + 10)}>Pan left</button>
+            <button type="button" className="button button-secondary" onClick={() => setOffsetX((value) => value - 10)}>Pan right</button>
+            <button type="button" className="button button-secondary" onClick={() => setOffsetY((value) => value - 10)}>Pan down</button>
+          </div>
+        </div>
+      </div>
+
       {preview.hasGeometry ? (
         <>
           <svg viewBox={preview.viewBox} className="geometry-preview" role="img" aria-label={title}>
             <rect x="0" y="0" width="100%" height="100%" rx="16" fill="#f8fafc" />
-            {preview.shapes.map((shape) => (
-              <path
-                key={`${shape.label}-${shape.stroke}`}
-                d={shape.path}
-                fill={shape.fill}
-                stroke={shape.stroke}
-                strokeWidth="2.5"
-                vectorEffect="non-scaling-stroke"
-              />
-            ))}
+            <g transform={transform}>
+              {preview.shapes.map((shape) => (
+                <path
+                  key={`${shape.label}-${shape.stroke}`}
+                  d={shape.path}
+                  fill={shape.fill}
+                  stroke={shape.stroke}
+                  strokeWidth="2.5"
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
+            </g>
           </svg>
 
           <div className="preview-legend">
