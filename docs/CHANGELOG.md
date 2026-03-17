@@ -30,6 +30,7 @@
 - Added real GeoJSON attachment/editing flows for mission AOIs and dataset footprints so geometry-powered coverage, terrain, and overlay intelligence can be fed directly in-product instead of staying hypothetical.
 - Added in-app geometry preview cards that render attached AOIs and dataset footprints as lightweight SVG map previews directly on mission and dataset detail pages.
 - Added overlay-review tracking on mission detail so recommended GIS layers can be marked reviewed, counted, and saved as part of the mission’s planning QA state.
+- Upgraded the in-app geometry preview into an interactive layer viewer with toggles for AOI and dataset footprint visibility, plus component-level tests for the preview behavior.
 - Added the first authenticated write path: queueing a processing job from the mission detail page now writes a real `drone_processing_jobs` row plus a `drone_processing_job_events` audit entry through a server-side action.
 - Added an entitlement-protected `/missions` workspace route so DroneOps now has a real mission pipeline surface beyond the auth dashboard.
 - Added a GIS/drone mission workspace snapshot model with AOI, capture, processing, CRS, and deliverable readiness metadata for the first workflow slice.

@@ -596,6 +596,12 @@ main {
   background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
 }
 
+.preview-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+}
+
 .preview-legend {
   display: flex;
   flex-wrap: wrap;

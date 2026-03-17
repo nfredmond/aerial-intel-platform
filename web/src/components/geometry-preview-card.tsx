@@ -1,3 +1,7 @@
+"use client";
+
+import { useMemo, useState } from "react";
+
 import { getGeoJsonPreviewModel } from "@/lib/geojson-preview";
 import type { Json } from "@/lib/supabase/types";
 
@@ -14,20 +18,29 @@ export function GeometryPreviewCard({
   missionGeometry,
   datasetGeometry,
 }: GeometryPreviewCardProps) {
-  const preview = getGeoJsonPreviewModel([
-    {
-      label: "Mission AOI",
-      geometry: missionGeometry,
-      stroke: "#2563eb",
-      fill: "rgba(37, 99, 235, 0.16)",
-    },
-    {
-      label: "Dataset footprint",
-      geometry: datasetGeometry,
-      stroke: "#16a34a",
-      fill: "rgba(22, 163, 74, 0.18)",
-    },
-  ]);
+  const [showMissionGeometry, setShowMissionGeometry] = useState(true);
+  const [showDatasetGeometry, setShowDatasetGeometry] = useState(true);
+
+  const preview = useMemo(
+    () => getGeoJsonPreviewModel([
+      {
+        label: "Mission AOI",
+        geometry: showMissionGeometry ? missionGeometry : null,
+        stroke: "#2563eb",
+        fill: "rgba(37, 99, 235, 0.16)",
+      },
+      {
+        label: "Dataset footprint",
+        geometry: showDatasetGeometry ? datasetGeometry : null,
+        stroke: "#16a34a",
+        fill: "rgba(22, 163, 74, 0.18)",
+      },
+    ]),
+    [datasetGeometry, missionGeometry, showDatasetGeometry, showMissionGeometry],
+  );
+
+  const hasMissionGeometry = Boolean(missionGeometry);
+  const hasDatasetGeometry = Boolean(datasetGeometry);
 
   return (
     <article className="surface stack-sm info-card">
@@ -35,6 +48,27 @@ export function GeometryPreviewCard({
         <p className="eyebrow">Geometry preview</p>
         <h2>{title}</h2>
         <p className="muted">{subtitle}</p>
+      </div>
+
+      <div className="preview-controls">
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={showMissionGeometry}
+            onChange={(event) => setShowMissionGeometry(event.target.checked)}
+            disabled={!hasMissionGeometry}
+          />
+          <span>Show mission AOI</span>
+        </label>
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={showDatasetGeometry}
+            onChange={(event) => setShowDatasetGeometry(event.target.checked)}
+            disabled={!hasDatasetGeometry}
+          />
+          <span>Show dataset footprint</span>
+        </label>
       </div>
 
       {preview.hasGeometry ? (
@@ -63,7 +97,7 @@ export function GeometryPreviewCard({
           </div>
         </>
       ) : (
-        <p className="muted">No supported geometry is attached yet, so the preview map cannot render.</p>
+        <p className="muted">No supported geometry is currently visible in the preview. Toggle a layer on or attach GeoJSON first.</p>
       )}
     </article>
   );
