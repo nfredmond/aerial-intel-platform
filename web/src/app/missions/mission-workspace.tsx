@@ -331,6 +331,9 @@ export function MissionWorkspace({
                             </span>
                           </div>
                           <p className="muted">{artifact.nextAction}</p>
+                          {artifact.handoffNotePreview ? (
+                            <p className="muted">Note: {artifact.handoffNotePreview}</p>
+                          ) : null}
                           <p className="muted">{artifact.delivery} · Source: {artifact.sourceJob}</p>
                           <div className="header-actions">
                             {canManageOperations ? (
@@ -397,6 +400,9 @@ export function MissionWorkspace({
                         <p className="muted">
                           Handoff: {artifact.handoffLabel} · {artifact.delivery}
                         </p>
+                        {artifact.handoffNotePreview ? (
+                          <p className="muted">Note: {artifact.handoffNotePreview}</p>
+                        ) : null}
                         <p className="muted">Next: {artifact.nextAction}</p>
                         <div className="header-actions">
                           <Link href={`/artifacts/${artifact.id}`} className="button button-secondary">

@@ -375,6 +375,7 @@ export default async function JobDetailPage({
                   </div>
                   <p className="muted">{output.storage_path ?? "Storage path pending"}</p>
                   <p className="muted">Handoff: {handoff.stageLabel}</p>
+                  {handoff.note ? <p className="muted">Note: {handoff.note}</p> : null}
                   <div className="header-actions">
                     <Link href={`/artifacts/${output.id}`} className="button button-secondary">
                       Review artifact

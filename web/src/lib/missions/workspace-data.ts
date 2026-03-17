@@ -232,7 +232,11 @@ function buildActivity(
 
     if (event.event_type.startsWith("artifact.") || event.event_type.startsWith("install.")) {
       lane = "delivery";
-      tone = event.event_type === "artifact.exported" || event.event_type === "install.bundle.ready" ? "success" : "info";
+      tone = event.event_type === "artifact.exported" || event.event_type === "install.bundle.ready"
+        ? "success"
+        : event.event_type === "artifact.note.updated"
+          ? "info"
+          : "info";
     } else if (event.event_type.startsWith("job.")) {
       lane = "processing";
       tone = event.event_type === "job.canceled" ? "warning" : event.event_type === "job.retried" ? "info" : "success";
@@ -397,6 +401,7 @@ function buildWorkspaceFromRows(params: {
       delivery: deliveryNote,
       handoffStage: handoff.stage,
       handoffLabel: handoff.stageLabel,
+      handoffNotePreview: handoff.note,
       nextAction: handoff.nextAction,
       shareSummary: buildArtifactShareSummary({
         artifactName,
