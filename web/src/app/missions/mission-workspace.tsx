@@ -110,6 +110,17 @@ function getCalloutClassName(tone: "success" | "warning" | "error") {
   }
 }
 
+function getActivityPillClassName(tone: "success" | "info" | "warning") {
+  switch (tone) {
+    case "success":
+      return "status-pill status-pill--success";
+    case "info":
+      return "status-pill status-pill--info";
+    default:
+      return "status-pill status-pill--warning";
+  }
+}
+
 export function MissionWorkspace({
   snapshot,
   source,
@@ -581,11 +592,21 @@ export function MissionWorkspace({
             {snapshot.activity.map((event) => (
               <article key={event.id} className="ops-event-card stack-xs">
                 <div className="ops-list-card-header">
-                  <strong>{event.title}</strong>
-                  <span className="muted">{event.type}</span>
+                  <div className="stack-xs">
+                    <strong>{event.title}</strong>
+                    <span className="muted">{event.type}</span>
+                  </div>
+                  <span className={getActivityPillClassName(event.tone)}>{event.lane}</span>
                 </div>
                 <p className="muted">{event.detail}</p>
-                <span className="eyebrow">{formatDateTime(event.at)}</span>
+                <div className="header-actions">
+                  <span className="eyebrow">{formatDateTime(event.at)}</span>
+                  {event.href ? (
+                    <Link href={event.href} className="button button-secondary">
+                      Open context
+                    </Link>
+                  ) : null}
+                </div>
               </article>
             ))}
           </div>

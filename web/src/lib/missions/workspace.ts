@@ -96,6 +96,9 @@ export type ActivityEventRecord = {
   type: string;
   title: string;
   detail: string;
+  lane: "capture" | "processing" | "delivery" | "ops";
+  tone: OpsTone;
+  href?: string;
 };
 
 export type MissionWorkspaceSnapshot = {
@@ -368,6 +371,9 @@ const DEMO_ACTIVITY: ActivityEventRecord[] = [
     type: "upload.completed",
     title: "GV corridor upload committed",
     detail: "684 images validated, thumbnails generated, capture map ready.",
+    lane: "capture",
+    tone: "success",
+    href: "/missions/gv-downtown-corridor",
   },
   {
     id: "evt-preflight-flagged",
@@ -375,6 +381,9 @@ const DEMO_ACTIVITY: ActivityEventRecord[] = [
     type: "preflight.flagged",
     title: "Colgate overlap warning",
     detail: "Upper-slope overlap dropped below the target threshold in one segment.",
+    lane: "capture",
+    tone: "warning",
+    href: "/missions/colgate-penstock-phase-1",
   },
   {
     id: "evt-job-stage-changed",
@@ -382,6 +391,9 @@ const DEMO_ACTIVITY: ActivityEventRecord[] = [
     type: "job.stage.changed",
     title: "GV job entered dense cloud stage",
     detail: "Point cloud generation is underway; ETA refreshed to 18 minutes.",
+    lane: "processing",
+    tone: "info",
+    href: "/jobs/job-gv-dense-cloud",
   },
   {
     id: "evt-install-ready",
@@ -389,6 +401,9 @@ const DEMO_ACTIVITY: ActivityEventRecord[] = [
     type: "install.bundle.ready",
     title: "Fairgrounds mission brief draft generated",
     detail: "Export shell created, but terrain-following validation still needs server-side recompute.",
+    lane: "delivery",
+    tone: "success",
+    href: "/missions/fairgrounds-campus-repeatable",
   },
 ];
 

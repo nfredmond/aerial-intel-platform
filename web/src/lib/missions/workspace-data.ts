@@ -227,6 +227,20 @@ function buildActivity(
     const mission = job?.mission_id ? missionsById.get(job.mission_id) : null;
     const payload = asRecord(event.payload);
 
+    let lane: ActivityEventRecord["lane"] = "ops";
+    let tone: ActivityEventRecord["tone"] = "info";
+
+    if (event.event_type.startsWith("artifact.") || event.event_type.startsWith("install.")) {
+      lane = "delivery";
+      tone = event.event_type === "artifact.exported" || event.event_type === "install.bundle.ready" ? "success" : "info";
+    } else if (event.event_type.startsWith("job.")) {
+      lane = "processing";
+      tone = event.event_type === "job.canceled" ? "warning" : event.event_type === "job.retried" ? "info" : "success";
+    } else if (event.event_type.startsWith("upload.") || event.event_type.startsWith("preflight.")) {
+      lane = "capture";
+      tone = event.event_type === "preflight.flagged" ? "warning" : "success";
+    }
+
     return {
       id: event.id,
       at: event.created_at,
@@ -238,6 +252,9 @@ function buildActivity(
           ? `${mission.name} · stage ${job?.stage ?? "unknown"}`
           : `Job stage ${job?.stage ?? "unknown"}`,
       ),
+      lane,
+      tone,
+      href: job ? `/jobs/${job.id}` : mission ? `/missions/${mission.id}` : undefined,
     };
   });
 }
