@@ -117,6 +117,7 @@ export function MissionBoardClient({ missions }: MissionBoardClientProps) {
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("all");
   const [riskFilter, setRiskFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("priority");
 
   const stageOptions = useMemo(
     () => Array.from(new Set(missions.map((mission) => mission.stage))).sort(),
@@ -141,10 +142,26 @@ export function MissionBoardClient({ missions }: MissionBoardClientProps) {
     });
   }, [missions, riskFilter, search, stageFilter]);
 
-  const rankedMissions = useMemo(
-    () => [...filteredMissions].sort((left, right) => getMissionPriorityScore(right) - getMissionPriorityScore(left)),
-    [filteredMissions],
-  );
+  const rankedMissions = useMemo(() => {
+    const next = [...filteredMissions];
+
+    next.sort((left, right) => {
+      switch (sortBy) {
+        case "readiness":
+          return getMissionReadinessPercent(right) - getMissionReadinessPercent(left);
+        case "health":
+          return right.healthScore - left.healthScore;
+        case "updated":
+          return new Date(right.lastUpdated).getTime() - new Date(left.lastUpdated).getTime();
+        case "name":
+          return left.name.localeCompare(right.name);
+        default:
+          return getMissionPriorityScore(right) - getMissionPriorityScore(left);
+      }
+    });
+
+    return next;
+  }, [filteredMissions, sortBy]);
 
   const deliveryReadyCount = filteredMissions.filter((mission) => getMissionReadinessPercent(mission) >= 80).length;
   const fragileCount = filteredMissions.filter((mission) => mission.blockers.length > 0 || mission.healthScore < 60).length;
@@ -187,6 +204,16 @@ export function MissionBoardClient({ missions }: MissionBoardClientProps) {
               <option value="in progress">In progress</option>
             </select>
           </label>
+          <label className="stack-xs filter-toolbar__field">
+            <span>Sort</span>
+            <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+              <option value="priority">Priority</option>
+              <option value="readiness">Readiness</option>
+              <option value="health">Health</option>
+              <option value="updated">Updated</option>
+              <option value="name">Name</option>
+            </select>
+          </label>
           <button
             type="button"
             className="button button-secondary filter-toolbar__reset"
@@ -194,6 +221,7 @@ export function MissionBoardClient({ missions }: MissionBoardClientProps) {
               setSearch("");
               setStageFilter("all");
               setRiskFilter("all");
+              setSortBy("priority");
             }}
           >
             Reset filters
@@ -359,6 +387,15 @@ export function MissionBoardClient({ missions }: MissionBoardClientProps) {
                 <div className="header-actions">
                   <Link href={`/missions/${mission.id}`} className="button button-secondary">
                     Open mission detail
+                  </Link>
+                  <Link href={`/missions/${mission.id}#mission-datasets`} className="button button-secondary">
+                    Datasets
+                  </Link>
+                  <Link href={`/missions/${mission.id}#mission-jobs`} className="button button-secondary">
+                    Jobs
+                  </Link>
+                  <Link href={`/missions/${mission.id}#mission-install`} className="button button-secondary">
+                    Install
                   </Link>
                 </div>
               </article>
