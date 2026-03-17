@@ -71,6 +71,11 @@ function getCalloutMessage(action?: string) {
         tone: "success",
         text: "Artifact marked exported. Final delivery traceability is now recorded on this artifact.",
       } as const;
+    case "note-saved":
+      return {
+        tone: "success",
+        text: "Artifact handoff note saved. The delivery trail now includes reviewer context and the updated next action.",
+      } as const;
     case "not-ready":
       return {
         tone: "error",
@@ -197,6 +202,59 @@ export default async function ArtifactDetailPage({
     }
 
     redirect(`/artifacts/${artifactId}?action=${targetAction}`);
+  }
+
+  async function saveHandoffNote(formData: FormData) {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/artifacts/${artifactId}?action=denied`);
+    }
+
+    const refreshedDetail = await getArtifactDetail(refreshedAccess, artifactId);
+    if (!refreshedDetail) {
+      redirect("/missions");
+    }
+
+    const noteValue = formData.get("handoffNote");
+    const nextActionValue = formData.get("handoffNextAction");
+    const handoffNote = typeof noteValue === "string" && noteValue.trim().length > 0 ? noteValue.trim() : null;
+    const handoffNextAction = typeof nextActionValue === "string" && nextActionValue.trim().length > 0 ? nextActionValue.trim() : null;
+    const artifactLabel = getString(refreshedDetail.metadata.name, refreshedDetail.output.kind.replaceAll("_", " "));
+
+    const nextMetadata = updateArtifactHandoffMetadata(refreshedDetail.metadata, {
+      note: handoffNote,
+      nextAction: handoffNextAction,
+    });
+
+    try {
+      await updateProcessingOutput(refreshedDetail.output.id, {
+        metadata: nextMetadata,
+      });
+
+      await insertJobEvent({
+        org_id: refreshedAccess.org.id,
+        job_id: refreshedDetail.output.job_id,
+        event_type: "artifact.note.updated",
+        payload: {
+          title: "Artifact handoff note updated",
+          detail: `${artifactLabel} handoff note was updated from the artifact detail page.`,
+        },
+      });
+    } catch {
+      redirect(`/artifacts/${artifactId}?action=error`);
+    }
+
+    redirect(`/artifacts/${artifactId}?action=note-saved`);
   }
 
   const artifactName = getString(detail.metadata.name, detail.output.kind.replaceAll("_", " "));
@@ -358,6 +416,35 @@ export default async function ArtifactDetailPage({
             {detail.output.status !== "ready" ? (
               <p className="muted">Artifact handoff actions unlock once the artifact itself is ready.</p>
             ) : null}
+          </div>
+
+          <div className="stack-xs surface-form-shell">
+            <h3>Handoff notes</h3>
+            <form action={saveHandoffNote} className="stack-sm">
+              <label className="stack-xs">
+                <span>Reviewer / delivery note</span>
+                <textarea
+                  name="handoffNote"
+                  defaultValue={handoff.note ?? ""}
+                  placeholder="Capture review findings, client-safe caveats, or delivery context."
+                  rows={4}
+                  disabled={access.role === "viewer"}
+                />
+              </label>
+              <label className="stack-xs">
+                <span>Next action override</span>
+                <input
+                  name="handoffNextAction"
+                  type="text"
+                  defaultValue={handoff.nextAction}
+                  placeholder="Optional custom next step for this artifact."
+                  disabled={access.role === "viewer"}
+                />
+              </label>
+              <button type="submit" className="button button-secondary" disabled={access.role === "viewer"}>
+                Save handoff note
+              </button>
+            </form>
           </div>
 
           <div className="stack-sm">

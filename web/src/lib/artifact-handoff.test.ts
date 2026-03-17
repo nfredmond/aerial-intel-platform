@@ -86,6 +86,17 @@ describe("artifact handoff helpers", () => {
     });
   });
 
+  it("persists custom handoff note and next action overrides", () => {
+    const updated = updateArtifactHandoffMetadata({}, {
+      note: "Client requested extra QA note about seam lines.",
+      nextAction: "Share revised export packet with the field lead.",
+    });
+
+    const summary = getArtifactHandoff(updated);
+    expect(summary.note).toContain("extra QA note");
+    expect(summary.nextAction).toContain("field lead");
+  });
+
   it("builds share and export packet strings with handoff context", () => {
     const handoff = getArtifactHandoff(
       updateArtifactHandoffMetadata({}, {
