@@ -8,6 +8,7 @@ import {
 } from "@/lib/missions/workspace";
 
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
+import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-button";
 
 import { MissionBoardClient } from "./mission-board-client";
 
@@ -341,6 +342,22 @@ export function MissionWorkspace({
                             <Link href={`/artifacts/${artifact.id}`} className="button button-secondary">
                               Open handoff
                             </Link>
+                          </div>
+                          <div className="header-actions">
+                            <SupportContextCopyButton
+                              text={artifact.shareSummary}
+                              buttonLabel="Copy share summary"
+                              successMessage="Share summary copied from the workspace queue."
+                              fallbackAriaLabel={`Share summary for ${artifact.name}`}
+                              fallbackHintMessage="Press Ctrl/Cmd+C, then paste this share summary into chat, docs, or email."
+                            />
+                            <SupportContextCopyButton
+                              text={artifact.exportPacket}
+                              buttonLabel="Copy export packet"
+                              successMessage="Export packet copied from the workspace queue."
+                              fallbackAriaLabel={`Export packet for ${artifact.name}`}
+                              fallbackHintMessage="Press Ctrl/Cmd+C, then paste this export packet into docs, tickets, or a delivery note."
+                            />
                           </div>
                         </article>
                       ))

@@ -85,6 +85,8 @@ export type OutputArtifactRecord = {
   handoffStage: "pending_review" | "reviewed" | "shared" | "exported";
   handoffLabel: string;
   nextAction: string;
+  shareSummary: string;
+  exportPacket: string;
   sourceJob: string;
 };
 
@@ -311,6 +313,8 @@ const DEMO_OUTPUTS: OutputArtifactRecord[] = [
     handoffStage: "reviewed",
     handoffLabel: "Reviewed",
     nextAction: "Share the reviewed artifact summary with the client or field handoff lane.",
+    shareSummary: "Downtown corridor orthomosaic · Mission: Grass Valley downtown curb inventory · Project: Nat Ford Planning aerial operations · Status: ready · Handoff: Reviewed · Path: aerial/gv/orthomosaic.tif",
+    exportPacket: "Artifact: Downtown corridor orthomosaic\nKind: Raster deliverable\nStatus: ready\nFormat: COG + map tiles\nMission: Grass Valley downtown curb inventory\nProject: Nat Ford Planning aerial operations\nDataset: Corridor capture batch A\nStorage path: aerial/gv/orthomosaic.tif\nDelivery note: Internal QA share\nHandoff stage: Reviewed\nReviewed at: Not recorded\nShared at: Not recorded\nExported at: Not recorded\nNext action: Share the reviewed artifact summary with the client or field handoff lane.",
     sourceJob: "GV corridor dense cloud refresh",
   },
   {
@@ -323,6 +327,8 @@ const DEMO_OUTPUTS: OutputArtifactRecord[] = [
     handoffStage: "shared",
     handoffLabel: "Shared",
     nextAction: "Export/package the artifact and record final delivery traceability.",
+    shareSummary: "Downtown surface model · Mission: Grass Valley downtown curb inventory · Project: Nat Ford Planning aerial operations · Status: ready · Handoff: Shared · Path: aerial/gv/dsm.tif",
+    exportPacket: "Artifact: Downtown surface model\nKind: Elevation\nStatus: ready\nFormat: COG\nMission: Grass Valley downtown curb inventory\nProject: Nat Ford Planning aerial operations\nDataset: Corridor capture batch A\nStorage path: aerial/gv/dsm.tif\nDelivery note: Ready for TiTiler publishing\nHandoff stage: Shared\nReviewed at: Not recorded\nShared at: Not recorded\nExported at: Not recorded\nNext action: Export/package the artifact and record final delivery traceability.",
     sourceJob: "GV corridor dense cloud refresh",
   },
   {
@@ -335,6 +341,8 @@ const DEMO_OUTPUTS: OutputArtifactRecord[] = [
     handoffStage: "pending_review",
     handoffLabel: "Pending review",
     nextAction: "Wait for processing readiness, then review artifact quality and GIS posture.",
+    shareSummary: "Downtown point cloud · Mission: Grass Valley downtown curb inventory · Project: Nat Ford Planning aerial operations · Status: processing · Handoff: Pending review · Path: aerial/gv/point-cloud.copc.laz",
+    exportPacket: "Artifact: Downtown point cloud\nKind: 3D\nStatus: processing\nFormat: LAZ / COPC target\nMission: Grass Valley downtown curb inventory\nProject: Nat Ford Planning aerial operations\nDataset: Corridor capture batch A\nStorage path: aerial/gv/point-cloud.copc.laz\nDelivery note: Hold for QA\nHandoff stage: Pending review\nReviewed at: Not recorded\nShared at: Not recorded\nExported at: Not recorded\nNext action: Wait for processing readiness, then review artifact quality and GIS posture.",
     sourceJob: "GV corridor dense cloud refresh",
   },
   {
@@ -347,6 +355,8 @@ const DEMO_OUTPUTS: OutputArtifactRecord[] = [
     handoffStage: "pending_review",
     handoffLabel: "Pending review",
     nextAction: "Complete install-bundle QA and validate the controller handoff steps.",
+    shareSummary: "Colgate install bundle · Mission: Colgate penstock slope condition baseline · Project: Nat Ford Planning aerial operations · Status: draft · Handoff: Pending review · Path: aerial/colgate/install-bundle.zip",
+    exportPacket: "Artifact: Colgate install bundle\nKind: Mission package\nStatus: draft\nFormat: KMZ + PDF brief\nMission: Colgate penstock slope condition baseline\nProject: Nat Ford Planning aerial operations\nDataset: Colgate image batch\nStorage path: aerial/colgate/install-bundle.zip\nDelivery note: Needs controller validation\nHandoff stage: Pending review\nReviewed at: Not recorded\nShared at: Not recorded\nExported at: Not recorded\nNext action: Complete install-bundle QA and validate the controller handoff steps.",
     sourceJob: "Colgate baseline processing",
   },
 ];

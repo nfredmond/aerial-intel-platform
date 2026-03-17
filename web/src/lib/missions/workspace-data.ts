@@ -1,6 +1,11 @@
 import { formatEntitlementTier } from "@/lib/auth/access-insights";
 import type { DroneOpsAccessResult } from "@/lib/auth/drone-ops-access";
-import { getArtifactHandoff, summarizeArtifactHandoffs } from "@/lib/artifact-handoff";
+import {
+  buildArtifactExportPacket,
+  buildArtifactShareSummary,
+  getArtifactHandoff,
+  summarizeArtifactHandoffs,
+} from "@/lib/artifact-handoff";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
 
@@ -317,6 +322,11 @@ function buildWorkspaceFromRows(params: {
     };
   });
 
+  const projectsById = new Map(projects.map((project) => [project.id, project]));
+  const datasetsById = new Map(datasets.map((dataset) => [dataset.id, dataset]));
+  const jobsById = new Map(jobs.map((job) => [job.id, job]));
+  const missionsById = new Map(missions.map((mission) => [mission.id, mission]));
+
   const datasetRows: DatasetRecord[] = datasets.map((dataset) => {
     const metadata = asRecord(dataset.metadata);
     return {
@@ -353,23 +363,48 @@ function buildWorkspaceFromRows(params: {
   const outputRows: OutputArtifactRecord[] = outputs.map((output) => {
     const metadata = asRecord(output.metadata);
     const handoff = getArtifactHandoff(metadata);
+    const job = jobsById.get(output.job_id);
+    const mission = output.mission_id ? missionsById.get(output.mission_id) ?? null : job?.mission_id ? missionsById.get(job.mission_id) ?? null : null;
+    const dataset = output.dataset_id ? datasetsById.get(output.dataset_id) ?? null : job?.dataset_id ? datasetsById.get(job.dataset_id) ?? null : null;
+    const project = job?.project_id ? projectsById.get(job.project_id) ?? null : mission?.project_id ? projectsById.get(mission.project_id) ?? null : null;
+    const artifactName = asString(metadata.name, output.kind.replaceAll("_", " "));
+    const storagePath = output.storage_path ?? "Storage path pending";
+    const deliveryNote = asString(metadata.delivery, storagePath);
 
     return {
       id: output.id,
-      name: asString(metadata.name, output.kind.replaceAll("_", " ")),
+      name: artifactName,
       kind: output.kind.replaceAll("_", " "),
       status: mapOutputStatus(output.status),
       format: asString(metadata.format, output.kind === "orthomosaic" || output.kind === "dsm" || output.kind === "dem" ? "COG" : "Derived artifact"),
-      delivery: asString(metadata.delivery, output.storage_path ?? "Storage path pending"),
+      delivery: deliveryNote,
       handoffStage: handoff.stage,
       handoffLabel: handoff.stageLabel,
       nextAction: handoff.nextAction,
-      sourceJob: jobs.find((job) => job.id === output.job_id)?.engine ?? "Unknown job",
+      shareSummary: buildArtifactShareSummary({
+        artifactName,
+        missionName: mission?.name,
+        projectName: project?.name,
+        status: output.status,
+        storagePath,
+        handoffStageLabel: handoff.stageLabel,
+      }),
+      exportPacket: buildArtifactExportPacket({
+        artifactName,
+        artifactKind: output.kind,
+        artifactStatus: output.status,
+        artifactFormat: asString(metadata.format, output.kind === "orthomosaic" || output.kind === "dsm" || output.kind === "dem" ? "COG" : "Derived artifact"),
+        missionName: mission?.name,
+        projectName: project?.name,
+        datasetName: dataset?.name,
+        storagePath,
+        deliveryNote,
+        handoff,
+      }),
+      sourceJob: job?.engine ?? "Unknown job",
     };
   });
 
-  const jobsById = new Map(jobs.map((job) => [job.id, job]));
-  const missionsById = new Map(missions.map((mission) => [mission.id, mission]));
   const activity = buildActivity(events, jobsById, missionsById);
 
   const readyOutputCount = missionRows
