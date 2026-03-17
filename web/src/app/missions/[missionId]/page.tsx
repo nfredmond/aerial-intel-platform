@@ -8,6 +8,7 @@ import { GeometryJsonField } from "@/components/geometry-json-field";
 import { GeometryPreviewCard } from "@/components/geometry-preview-card";
 import { MissionStatusDashboard } from "@/components/mission-status-dashboard";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
+import { getArtifactHandoff, type ArtifactMetadataRecord } from "@/lib/artifact-handoff";
 import {
   buildCoverageRosterSummary,
   getCoverageRoster,
@@ -888,51 +889,6 @@ export default async function MissionDetailPage({
     items: coverageRoster,
   });
   const bestCoverage = coverageRoster.find((item) => item.coveragePercent !== null)?.coveragePercent ?? null;
-  const overlayReviewPercent = overlayPlan.recommendations.length > 0
-    ? Math.round((reviewedOverlayCount / overlayPlan.recommendations.length) * 100)
-    : null;
-  const dashboardMetrics = [
-    {
-      id: "readiness",
-      label: "Mission readiness",
-      value: readinessSummary.percent,
-      displayValue: `${readinessSummary.percent}%`,
-      detail: `${readinessSummary.completeCount}/${readinessSummary.totalCount} checklist steps complete.`,
-      tone: readinessSummary.percent >= 85 ? "success" as const : readinessSummary.percent >= 60 ? "info" as const : "warning" as const,
-    },
-    {
-      id: "spatial",
-      label: "Spatial score",
-      value: missionSpatialInsight.score,
-      displayValue: `${missionSpatialInsight.score}`,
-      detail: missionSpatialInsight.summary,
-      tone: missionSpatialInsight.riskLevel === "low" ? "success" as const : missionSpatialInsight.riskLevel === "moderate" ? "info" as const : "warning" as const,
-    },
-    {
-      id: "terrain",
-      label: "Terrain posture",
-      value: terrainInsight.score,
-      displayValue: `${terrainInsight.score}`,
-      detail: terrainInsight.summary,
-      tone: terrainInsight.riskLevel === "low" ? "success" as const : terrainInsight.riskLevel === "moderate" ? "info" as const : "warning" as const,
-    },
-    {
-      id: "overlay-review",
-      label: "Overlay review",
-      value: overlayReviewPercent,
-      displayValue: overlayReviewPercent !== null ? `${overlayReviewPercent}%` : "N/A",
-      detail: `${reviewedOverlayCount}/${overlayPlan.recommendations.length} recommended overlay layers reviewed.`,
-      tone: overlayReviewPercent !== null && overlayReviewPercent >= 100 ? "success" as const : overlayReviewPercent !== null && overlayReviewPercent >= 50 ? "info" as const : "warning" as const,
-    },
-    {
-      id: "best-coverage",
-      label: "Best dataset coverage",
-      value: bestCoverage,
-      displayValue: bestCoverage !== null ? `${bestCoverage}%` : "N/A",
-      detail: bestCoverage !== null ? "Highest planned-versus-captured extent coverage among attached datasets." : "No comparable dataset footprint available yet.",
-      tone: bestCoverage !== null && bestCoverage >= 90 ? "success" as const : bestCoverage !== null && bestCoverage >= 70 ? "info" as const : "warning" as const,
-    },
-  ];
   const missionGeometryInsight = getMissionGeometryInsight({
     geometry: missionGeometry,
     fallbackAreaAcres: getNumber(detail.summary.areaAcres),
@@ -986,6 +942,51 @@ export default async function MissionDetailPage({
     missionName: detail.mission.name,
     steps: readinessSummary.steps,
   });
+  const overlayReviewPercent = overlayPlan.recommendations.length > 0
+    ? Math.round((reviewedOverlayCount / overlayPlan.recommendations.length) * 100)
+    : null;
+  const dashboardMetrics = [
+    {
+      id: "readiness",
+      label: "Mission readiness",
+      value: readinessSummary.percent,
+      displayValue: `${readinessSummary.percent}%`,
+      detail: `${readinessSummary.completeCount}/${readinessSummary.totalCount} checklist steps complete.`,
+      tone: readinessSummary.percent >= 85 ? "success" as const : readinessSummary.percent >= 60 ? "info" as const : "warning" as const,
+    },
+    {
+      id: "spatial",
+      label: "Spatial score",
+      value: missionSpatialInsight.score,
+      displayValue: `${missionSpatialInsight.score}`,
+      detail: missionSpatialInsight.summary,
+      tone: missionSpatialInsight.riskLevel === "low" ? "success" as const : missionSpatialInsight.riskLevel === "moderate" ? "info" as const : "warning" as const,
+    },
+    {
+      id: "terrain",
+      label: "Terrain posture",
+      value: terrainInsight.score,
+      displayValue: `${terrainInsight.score}`,
+      detail: terrainInsight.summary,
+      tone: terrainInsight.riskLevel === "low" ? "success" as const : terrainInsight.riskLevel === "moderate" ? "info" as const : "warning" as const,
+    },
+    {
+      id: "overlay-review",
+      label: "Overlay review",
+      value: overlayReviewPercent,
+      displayValue: overlayReviewPercent !== null ? `${overlayReviewPercent}%` : "N/A",
+      detail: `${reviewedOverlayCount}/${overlayPlan.recommendations.length} recommended overlay layers reviewed.`,
+      tone: overlayReviewPercent !== null && overlayReviewPercent >= 100 ? "success" as const : overlayReviewPercent !== null && overlayReviewPercent >= 50 ? "info" as const : "warning" as const,
+    },
+    {
+      id: "best-coverage",
+      label: "Best dataset coverage",
+      value: bestCoverage,
+      displayValue: bestCoverage !== null ? `${bestCoverage}%` : "N/A",
+      detail: bestCoverage !== null ? "Highest planned-versus-captured extent coverage among attached datasets." : "No comparable dataset footprint available yet.",
+      tone: bestCoverage !== null && bestCoverage >= 90 ? "success" as const : bestCoverage !== null && bestCoverage >= 70 ? "info" as const : "warning" as const,
+    },
+  ];
   const calloutState =
     resolvedSearchParams.created
     ?? resolvedSearchParams.attached
@@ -1265,7 +1266,7 @@ export default async function MissionDetailPage({
       </section>
 
       <section className="grid-cards">
-        <article className="surface stack-sm info-card">
+        <article id="mission-datasets" className="surface stack-sm info-card">
           <div className="stack-xs">
             <p className="eyebrow">Datasets</p>
             <h2>Mission ingest lane</h2>
@@ -1495,7 +1496,7 @@ export default async function MissionDetailPage({
       </section>
 
       <section className="grid-cards">
-        <article className="surface stack-sm info-card">
+        <article id="mission-install" className="surface stack-sm info-card">
           <div className="stack-xs">
             <p className="eyebrow">Planner + install readiness</p>
             <h2>Latest mission version</h2>
@@ -1599,7 +1600,7 @@ export default async function MissionDetailPage({
       </section>
 
       <section className="ops-console-grid">
-        <article className="surface stack-sm">
+        <article id="mission-jobs" className="surface stack-sm">
           <div className="stack-xs">
             <p className="eyebrow">Jobs</p>
             <h2>Mission processing runs</h2>
@@ -1639,28 +1640,37 @@ export default async function MissionDetailPage({
             <h2>Artifact trail</h2>
           </div>
           <div className="stack-xs">
-            {detail.outputs.map((output) => (
-              <article key={output.id} className="ops-list-card stack-xs">
-                <div className="ops-list-card-header">
-                  <strong>{output.kind.replaceAll("_", " ")}</strong>
-                  <span
-                    className={getOutputPillClassName(
-                      output.status === "ready" ? "ready" : output.status === "pending" ? "processing" : "draft",
-                    )}
-                  >
-                    {formatOutputArtifactStatus(
-                      output.status === "ready" ? "ready" : output.status === "pending" ? "processing" : "draft",
-                    )}
-                  </span>
-                </div>
-                <p className="muted">{output.storage_path ?? "Storage path pending"}</p>
-                <div className="header-actions">
-                  <Link href={`/artifacts/${output.id}`} className="button button-secondary">
-                    Review artifact
-                  </Link>
-                </div>
-              </article>
-            ))}
+            {detail.outputs.map((output) => {
+              const handoff = getArtifactHandoff(
+                output.metadata && typeof output.metadata === "object" && !Array.isArray(output.metadata)
+                  ? (output.metadata as ArtifactMetadataRecord)
+                  : {},
+              );
+
+              return (
+                <article key={output.id} className="ops-list-card stack-xs">
+                  <div className="ops-list-card-header">
+                    <strong>{output.kind.replaceAll("_", " ")}</strong>
+                    <span
+                      className={getOutputPillClassName(
+                        output.status === "ready" ? "ready" : output.status === "pending" ? "processing" : "draft",
+                      )}
+                    >
+                      {formatOutputArtifactStatus(
+                        output.status === "ready" ? "ready" : output.status === "pending" ? "processing" : "draft",
+                      )}
+                    </span>
+                  </div>
+                  <p className="muted">{output.storage_path ?? "Storage path pending"}</p>
+                  <p className="muted">Handoff: {handoff.stageLabel}</p>
+                  <div className="header-actions">
+                    <Link href={`/artifacts/${output.id}`} className="button button-secondary">
+                      Review artifact
+                    </Link>
+                  </div>
+                </article>
+              );
+            })}
             {detail.events.slice(0, 6).map((event) => {
               const payload = (event.payload as Record<string, string | undefined>) ?? {};
               return (

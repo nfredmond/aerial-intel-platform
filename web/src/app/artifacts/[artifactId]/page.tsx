@@ -6,10 +6,18 @@ import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-button";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import {
+  buildArtifactExportPacket,
+  buildArtifactShareSummary,
+  getArtifactHandoff,
+  type ArtifactHandoffStage,
+  updateArtifactHandoffMetadata,
+} from "@/lib/artifact-handoff";
+import {
   getBenchmarkOutputForArtifact,
   getBenchmarkSummaryView,
 } from "@/lib/benchmark-summary";
 import { getArtifactDetail, getString } from "@/lib/missions/detail-data";
+import { insertJobEvent, updateProcessingOutput } from "@/lib/supabase/admin";
 
 function formatDateTime(value: string | null) {
   if (!value) return "TBD";
@@ -35,10 +43,60 @@ function statusClass(status: string) {
   }
 }
 
+function handoffClass(stage: ArtifactHandoffStage) {
+  switch (stage) {
+    case "reviewed":
+    case "shared":
+    case "exported":
+      return "status-pill status-pill--success";
+    default:
+      return "status-pill status-pill--warning";
+  }
+}
+
+function getCalloutMessage(action?: string) {
+  switch (action) {
+    case "reviewed":
+      return {
+        tone: "success",
+        text: "Artifact marked reviewed. The handoff trail now records review timing and the next action.",
+      } as const;
+    case "shared":
+      return {
+        tone: "success",
+        text: "Artifact marked shared. The handoff trail now records a client/ops share checkpoint.",
+      } as const;
+    case "exported":
+      return {
+        tone: "success",
+        text: "Artifact marked exported. Final delivery traceability is now recorded on this artifact.",
+      } as const;
+    case "not-ready":
+      return {
+        tone: "error",
+        text: "Only ready artifacts can be marked reviewed, shared, or exported.",
+      } as const;
+    case "denied":
+      return {
+        tone: "error",
+        text: "Viewer access cannot update artifact handoff state.",
+      } as const;
+    case "error":
+      return {
+        tone: "error",
+        text: "Artifact handoff state could not be updated. Check server configuration and try again.",
+      } as const;
+    default:
+      return null;
+  }
+}
+
 export default async function ArtifactDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ artifactId: string }>;
+  searchParams: Promise<{ action?: string }>;
 }) {
   const access = await getDroneOpsAccess();
 
@@ -51,37 +109,123 @@ export default async function ArtifactDetailPage({
   }
 
   const { artifactId } = await params;
+  const resolvedSearchParams = await searchParams;
   const detail = await getArtifactDetail(access, artifactId);
 
   if (!detail) {
     notFound();
   }
 
+  async function updateArtifactState(targetAction: "reviewed" | "shared" | "exported") {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/artifacts/${artifactId}?action=denied`);
+    }
+
+    const refreshedDetail = await getArtifactDetail(refreshedAccess, artifactId);
+    if (!refreshedDetail) {
+      redirect("/missions");
+    }
+
+    if (refreshedDetail.output.status !== "ready") {
+      redirect(`/artifacts/${artifactId}?action=not-ready`);
+    }
+
+    const currentHandoff = getArtifactHandoff(refreshedDetail.metadata);
+    const actorEmail = refreshedAccess.user.email ?? null;
+    const now = new Date().toISOString();
+
+    const nextMetadata = updateArtifactHandoffMetadata(refreshedDetail.metadata, {
+      reviewedAt: currentHandoff.reviewedAt ?? now,
+      reviewedByEmail: currentHandoff.reviewedByEmail ?? actorEmail,
+      sharedAt: targetAction === "shared" || targetAction === "exported" ? currentHandoff.sharedAt ?? now : undefined,
+      sharedByEmail:
+        targetAction === "shared" || targetAction === "exported"
+          ? currentHandoff.sharedByEmail ?? actorEmail
+          : undefined,
+      exportedAt: targetAction === "exported" ? currentHandoff.exportedAt ?? now : undefined,
+      exportedByEmail: targetAction === "exported" ? currentHandoff.exportedByEmail ?? actorEmail : undefined,
+      note:
+        targetAction === "exported"
+          ? "Final export/delivery checkpoint recorded from artifact detail page."
+          : targetAction === "shared"
+            ? "Artifact share checkpoint recorded from artifact detail page."
+            : "Artifact reviewed from artifact detail page.",
+    });
+
+    try {
+      await updateProcessingOutput(refreshedDetail.output.id, {
+        metadata: nextMetadata,
+      });
+
+      await insertJobEvent({
+        org_id: refreshedAccess.org.id,
+        job_id: refreshedDetail.output.job_id,
+        event_type:
+          targetAction === "reviewed"
+            ? "artifact.reviewed"
+            : targetAction === "shared"
+              ? "artifact.shared"
+              : "artifact.exported",
+        payload: {
+          title:
+            targetAction === "reviewed"
+              ? "Artifact reviewed"
+              : targetAction === "shared"
+                ? "Artifact shared"
+                : "Artifact exported",
+          detail:
+            targetAction === "reviewed"
+              ? `${getString(refreshedDetail.metadata.name, refreshedDetail.output.kind.replaceAll("_", " "))} was marked reviewed from the artifact detail page.`
+              : targetAction === "shared"
+                ? `${getString(refreshedDetail.metadata.name, refreshedDetail.output.kind.replaceAll("_", " "))} was marked shared from the artifact detail page.`
+                : `${getString(refreshedDetail.metadata.name, refreshedDetail.output.kind.replaceAll("_", " "))} was marked exported from the artifact detail page.`,
+        },
+      });
+    } catch {
+      redirect(`/artifacts/${artifactId}?action=error`);
+    }
+
+    redirect(`/artifacts/${artifactId}?action=${targetAction}`);
+  }
+
   const artifactName = getString(detail.metadata.name, detail.output.kind.replaceAll("_", " "));
   const storagePath = detail.output.storage_path ?? "Storage path pending";
   const benchmarkSummary = getBenchmarkSummaryView(detail.outputSummary.benchmarkSummary ?? detail.outputSummary);
   const benchmarkOutput = getBenchmarkOutputForArtifact(benchmarkSummary, detail.output.kind);
-  const exportPacket = [
-    `Artifact: ${artifactName}`,
-    `Kind: ${detail.output.kind}`,
-    `Status: ${detail.output.status}`,
-    `Format: ${getString(detail.metadata.format, "Derived artifact")}`,
-    `Mission: ${detail.mission?.name ?? "No mission linked"}`,
-    `Project: ${detail.project?.name ?? "No project linked"}`,
-    `Dataset: ${detail.dataset?.name ?? "No dataset linked"}`,
-    `Storage path: ${storagePath}`,
-    `Delivery note: ${getString(detail.metadata.delivery, "Delivery note pending")}`,
-  ].join("\n");
-
-  const shareSummary = [
+  const handoff = getArtifactHandoff(detail.metadata);
+  const exportPacket = buildArtifactExportPacket({
     artifactName,
-    detail.mission ? `Mission: ${detail.mission.name}` : null,
-    detail.project ? `Project: ${detail.project.name}` : null,
-    `Status: ${detail.output.status}`,
-    `Path: ${storagePath}`,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+    artifactKind: detail.output.kind,
+    artifactStatus: detail.output.status,
+    artifactFormat: getString(detail.metadata.format, "Derived artifact"),
+    missionName: detail.mission?.name,
+    projectName: detail.project?.name,
+    datasetName: detail.dataset?.name,
+    storagePath,
+    deliveryNote: getString(detail.metadata.delivery, "Delivery note pending"),
+    handoff,
+  });
+
+  const shareSummary = buildArtifactShareSummary({
+    artifactName,
+    missionName: detail.mission?.name,
+    projectName: detail.project?.name,
+    status: detail.output.status,
+    storagePath,
+    handoffStageLabel: handoff.stageLabel,
+  });
+  const callout = getCalloutMessage(resolvedSearchParams.action);
 
   return (
     <main className="app-shell stack-md">
@@ -109,6 +253,12 @@ export default async function ArtifactDetailPage({
         </div>
       </section>
 
+      {callout ? (
+        <section className={callout.tone === "success" ? "callout callout-success" : "callout callout-error"}>
+          {callout.text}
+        </section>
+      ) : null}
+
       <section className="detail-grid">
         <article className="surface stack-sm">
           <div className="stack-xs">
@@ -134,6 +284,10 @@ export default async function ArtifactDetailPage({
               <dd>{getString(detail.metadata.delivery, "Delivery note pending")}</dd>
             </div>
             <div className="kv-row">
+              <dt>Handoff stage</dt>
+              <dd><span className={handoffClass(handoff.stage)}>{handoff.stageLabel}</span></dd>
+            </div>
+            <div className="kv-row">
               <dt>Bucket</dt>
               <dd>{detail.output.storage_bucket ?? "Storage bucket pending"}</dd>
             </div>
@@ -154,11 +308,56 @@ export default async function ArtifactDetailPage({
 
         <aside className="surface stack-sm">
           <div className="stack-xs">
-            <p className="eyebrow">Share and export</p>
-            <h2>Operator-ready handoff</h2>
+            <p className="eyebrow">Handoff controls</p>
+            <h2>Record review, share, and export</h2>
             <p className="muted">
-              This is the first v1 review/share/export surface: copy a concise share summary or a fuller export packet while signed URLs and client portal flows are still pending.
+              This extends the v1 artifact surface from copy-only summaries into a real handoff audit trail while signed URLs and client portal delivery are still pending.
             </p>
+          </div>
+
+          <dl className="kv-grid">
+            <div className="kv-row">
+              <dt>Current stage</dt>
+              <dd>{handoff.stageLabel}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Reviewed</dt>
+              <dd>{handoff.reviewedAt ? formatDateTime(handoff.reviewedAt) : "Not recorded"}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Shared</dt>
+              <dd>{handoff.sharedAt ? formatDateTime(handoff.sharedAt) : "Not recorded"}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Exported</dt>
+              <dd>{handoff.exportedAt ? formatDateTime(handoff.exportedAt) : "Not recorded"}</dd>
+            </div>
+            <div className="kv-row mission-meta-grid__wide">
+              <dt>Next action</dt>
+              <dd>{handoff.nextAction}</dd>
+            </div>
+          </dl>
+
+          <div className="stack-xs surface-form-shell">
+            <h3>Update handoff state</h3>
+            <form action={updateArtifactState.bind(null, "reviewed")}>
+              <button type="submit" className="button button-secondary" disabled={access.role === "viewer" || detail.output.status !== "ready"}>
+                Mark reviewed
+              </button>
+            </form>
+            <form action={updateArtifactState.bind(null, "shared")}>
+              <button type="submit" className="button button-secondary" disabled={access.role === "viewer" || detail.output.status !== "ready"}>
+                Mark shared
+              </button>
+            </form>
+            <form action={updateArtifactState.bind(null, "exported")}>
+              <button type="submit" className="button button-secondary" disabled={access.role === "viewer" || detail.output.status !== "ready"}>
+                Mark exported
+              </button>
+            </form>
+            {detail.output.status !== "ready" ? (
+              <p className="muted">Artifact handoff actions unlock once the artifact itself is ready.</p>
+            ) : null}
           </div>
 
           <div className="stack-sm">
@@ -216,6 +415,7 @@ export default async function ArtifactDetailPage({
             <h2>Current processing context</h2>
           </div>
           <p className="muted">{getString(detail.outputSummary.notes, "No job notes recorded yet.")}</p>
+          <p className="muted">{handoff.note ?? "No artifact-specific handoff note recorded yet."}</p>
         </article>
       </section>
 

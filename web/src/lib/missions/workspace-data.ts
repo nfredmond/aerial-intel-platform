@@ -1,5 +1,6 @@
 import { formatEntitlementTier } from "@/lib/auth/access-insights";
 import type { DroneOpsAccessResult } from "@/lib/auth/drone-ops-access";
+import { getArtifactHandoff } from "@/lib/artifact-handoff";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
 
@@ -336,13 +337,15 @@ function buildWorkspaceFromRows(params: {
 
   const outputRows: OutputArtifactRecord[] = outputs.map((output) => {
     const metadata = asRecord(output.metadata);
+    const handoff = getArtifactHandoff(metadata);
+
     return {
       id: output.id,
       name: asString(metadata.name, output.kind.replaceAll("_", " ")),
       kind: output.kind.replaceAll("_", " "),
       status: mapOutputStatus(output.status),
       format: asString(metadata.format, output.kind === "orthomosaic" || output.kind === "dsm" || output.kind === "dem" ? "COG" : "Derived artifact"),
-      delivery: asString(metadata.delivery, output.storage_path ?? "Storage path pending"),
+      delivery: `Handoff: ${handoff.stageLabel} · ${asString(metadata.delivery, output.storage_path ?? "Storage path pending")}`,
       sourceJob: jobs.find((job) => job.id === output.job_id)?.engine ?? "Unknown job",
     };
   });

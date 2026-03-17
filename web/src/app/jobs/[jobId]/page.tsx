@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
+import { getArtifactHandoff, type ArtifactMetadataRecord } from "@/lib/artifact-handoff";
 import {
   getBenchmarkSummaryView,
 } from "@/lib/benchmark-summary";
@@ -348,20 +349,29 @@ export default async function JobDetailPage({
             <h2>Artifact readiness</h2>
           </div>
           <div className="stack-xs">
-            {detail.outputs.map((output) => (
-              <article key={output.id} className="ops-list-card stack-xs">
-                <div className="ops-list-card-header">
-                  <strong>{output.kind.replaceAll("_", " ")}</strong>
-                  <span className={statusClass(output.status)}>{output.status}</span>
-                </div>
-                <p className="muted">{output.storage_path ?? "Storage path pending"}</p>
-                <div className="header-actions">
-                  <Link href={`/artifacts/${output.id}`} className="button button-secondary">
-                    Review artifact
-                  </Link>
-                </div>
-              </article>
-            ))}
+            {detail.outputs.map((output) => {
+              const handoff = getArtifactHandoff(
+                output.metadata && typeof output.metadata === "object" && !Array.isArray(output.metadata)
+                  ? (output.metadata as ArtifactMetadataRecord)
+                  : {},
+              );
+
+              return (
+                <article key={output.id} className="ops-list-card stack-xs">
+                  <div className="ops-list-card-header">
+                    <strong>{output.kind.replaceAll("_", " ")}</strong>
+                    <span className={statusClass(output.status)}>{output.status}</span>
+                  </div>
+                  <p className="muted">{output.storage_path ?? "Storage path pending"}</p>
+                  <p className="muted">Handoff: {handoff.stageLabel}</p>
+                  <div className="header-actions">
+                    <Link href={`/artifacts/${output.id}`} className="button button-secondary">
+                      Review artifact
+                    </Link>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </article>
 
