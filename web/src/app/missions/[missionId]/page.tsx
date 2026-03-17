@@ -9,6 +9,10 @@ import {
   buildMissionGisBrief,
 } from "@/lib/gis-briefs";
 import {
+  buildMissionOverlayChecklist,
+  getMissionOverlayPlan,
+} from "@/lib/overlay-recommendations";
+import {
   getCoverageComparisonInsight,
   getMissionGeometryInsight,
   getTerrainInsight,
@@ -765,6 +769,19 @@ export default async function MissionDetailPage({
     missionType: detail.mission.mission_type,
     warnings,
   });
+  const overlayPlan = getMissionOverlayPlan({
+    missionType: detail.mission.mission_type,
+    areaAcres: getNumber(detail.summary.areaAcres),
+    geometryAttached: missionGeometryInsight.hasGeometry,
+    terrainRiskLevel: terrainInsight.riskLevel,
+    missionStatus: detail.mission.status,
+    installBundleReady: availableExports.includes("install_bundle"),
+  });
+  const overlayChecklist = buildMissionOverlayChecklist({
+    missionName: detail.mission.name,
+    projectName: detail.project?.name ?? "Project pending",
+    recommendations: overlayPlan.recommendations,
+  });
   const calloutState =
     resolvedSearchParams.created
     ?? resolvedSearchParams.attached
@@ -1107,6 +1124,27 @@ export default async function MissionDetailPage({
           <ul className="action-list mission-blocker-list">
             {coverageComparisonInsight.recommendations.map((item) => <li key={item}>{item}</li>)}
           </ul>
+        </article>
+
+        <article className="surface stack-sm info-card">
+          <div className="stack-xs">
+            <p className="eyebrow">Overlay plan</p>
+            <h2>GIS constraints and context layers</h2>
+          </div>
+          <div className="ops-list-card-header">
+            <p className="muted">{overlayPlan.summary}</p>
+            <span className="status-pill status-pill--info">{overlayPlan.recommendations.length} layers</span>
+          </div>
+          <ul className="action-list mission-blocker-list">
+            {overlayPlan.recommendations.map((item) => <li key={item.id}><strong>{item.label}</strong> ({item.priority}) — {item.rationale}</li>)}
+          </ul>
+          <SupportContextCopyButton
+            text={overlayChecklist}
+            buttonLabel="Copy overlay checklist"
+            successMessage="Overlay checklist copied. Paste it into planning notes, Slack, or a field QA checklist."
+            fallbackAriaLabel="Mission overlay checklist"
+            fallbackHintMessage="Press Ctrl/Cmd+C, then paste this overlay checklist into notes, chat, or a delivery checklist."
+          />
         </article>
 
         <article className="surface stack-sm info-card">
