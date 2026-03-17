@@ -190,6 +190,34 @@ function inferOutputFormat(summaryKey, filePath) {
   return "Derived artifact";
 }
 
+async function loadRunLogExcerpt(summaryPath, summary) {
+  const runLog = typeof summary.run_log === "string" ? summary.run_log : "";
+  if (!runLog) {
+    return { runLogPath: null, logTail: [] };
+  }
+
+  const candidates = [
+    path.isAbsolute(runLog) ? runLog : path.resolve(process.cwd(), runLog),
+    path.isAbsolute(runLog) ? runLog : path.resolve(path.dirname(summaryPath), runLog),
+    path.resolve(path.dirname(summaryPath), "run.log"),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      const logText = await fs.readFile(candidate, "utf8");
+      const lines = logText.split(/\r?\n/).filter(Boolean);
+      return {
+        runLogPath: candidate,
+        logTail: lines.slice(-40),
+      };
+    } catch {
+      // try next candidate
+    }
+  }
+
+  return { runLogPath: runLog, logTail: [] };
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help === "true") {
@@ -214,6 +242,7 @@ async function main() {
 
   const rawSummary = await fs.readFile(summaryPath, "utf8");
   const summary = JSON.parse(rawSummary);
+  const { runLogPath, logTail } = await loadRunLogExcerpt(summaryPath, summary);
 
   const client = createClient({ supabaseUrl, serviceRoleKey });
   const org = await client.selectOne("drone_orgs", `slug=eq.${encodeURIComponent(orgSlug)}&select=id,name,slug`);
@@ -291,6 +320,8 @@ async function main() {
       eta: "Complete",
       notes: "Imported from ODM benchmark summary.",
       benchmarkSummary: summary,
+      runLogPath,
+      logTail,
     },
     external_job_reference: externalRef,
     started_at: summary.timestamp_utc ?? null,

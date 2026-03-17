@@ -569,6 +569,20 @@ main {
   width: auto;
 }
 
+.log-panel {
+  margin: 0;
+  border: 1px solid #dbe3f4;
+  border-radius: 0.95rem;
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 0.95rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 @media (min-width: 900px) {
   .auth-layout {
     grid-template-columns: minmax(0, 1fr) minmax(0, 470px);

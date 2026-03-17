@@ -8,6 +8,11 @@ import {
   getBenchmarkSummaryView,
 } from "@/lib/benchmark-summary";
 import { getJobDetail, getString } from "@/lib/missions/detail-data";
+import {
+  insertJobEvent,
+  insertProcessingJob,
+  updateProcessingJob,
+} from "@/lib/supabase/admin";
 
 function formatDateTime(value: string | null) {
   if (!value) return "TBD";
@@ -33,10 +38,44 @@ function statusClass(status: string) {
   }
 }
 
+function getCalloutMessage(actionState?: string) {
+  if (!actionState) {
+    return null;
+  }
+
+  if (actionState === "canceled") {
+    return {
+      tone: "success",
+      text: "Job canceled. The timeline has been updated and the run is no longer active.",
+    } as const;
+  }
+
+  if (actionState === "retried") {
+    return {
+      tone: "success",
+      text: "Retry job queued. A new processing run has been created from this job configuration.",
+    } as const;
+  }
+
+  if (actionState === "denied") {
+    return {
+      tone: "error",
+      text: "Viewer access cannot update jobs.",
+    } as const;
+  }
+
+  return {
+    tone: "error",
+    text: "The requested job action could not be completed.",
+  } as const;
+}
+
 export default async function JobDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ jobId: string }>;
+  searchParams: Promise<{ action?: string }>;
 }) {
   const access = await getDroneOpsAccess();
 
@@ -49,13 +88,138 @@ export default async function JobDetailPage({
   }
 
   const { jobId } = await params;
+  const resolvedSearchParams = await searchParams;
   const detail = await getJobDetail(access, jobId);
 
   if (!detail) {
     notFound();
   }
 
+  async function cancelJob() {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/jobs/${jobId}?action=denied`);
+    }
+
+    const refreshedDetail = await getJobDetail(refreshedAccess, jobId);
+    if (!refreshedDetail) {
+      redirect("/missions");
+    }
+
+    try {
+      await updateProcessingJob(refreshedDetail.job.id, {
+        status: "canceled",
+        stage: "canceled",
+        queue_position: null,
+        completed_at: new Date().toISOString(),
+        output_summary: {
+          ...refreshedDetail.outputSummary,
+          eta: "Canceled",
+          notes: "Job canceled from job detail page.",
+        },
+      });
+
+      await insertJobEvent({
+        org_id: refreshedAccess.org.id,
+        job_id: refreshedDetail.job.id,
+        event_type: "job.canceled",
+        payload: {
+          title: "Job canceled",
+          detail: "Operator canceled this job from the job detail page.",
+        },
+      });
+    } catch {
+      redirect(`/jobs/${jobId}?action=error`);
+    }
+
+    redirect(`/jobs/${jobId}?action=canceled`);
+  }
+
+  async function retryJob() {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/jobs/${jobId}?action=denied`);
+    }
+
+    const refreshedDetail = await getJobDetail(refreshedAccess, jobId);
+    if (!refreshedDetail) {
+      redirect("/missions");
+    }
+
+    try {
+      const clonedInputSummary = {
+        ...refreshedDetail.inputSummary,
+        name: `${getString(refreshedDetail.inputSummary.name, `${refreshedDetail.job.engine.toUpperCase()} job`)} retry`,
+        retryOfJobId: refreshedDetail.job.id,
+      };
+
+      const insertedJob = await insertProcessingJob({
+        org_id: refreshedAccess.org.id,
+        project_id: refreshedDetail.job.project_id,
+        site_id: refreshedDetail.job.site_id,
+        mission_id: refreshedDetail.job.mission_id,
+        dataset_id: refreshedDetail.job.dataset_id,
+        engine: refreshedDetail.job.engine,
+        preset_id: refreshedDetail.job.preset_id,
+        status: "queued",
+        stage: "queued",
+        progress: 0,
+        queue_position: 1,
+        input_summary: clonedInputSummary,
+        output_summary: {
+          eta: "Pending queue pickup",
+          notes: `Retry requested from job ${refreshedDetail.job.id}.`,
+          runLogPath: refreshedDetail.outputSummary.runLogPath,
+        },
+        external_job_reference: null,
+        created_by: refreshedAccess.user.id,
+      });
+
+      if (!insertedJob?.id) {
+        redirect(`/jobs/${jobId}?action=error`);
+      }
+
+      await insertJobEvent({
+        org_id: refreshedAccess.org.id,
+        job_id: insertedJob.id,
+        event_type: "job.retried",
+        payload: {
+          title: "Retry job queued",
+          detail: `Retry requested from job ${refreshedDetail.job.id}.`,
+        },
+      });
+
+      redirect(`/jobs/${insertedJob.id}?action=retried`);
+    } catch {
+      redirect(`/jobs/${jobId}?action=error`);
+    }
+  }
+
   const benchmarkSummary = getBenchmarkSummaryView(detail.outputSummary.benchmarkSummary ?? detail.outputSummary);
+  const logTail = Array.isArray(detail.outputSummary.logTail)
+    ? detail.outputSummary.logTail.filter((line): line is string => typeof line === "string")
+    : [];
+  const callout = getCalloutMessage(resolvedSearchParams.action);
 
   return (
     <main className="app-shell stack-md">
@@ -76,6 +240,12 @@ export default async function JobDetailPage({
           <SignOutForm label="Sign out" variant="secondary" />
         </div>
       </section>
+
+      {callout ? (
+        <section className={callout.tone === "success" ? "callout callout-success" : "callout callout-error"}>
+          {callout.text}
+        </section>
+      ) : null}
 
       <section className="detail-grid">
         <article className="surface stack-sm">
@@ -147,6 +317,27 @@ export default async function JobDetailPage({
               <dd>{getString(detail.outputSummary.eta, "Pending")}</dd>
             </div>
           </dl>
+
+          <div className="stack-xs surface-form-shell">
+            <h3>Job controls</h3>
+            <form action={retryJob}>
+              <button type="submit" className="button button-secondary" disabled={access.role === "viewer"}>
+                Retry job
+              </button>
+            </form>
+            <form action={cancelJob}>
+              <button
+                type="submit"
+                className="button button-secondary"
+                disabled={access.role === "viewer" || !["queued", "running"].includes(detail.job.status)}
+              >
+                Cancel job
+              </button>
+            </form>
+            {!(["queued", "running"].includes(detail.job.status)) ? (
+              <p className="muted">Cancel is only available for queued or running jobs.</p>
+            ) : null}
+          </div>
         </aside>
       </section>
 
@@ -263,6 +454,27 @@ export default async function JobDetailPage({
           </div>
         </section>
       ) : null}
+
+      <section className="surface stack-sm">
+        <div className="stack-xs">
+          <p className="eyebrow">Run logs</p>
+          <h2>Execution log tail</h2>
+          <p className="muted">
+            This surfaces imported log context when available so operators can inspect recent run output without leaving the app.
+          </p>
+        </div>
+        <dl className="kv-grid">
+          <div className="kv-row">
+            <dt>Log path</dt>
+            <dd>{getString(detail.outputSummary.runLogPath, benchmarkSummary?.runLog ?? "No log path recorded")}</dd>
+          </div>
+        </dl>
+        {logTail.length > 0 ? (
+          <pre className="log-panel">{logTail.join("\n")}</pre>
+        ) : (
+          <p className="muted">No log tail has been imported for this job yet.</p>
+        )}
+      </section>
 
       <section className="surface stack-sm">
         <div className="stack-xs">

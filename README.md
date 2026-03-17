@@ -73,7 +73,7 @@ Current Next.js app features:
 - `/missions` protected Aerial Operations OS workspace shell
 - `/missions/[missionId]` mission detail with live actions for dataset attachment, queued processing, and install-bundle generation
 - `/datasets/[datasetId]` dataset preflight review surface for capture findings and readiness approval
-- `/jobs/[jobId]` processing job detail with artifact linkage
+- `/jobs/[jobId]` processing job detail with artifact linkage, retry/cancel controls, and imported log-tail visibility
 - `/artifacts/[artifactId]` artifact review/share/export surface with copy-ready delivery packets
 - role + entitlement gate (`drone_memberships` + active `drone_entitlements` where `product_id='drone-ops'`)
 - query-backed mission workspace loading from Supabase aerial-ops tables when present, with automatic fallback to the built-in demo workspace when the new migration is empty or not applied yet

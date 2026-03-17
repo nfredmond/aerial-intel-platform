@@ -131,6 +131,16 @@ export type DatasetPatch = {
   captured_at?: string | null;
 };
 
+export type ProcessingJobPatch = {
+  status?: string;
+  stage?: string;
+  progress?: number;
+  queue_position?: number | null;
+  input_summary?: Json;
+  output_summary?: Json;
+  completed_at?: string | null;
+};
+
 export async function insertMission(input: MissionInsert) {
   const rows = await adminRestRequest<Array<{ id: string }>>(
     "drone_missions?select=id",
@@ -215,6 +225,18 @@ export async function updateMissionVersion(id: string, patch: MissionVersionPatc
 export async function updateDataset(id: string, patch: DatasetPatch) {
   const rows = await adminRestRequest<Array<{ id: string }>>(
     `drone_datasets?id=eq.${encodeURIComponent(id)}&select=id`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    },
+  );
+
+  return rows[0] ?? null;
+}
+
+export async function updateProcessingJob(id: string, patch: ProcessingJobPatch) {
+  const rows = await adminRestRequest<Array<{ id: string }>>(
+    `drone_processing_jobs?id=eq.${encodeURIComponent(id)}&select=id`,
     {
       method: "PATCH",
       body: JSON.stringify(patch),
