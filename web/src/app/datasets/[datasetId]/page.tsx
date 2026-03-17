@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
+import { getDatasetSpatialInsight } from "@/lib/gis-insights";
 import { getDatasetDetail } from "@/lib/missions/detail-data";
 import { updateDataset } from "@/lib/supabase/admin";
 
@@ -128,6 +129,16 @@ export default async function DatasetDetailPage({
   const findings = Array.isArray(preflight.findings)
     ? preflight.findings.filter((value): value is string => typeof value === "string")
     : [];
+  const datasetSpatialInsight = getDatasetSpatialInsight({
+    datasetKind: detail.dataset.kind,
+    status: detail.dataset.status,
+    imageCount: typeof metadata.imageCount === "number" ? metadata.imageCount : 0,
+    overlapFront: typeof preflight.overlapFront === "number" ? preflight.overlapFront : undefined,
+    overlapSide: typeof preflight.overlapSide === "number" ? preflight.overlapSide : undefined,
+    gcpCaptured: preflight.gcpCaptured === true,
+    reviewed: preflight.reviewed === true,
+    findings,
+  });
   const callout = getCalloutMessage(resolvedSearchParams.reviewed);
 
   return (
@@ -231,6 +242,22 @@ export default async function DatasetDetailPage({
           </div>
           <ul className="action-list mission-blocker-list">
             {findings.length > 0 ? findings.map((item) => <li key={item}>{item}</li>) : <li>No preflight findings recorded.</li>}
+          </ul>
+        </article>
+
+        <article className="surface stack-sm info-card">
+          <div className="stack-xs">
+            <p className="eyebrow">GIS spatial intelligence</p>
+            <h2>Dataset readiness insight</h2>
+          </div>
+          <div className="ops-list-card-header">
+            <p className="muted">{datasetSpatialInsight.summary}</p>
+            <span className={datasetSpatialInsight.riskLevel === "low" ? "status-pill status-pill--success" : datasetSpatialInsight.riskLevel === "moderate" ? "status-pill status-pill--info" : "status-pill status-pill--warning"}>
+              Score {datasetSpatialInsight.score}
+            </span>
+          </div>
+          <ul className="action-list mission-blocker-list">
+            {datasetSpatialInsight.recommendations.map((item) => <li key={item}>{item}</li>)}
           </ul>
         </article>
 

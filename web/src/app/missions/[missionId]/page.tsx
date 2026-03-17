@@ -5,6 +5,9 @@ import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import {
+  getMissionSpatialInsight,
+} from "@/lib/gis-insights";
+import {
   getMissionDetail,
   getNumber,
   getString,
@@ -714,6 +717,18 @@ export default async function MissionDetailPage({
   const warnings = getStringArray(detail.summary.warnings);
   const calloutMessage = getCalloutMessage(resolvedSearchParams);
   const deliverySummary = ((detail.summary.delivery as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+  const missionSpatialInsight = getMissionSpatialInsight({
+    missionType: detail.mission.mission_type,
+    areaAcres: getNumber(detail.summary.areaAcres),
+    imageCount: getNumber(detail.summary.imageCount),
+    gsdCm: getNumber(detail.summary.gsdCm),
+    coordinateSystem: getString(detail.summary.coordinateSystem, "Unknown CRS"),
+    warnings,
+    blockers,
+    availableExports,
+    versionStatus: latestVersion?.status,
+    missionStatus: detail.mission.status,
+  });
   const calloutState =
     resolvedSearchParams.created
     ?? resolvedSearchParams.attached
@@ -802,6 +817,22 @@ export default async function MissionDetailPage({
                 {warnings.length > 0 ? warnings.map((item) => <li key={item}>{item}</li>) : <li>No warnings recorded.</li>}
               </ul>
             </div>
+          </div>
+
+          <div className="surface-form-shell stack-sm">
+            <div className="ops-list-card-header">
+              <div className="stack-xs">
+                <h3>GIS spatial intelligence</h3>
+                <p className="muted">Explainable GIS-native readiness scoring based on mission scale, capture density, CRS posture, blockers, and export state.</p>
+              </div>
+              <span className={missionSpatialInsight.riskLevel === "low" ? "status-pill status-pill--success" : missionSpatialInsight.riskLevel === "moderate" ? "status-pill status-pill--info" : "status-pill status-pill--warning"}>
+                Score {missionSpatialInsight.score}
+              </span>
+            </div>
+            <p className="muted">{missionSpatialInsight.summary}</p>
+            <ul className="action-list mission-blocker-list">
+              {missionSpatialInsight.recommendations.map((item) => <li key={item}>{item}</li>)}
+            </ul>
           </div>
         </article>
 
