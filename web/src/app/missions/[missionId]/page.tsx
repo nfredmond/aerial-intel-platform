@@ -6,6 +6,7 @@ import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-button";
 import { GeometryJsonField } from "@/components/geometry-json-field";
 import { GeometryPreviewCard } from "@/components/geometry-preview-card";
+import { MissionStatusDashboard } from "@/components/mission-status-dashboard";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import {
   buildCoverageRosterSummary,
@@ -886,6 +887,52 @@ export default async function MissionDetailPage({
     missionName: detail.mission.name,
     items: coverageRoster,
   });
+  const bestCoverage = coverageRoster.find((item) => item.coveragePercent !== null)?.coveragePercent ?? null;
+  const overlayReviewPercent = overlayPlan.recommendations.length > 0
+    ? Math.round((reviewedOverlayCount / overlayPlan.recommendations.length) * 100)
+    : null;
+  const dashboardMetrics = [
+    {
+      id: "readiness",
+      label: "Mission readiness",
+      value: readinessSummary.percent,
+      displayValue: `${readinessSummary.percent}%`,
+      detail: `${readinessSummary.completeCount}/${readinessSummary.totalCount} checklist steps complete.`,
+      tone: readinessSummary.percent >= 85 ? "success" as const : readinessSummary.percent >= 60 ? "info" as const : "warning" as const,
+    },
+    {
+      id: "spatial",
+      label: "Spatial score",
+      value: missionSpatialInsight.score,
+      displayValue: `${missionSpatialInsight.score}`,
+      detail: missionSpatialInsight.summary,
+      tone: missionSpatialInsight.riskLevel === "low" ? "success" as const : missionSpatialInsight.riskLevel === "moderate" ? "info" as const : "warning" as const,
+    },
+    {
+      id: "terrain",
+      label: "Terrain posture",
+      value: terrainInsight.score,
+      displayValue: `${terrainInsight.score}`,
+      detail: terrainInsight.summary,
+      tone: terrainInsight.riskLevel === "low" ? "success" as const : terrainInsight.riskLevel === "moderate" ? "info" as const : "warning" as const,
+    },
+    {
+      id: "overlay-review",
+      label: "Overlay review",
+      value: overlayReviewPercent,
+      displayValue: overlayReviewPercent !== null ? `${overlayReviewPercent}%` : "N/A",
+      detail: `${reviewedOverlayCount}/${overlayPlan.recommendations.length} recommended overlay layers reviewed.`,
+      tone: overlayReviewPercent !== null && overlayReviewPercent >= 100 ? "success" as const : overlayReviewPercent !== null && overlayReviewPercent >= 50 ? "info" as const : "warning" as const,
+    },
+    {
+      id: "best-coverage",
+      label: "Best dataset coverage",
+      value: bestCoverage,
+      displayValue: bestCoverage !== null ? `${bestCoverage}%` : "N/A",
+      detail: bestCoverage !== null ? "Highest planned-versus-captured extent coverage among attached datasets." : "No comparable dataset footprint available yet.",
+      tone: bestCoverage !== null && bestCoverage >= 90 ? "success" as const : bestCoverage !== null && bestCoverage >= 70 ? "info" as const : "warning" as const,
+    },
+  ];
   const missionGeometryInsight = getMissionGeometryInsight({
     geometry: missionGeometry,
     fallbackAreaAcres: getNumber(detail.summary.areaAcres),
@@ -973,6 +1020,12 @@ export default async function MissionDetailPage({
       {calloutMessage && calloutState ? (
         <section className={getCalloutClassName(calloutState)}>{calloutMessage}</section>
       ) : null}
+
+      <MissionStatusDashboard
+        title="At-a-glance operational posture"
+        subtitle="Visual summary of readiness, GIS quality, terrain posture, overlay review, and best attached dataset coverage."
+        metrics={dashboardMetrics}
+      />
 
       <section className="detail-grid">
         <article className="surface stack-sm">

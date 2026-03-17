@@ -36,6 +36,7 @@
 - Added a mission-wide dataset coverage roster and copyable summary so all attached datasets can be ranked by planned-versus-captured coverage posture, not just the currently selected comparison target.
 - Added sample GeoJSON helpers for mission AOIs and dataset footprints so demos/testing can load valid polygon/corridor/footprint geometry directly from the form without manual JSON authoring every time.
 - Added live draft-geometry preview and validation inside the geometry forms so operators can see whether pasted/sample GeoJSON parses correctly before saving it to the mission or dataset.
+- Added a visual mission dashboard that rolls up readiness, spatial score, terrain posture, overlay review, and best dataset coverage into progress-bar cards for faster at-a-glance review.
 - Added the first authenticated write path: queueing a processing job from the mission detail page now writes a real `drone_processing_jobs` row plus a `drone_processing_job_events` audit entry through a server-side action.
 - Added an entitlement-protected `/missions` workspace route so DroneOps now has a real mission pipeline surface beyond the auth dashboard.
 - Added a GIS/drone mission workspace snapshot model with AOI, capture, processing, CRS, and deliverable readiness metadata for the first workflow slice.
