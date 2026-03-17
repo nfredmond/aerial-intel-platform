@@ -4,7 +4,11 @@ import { notFound, redirect } from "next/navigation";
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
-import { getArtifactHandoff, type ArtifactMetadataRecord } from "@/lib/artifact-handoff";
+import {
+  getArtifactHandoff,
+  summarizeArtifactHandoffs,
+  type ArtifactMetadataRecord,
+} from "@/lib/artifact-handoff";
 import {
   getBenchmarkSummaryView,
 } from "@/lib/benchmark-summary";
@@ -220,6 +224,13 @@ export default async function JobDetailPage({
   const logTail = Array.isArray(detail.outputSummary.logTail)
     ? detail.outputSummary.logTail.filter((line): line is string => typeof line === "string")
     : [];
+  const handoffCounts = summarizeArtifactHandoffs(
+    detail.outputs.map((output) =>
+      output.metadata && typeof output.metadata === "object" && !Array.isArray(output.metadata)
+        ? (output.metadata as ArtifactMetadataRecord)
+        : {},
+    ),
+  );
   const callout = getCalloutMessage(resolvedSearchParams.action);
 
   return (
@@ -377,9 +388,27 @@ export default async function JobDetailPage({
 
         <article className="surface stack-sm info-card">
           <div className="stack-xs">
-            <p className="eyebrow">Output notes</p>
-            <h2>Current summary</h2>
+            <p className="eyebrow">Handoff posture</p>
+            <h2>Review/share/export counts</h2>
           </div>
+          <dl className="kv-grid">
+            <div className="kv-row">
+              <dt>Pending review</dt>
+              <dd>{handoffCounts.pendingReviewCount}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Reviewed</dt>
+              <dd>{handoffCounts.reviewedCount}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Shared</dt>
+              <dd>{handoffCounts.sharedCount}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Exported</dt>
+              <dd>{handoffCounts.exportedCount}</dd>
+            </div>
+          </dl>
           <p className="muted">{getString(detail.outputSummary.notes, "No job notes recorded yet.")}</p>
         </article>
       </section>

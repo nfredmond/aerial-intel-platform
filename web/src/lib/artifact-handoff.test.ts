@@ -4,6 +4,7 @@ import {
   buildArtifactExportPacket,
   buildArtifactShareSummary,
   getArtifactHandoff,
+  summarizeArtifactHandoffs,
   updateArtifactHandoffMetadata,
 } from "./artifact-handoff";
 
@@ -52,6 +53,37 @@ describe("artifact handoff helpers", () => {
     expect(exportedSummary.exportedByEmail).toBe("ops@example.com");
     expect(exportedSummary.note).toContain("Final PDF packet");
     expect((exported.handoff as Record<string, unknown>).stage).toBe("exported");
+  });
+
+  it("summarizes handoff counts across multiple artifacts", () => {
+    const counts = summarizeArtifactHandoffs([
+      {},
+      updateArtifactHandoffMetadata({}, {
+        reviewedAt: "2026-03-17T19:35:00.000Z",
+        reviewedByEmail: "reviewer@example.com",
+      }),
+      updateArtifactHandoffMetadata({}, {
+        reviewedAt: "2026-03-17T19:35:00.000Z",
+        reviewedByEmail: "reviewer@example.com",
+        sharedAt: "2026-03-17T19:45:00.000Z",
+        sharedByEmail: "ops@example.com",
+      }),
+      updateArtifactHandoffMetadata({}, {
+        reviewedAt: "2026-03-17T19:35:00.000Z",
+        reviewedByEmail: "reviewer@example.com",
+        sharedAt: "2026-03-17T19:45:00.000Z",
+        sharedByEmail: "ops@example.com",
+        exportedAt: "2026-03-17T20:00:00.000Z",
+        exportedByEmail: "ops@example.com",
+      }),
+    ]);
+
+    expect(counts).toEqual({
+      pendingReviewCount: 1,
+      reviewedCount: 1,
+      sharedCount: 1,
+      exportedCount: 1,
+    });
   });
 
   it("builds share and export packet strings with handoff context", () => {

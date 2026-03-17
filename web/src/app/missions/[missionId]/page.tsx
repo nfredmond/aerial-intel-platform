@@ -8,7 +8,11 @@ import { GeometryJsonField } from "@/components/geometry-json-field";
 import { GeometryPreviewCard } from "@/components/geometry-preview-card";
 import { MissionStatusDashboard } from "@/components/mission-status-dashboard";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
-import { getArtifactHandoff, type ArtifactMetadataRecord } from "@/lib/artifact-handoff";
+import {
+  getArtifactHandoff,
+  summarizeArtifactHandoffs,
+  type ArtifactMetadataRecord,
+} from "@/lib/artifact-handoff";
 import {
   buildCoverageRosterSummary,
   getCoverageRoster,
@@ -942,6 +946,13 @@ export default async function MissionDetailPage({
     missionName: detail.mission.name,
     steps: readinessSummary.steps,
   });
+  const handoffCounts = summarizeArtifactHandoffs(
+    detail.outputs.map((output) =>
+      output.metadata && typeof output.metadata === "object" && !Array.isArray(output.metadata)
+        ? (output.metadata as ArtifactMetadataRecord)
+        : {},
+    ),
+  );
   const overlayReviewPercent = overlayPlan.recommendations.length > 0
     ? Math.round((reviewedOverlayCount / overlayPlan.recommendations.length) * 100)
     : null;
@@ -1594,6 +1605,14 @@ export default async function MissionDetailPage({
             <div className="kv-row">
               <dt>Ready artifacts</dt>
               <dd>{detail.outputs.filter((output) => output.status === "ready").length}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Pending review</dt>
+              <dd>{handoffCounts.pendingReviewCount}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Shared/exported</dt>
+              <dd>{handoffCounts.sharedCount + handoffCounts.exportedCount}</dd>
             </div>
           </dl>
         </article>

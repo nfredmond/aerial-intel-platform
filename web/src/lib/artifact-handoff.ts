@@ -19,6 +19,13 @@ export type ArtifactHandoffSummary = {
   nextAction: string;
 };
 
+export type ArtifactHandoffCounts = {
+  pendingReviewCount: number;
+  reviewedCount: number;
+  sharedCount: number;
+  exportedCount: number;
+};
+
 export type ArtifactHandoffPatch = {
   reviewedAt?: string | null;
   reviewedByEmail?: string | null;
@@ -138,6 +145,37 @@ export function updateArtifactHandoffMetadata(metadata: JsonRecord, patch: Artif
     ...metadata,
     handoff: nextHandoff,
   } satisfies JsonRecord;
+}
+
+export function summarizeArtifactHandoffs(metadataRecords: ArtifactMetadataRecord[]) {
+  return metadataRecords.reduce<ArtifactHandoffCounts>(
+    (summary, metadata) => {
+      const handoff = getArtifactHandoff(metadata);
+
+      switch (handoff.stage) {
+        case "exported":
+          summary.exportedCount += 1;
+          break;
+        case "shared":
+          summary.sharedCount += 1;
+          break;
+        case "reviewed":
+          summary.reviewedCount += 1;
+          break;
+        default:
+          summary.pendingReviewCount += 1;
+          break;
+      }
+
+      return summary;
+    },
+    {
+      pendingReviewCount: 0,
+      reviewedCount: 0,
+      sharedCount: 0,
+      exportedCount: 0,
+    },
+  );
 }
 
 export function buildArtifactShareSummary(input: {
