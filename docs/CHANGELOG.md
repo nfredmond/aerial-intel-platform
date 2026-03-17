@@ -38,6 +38,7 @@
 - Added live draft-geometry preview and validation inside the geometry forms so operators can see whether pasted/sample GeoJSON parses correctly before saving it to the mission or dataset.
 - Added a visual mission dashboard that rolls up readiness, spatial score, terrain posture, overlay review, and best dataset coverage into progress-bar cards for faster at-a-glance review.
 - Upgraded the `/missions` workspace mission cards with visual readiness strips and inline blockers/warnings/output-health stats so operators can spot weak missions before drilling into detail pages.
+- Added a GIS triage board to the workspace overview so delivery-ready missions, fragile missions, QA-ready missions, and the current top-priority mission are visible before opening mission detail.
 - Added the first authenticated write path: queueing a processing job from the mission detail page now writes a real `drone_processing_jobs` row plus a `drone_processing_job_events` audit entry through a server-side action.
 - Added an entitlement-protected `/missions` workspace route so DroneOps now has a real mission pipeline surface beyond the auth dashboard.
 - Added a GIS/drone mission workspace snapshot model with AOI, capture, processing, CRS, and deliverable readiness metadata for the first workflow slice.

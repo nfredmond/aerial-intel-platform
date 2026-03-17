@@ -147,6 +147,23 @@ function getMissionReadinessTone(percent: number) {
   return "status-pill status-pill--warning";
 }
 
+function getMissionPriorityScore(mission: MissionWorkspaceSnapshot["missions"][number]) {
+  const readiness = getMissionReadinessPercent(mission);
+  return readiness + Math.max(0, mission.healthScore - mission.blockers.length * 8 - mission.warnings.length * 4);
+}
+
+function getMissionRiskLabel(mission: MissionWorkspaceSnapshot["missions"][number]) {
+  if (mission.blockers.length > 0 || mission.healthScore < 60) {
+    return { label: "Fragile", className: "status-pill status-pill--warning" };
+  }
+
+  if (mission.stage === "ready-for-qa") {
+    return { label: "QA-ready", className: "status-pill status-pill--success" };
+  }
+
+  return { label: "In progress", className: "status-pill status-pill--info" };
+}
+
 export function MissionWorkspace({
   snapshot,
   source,
@@ -155,6 +172,10 @@ export function MissionWorkspace({
   notice,
 }: MissionWorkspaceProps) {
   const selectedMission = snapshot.missions[0] ?? null;
+  const rankedMissions = [...snapshot.missions].sort((left, right) => getMissionPriorityScore(right) - getMissionPriorityScore(left));
+  const deliveryReadyCount = snapshot.missions.filter((mission) => getMissionReadinessPercent(mission) >= 80).length;
+  const fragileCount = snapshot.missions.filter((mission) => mission.blockers.length > 0 || mission.healthScore < 60).length;
+  const qaReadyCount = snapshot.missions.filter((mission) => mission.stage === "ready-for-qa").length;
 
   return (
     <main className="ops-workspace-shell">
@@ -301,6 +322,57 @@ export function MissionWorkspace({
           </section>
 
           <section className="grid-cards">
+            <article className="surface info-card stack-sm">
+              <div className="stack-xs">
+                <p className="eyebrow">GIS triage board</p>
+                <h2>Priority queue and delivery posture</h2>
+                <p className="muted">A fast read on which missions are closest to delivery, which are fragile, and which are already staged for QA.</p>
+              </div>
+              <div className="status-dashboard-grid">
+                <article className="status-dashboard-card stack-xs">
+                  <strong>Delivery-ready</strong>
+                  <span className="status-pill status-pill--success">{deliveryReadyCount}</span>
+                  <p className="muted">Missions with readiness at or above 80%.</p>
+                </article>
+                <article className="status-dashboard-card stack-xs">
+                  <strong>Fragile missions</strong>
+                  <span className="status-pill status-pill--warning">{fragileCount}</span>
+                  <p className="muted">Missions with blockers or low health that should stay in explicit GIS/ops review.</p>
+                </article>
+                <article className="status-dashboard-card stack-xs">
+                  <strong>QA-ready</strong>
+                  <span className="status-pill status-pill--info">{qaReadyCount}</span>
+                  <p className="muted">Missions currently at the ready-for-QA stage.</p>
+                </article>
+                <article className="status-dashboard-card stack-xs">
+                  <strong>Top priority</strong>
+                  <span className="status-pill status-pill--info">{rankedMissions[0]?.name ?? "None"}</span>
+                  <p className="muted">Best current candidate for the next focused ops/GIS pass.</p>
+                </article>
+              </div>
+              <div className="stack-xs">
+                {rankedMissions.slice(0, 3).map((mission) => {
+                  const readinessPercent = getMissionReadinessPercent(mission);
+                  const risk = getMissionRiskLabel(mission);
+                  const readyOutputs = getMissionReadyOutputCount(mission);
+                  return (
+                    <article key={`queue-${mission.id}`} className="ops-list-card stack-xs">
+                      <div className="ops-list-card-header">
+                        <strong>{mission.name}</strong>
+                        <span className={risk.className}>{risk.label}</span>
+                      </div>
+                      <div className="status-meter" aria-hidden="true">
+                        <span className="status-meter-fill" style={{ width: `${readinessPercent}%` }} />
+                      </div>
+                      <p className="muted">
+                        {readinessPercent}% ready · {readyOutputs}/{mission.outputs.length} outputs ready · {mission.blockers.length} blockers · {mission.warnings.length} warnings
+                      </p>
+                    </article>
+                  );
+                })}
+              </div>
+            </article>
+
             <article className="surface info-card stack-sm">
               <h2>Mission lanes</h2>
               <div className="mission-grid mission-grid--single-column">
