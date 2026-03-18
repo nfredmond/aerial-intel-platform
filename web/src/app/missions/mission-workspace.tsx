@@ -154,6 +154,8 @@ export function MissionWorkspace({
   const reviewQueue = handoffQueue.filter((artifact) => artifact.handoffStage === "pending_review");
   const shareQueue = handoffQueue.filter((artifact) => artifact.handoffStage === "reviewed");
   const exportQueue = handoffQueue.filter((artifact) => artifact.handoffStage === "shared");
+  const openV1Items = snapshot.v1Readiness.items.filter((item) => !item.complete);
+  const solidV1Ready = source === "database" && openV1Items.length === 0;
 
   return (
     <main className="ops-workspace-shell">
@@ -593,6 +595,52 @@ export function MissionWorkspace({
                   <p className="muted">{item.detail}</p>
                 </article>
               ))}
+            </div>
+          </div>
+
+          <div className="stack-sm surface-form-shell">
+            <div className="stack-xs">
+              <p className="eyebrow">V1 go / no-go</p>
+              <h3>{solidV1Ready ? "Solid v1" : "Not solid v1 yet"}</h3>
+              <p className="muted">
+                {solidV1Ready
+                  ? "The real data-backed workflow currently clears the acceptance bar end-to-end."
+                  : source !== "database"
+                    ? "The real data backbone is not active yet, so this workspace still counts as a prototype even if much of the UX loop is implemented."
+                    : `${openV1Items.length} acceptance step(s) are still open on the live data path.`}
+              </p>
+            </div>
+            <div className="stack-xs">
+              {source !== "database" ? (
+                <article className="ops-list-card stack-xs">
+                  <div className="ops-list-card-header">
+                    <strong>Real data backbone</strong>
+                    <span className="status-pill status-pill--warning">Required</span>
+                  </div>
+                  <p className="muted">
+                    Apply/populate the protected aerial-ops tables so mission, dataset, job, event, and artifact flows are real instead of fallback-only.
+                  </p>
+                </article>
+              ) : null}
+              {openV1Items.length > 0 ? (
+                openV1Items.map((item) => (
+                  <article key={`blocker-${item.id}`} className="ops-list-card stack-xs">
+                    <div className="ops-list-card-header">
+                      <strong>{item.label}</strong>
+                      <span className="status-pill status-pill--warning">Open</span>
+                    </div>
+                    <p className="muted">{item.detail}</p>
+                  </article>
+                ))
+              ) : source === "database" ? (
+                <article className="ops-list-card stack-xs">
+                  <div className="ops-list-card-header">
+                    <strong>Acceptance bar cleared</strong>
+                    <span className="status-pill status-pill--success">Ready</span>
+                  </div>
+                  <p className="muted">Nothing in the current acceptance list is blocking a solid-v1 call.</p>
+                </article>
+              ) : null}
             </div>
           </div>
 
