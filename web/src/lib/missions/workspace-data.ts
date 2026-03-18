@@ -377,6 +377,9 @@ function buildWorkspaceFromRows(params: {
 
     return {
       id: job.id,
+      missionId: job.mission_id,
+      presetId: job.preset_id,
+      source: typeof inputSummary.source === "string" ? inputSummary.source : null,
       name: asString(inputSummary.name, `${job.engine.toUpperCase()} job`),
       engine: job.engine,
       stage: job.stage,

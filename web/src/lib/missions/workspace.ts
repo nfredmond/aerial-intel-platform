@@ -64,6 +64,9 @@ export type DatasetRecord = {
 
 export type JobRecord = {
   id: string;
+  missionId?: string | null;
+  presetId?: string | null;
+  source?: string | null;
   name: string;
   engine: string;
   stage: string;
@@ -292,6 +295,9 @@ const DEMO_DATASETS: DatasetRecord[] = [
 const DEMO_JOBS: JobRecord[] = [
   {
     id: "job-gv-dense-cloud",
+    missionId: "mission-gv-downtown-corridor",
+    presetId: "v1-proving-run",
+    source: "mission-proving-seed",
     name: "GV corridor dense cloud refresh",
     engine: "ODM via NodeODM",
     stage: "Point cloud densification",
@@ -304,6 +310,9 @@ const DEMO_JOBS: JobRecord[] = [
   },
   {
     id: "job-colgate-baseline",
+    missionId: "mission-colgate-penstock-phase-1",
+    presetId: null,
+    source: null,
     name: "Colgate baseline processing",
     engine: "ODM / future ClusterODM lane",
     stage: "Preflight review",
@@ -316,6 +325,9 @@ const DEMO_JOBS: JobRecord[] = [
   },
   {
     id: "job-fairgrounds-sim",
+    missionId: "mission-fairgrounds-campus-repeatable",
+    presetId: null,
+    source: null,
     name: "Fairgrounds simulation package",
     engine: "Mission planner validation",
     stage: "Queueing export bundle",

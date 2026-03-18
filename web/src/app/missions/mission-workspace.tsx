@@ -139,6 +139,10 @@ function getArtifactAuditLine(artifact: MissionWorkspaceSnapshot["outputArtifact
   return null;
 }
 
+function isProvingWorkspaceJob(job: MissionWorkspaceSnapshot["jobs"][number]) {
+  return job.presetId === "v1-proving-run" || job.source === "mission-proving-seed";
+}
+
 function getReadinessAction(
   item: MissionWorkspaceSnapshot["v1Readiness"]["items"][number],
   snapshot: MissionWorkspaceSnapshot,
@@ -186,6 +190,10 @@ export function MissionWorkspace({
   const exportQueue = handoffQueue.filter((artifact) => artifact.handoffStage === "shared");
   const openV1Items = snapshot.v1Readiness.items.filter((item) => !item.complete);
   const solidV1Ready = source === "database" && openV1Items.length === 0;
+  const activeProvingJob = snapshot.jobs.find(
+    (job) => isProvingWorkspaceJob(job) && ["queued", "running"].includes(job.status),
+  ) ?? null;
+  const firstReadyArtifact = snapshot.outputArtifacts.find((artifact) => artifact.status === "ready") ?? null;
 
   return (
     <main className="ops-workspace-shell">
@@ -706,6 +714,42 @@ export function MissionWorkspace({
                 </article>
               ) : null}
             </div>
+          </div>
+
+          <div className="stack-sm surface-form-shell">
+            <div className="stack-xs">
+              <p className="eyebrow">Live proving focus</p>
+              <h3>Continue the real-data path</h3>
+              <p className="muted">
+                Top-level shortcut into the fastest honest next action on the live proving lane.
+              </p>
+            </div>
+            {activeProvingJob ? (
+              <>
+                <p className="muted">
+                  Active proving job: {activeProvingJob.name} ({activeProvingJob.status}). Continue it from the job page.
+                </p>
+                <Link href={`/jobs/${activeProvingJob.id}`} className="button button-primary">
+                  Open proving job
+                </Link>
+              </>
+            ) : firstReadyArtifact ? (
+              <>
+                <p className="muted">Ready artifacts exist. Move the live proving path forward through review/share/export.</p>
+                <Link href={`/artifacts/${firstReadyArtifact.id}`} className="button button-primary">
+                  Review first ready artifact
+                </Link>
+              </>
+            ) : selectedMission ? (
+              <>
+                <p className="muted">No active proving job is surfaced yet. Use the selected mission to keep the live path moving.</p>
+                <Link href={`/missions/${selectedMission.id}`} className="button button-primary">
+                  Open selected mission
+                </Link>
+              </>
+            ) : (
+              <p className="muted">No mission is selected yet. Create or open a mission to continue the proving path.</p>
+            )}
           </div>
 
           <div className="stack-sm surface-form-shell">
