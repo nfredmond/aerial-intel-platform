@@ -414,6 +414,7 @@ export default async function JobDetailPage({
     ),
   );
   const provingJob = isManualProvingJob(detail);
+  const firstReadyOutput = detail.outputs.find((output) => output.status === "ready") ?? null;
   const callout = getCalloutMessage(resolvedSearchParams.action);
 
   return (
@@ -558,6 +559,53 @@ export default async function JobDetailPage({
                   Complete proving job
                 </button>
               </form>
+            </div>
+          ) : null}
+
+          {provingJob ? (
+            <div className="stack-xs surface-form-shell">
+              <h3>Live proving next step</h3>
+              {detail.job.status === "queued" ? (
+                <>
+                  <p className="muted">This proving job is queued. Start it to move the live run into active processing.</p>
+                  <form action={startProvingJob}>
+                    <button
+                      type="submit"
+                      className="button button-primary"
+                      disabled={access.role === "viewer"}
+                    >
+                      Start proving job now
+                    </button>
+                  </form>
+                </>
+              ) : detail.job.status === "running" ? (
+                <>
+                  <p className="muted">This proving job is running. Complete it once you want ready artifacts for the delivery lane.</p>
+                  <form action={completeProvingJob}>
+                    <button
+                      type="submit"
+                      className="button button-primary"
+                      disabled={access.role === "viewer"}
+                    >
+                      Complete proving job now
+                    </button>
+                  </form>
+                </>
+              ) : firstReadyOutput ? (
+                <>
+                  <p className="muted">The proving job has ready artifacts. Next step is to review/share/export the first deliverable.</p>
+                  <Link href={`/artifacts/${firstReadyOutput.id}`} className="button button-primary">
+                    Review first ready artifact
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <p className="muted">This proving job is no longer active. Review the mission or retry the run if more evidence is needed.</p>
+                  <Link href={detail.mission ? `/missions/${detail.mission.id}` : "/missions"} className="button button-secondary">
+                    Back to mission
+                  </Link>
+                </>
+              )}
             </div>
           ) : null}
         </aside>
