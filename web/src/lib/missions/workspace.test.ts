@@ -21,7 +21,7 @@ describe("missions/workspace", () => {
     expect(snapshot.entitlementLabel).toBe("Drone Professional");
     expect(snapshot.currentProject.name).toBe("Nat Ford Planning aerial operations");
     expect(snapshot.rail).toHaveLength(3);
-    expect(snapshot.statusChips).toHaveLength(4);
+    expect(snapshot.statusChips).toHaveLength(5);
     expect(snapshot.totals.missionCount).toBe(3);
     expect(snapshot.totals.totalAcres).toBe(130);
     expect(snapshot.totals.datasetCount).toBe(3);
@@ -31,6 +31,9 @@ describe("missions/workspace", () => {
     expect(snapshot.totals.outputsMissingCount).toBe(6);
     expect(snapshot.totals.handoffBacklogCount).toBe(2);
     expect(snapshot.totals.exportedArtifactCount).toBe(0);
+    expect(snapshot.v1Readiness.percent).toBeGreaterThan(0);
+    expect(snapshot.v1Readiness.items).toHaveLength(6);
+    expect(snapshot.v1Readiness.statusLabel).toBeTruthy();
     expect(snapshot.nextActions[0]).toContain("artifact handoff backlog");
     expect(snapshot.nextActions.at(-1)).toContain("stand up project/site/mission/dataset/job tables");
   });

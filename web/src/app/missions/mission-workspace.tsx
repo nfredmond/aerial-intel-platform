@@ -302,6 +302,11 @@ export function MissionWorkspace({
               <strong className="stat-value">{formatWholeNumber(snapshot.totals.handoffBacklogCount)}</strong>
               <p className="muted">Ready artifacts that still need review/share/export follow-through.</p>
             </article>
+            <article className="surface stat-card stack-xs">
+              <span className="eyebrow">V1 readiness</span>
+              <strong className="stat-value">{snapshot.v1Readiness.percent}%</strong>
+              <p className="muted">{snapshot.v1Readiness.statusLabel} · {snapshot.v1Readiness.completeCount}/{snapshot.v1Readiness.totalCount} acceptance steps complete.</p>
+            </article>
           </section>
 
           <MissionBoardClient missions={snapshot.missions} />
@@ -566,6 +571,29 @@ export function MissionWorkspace({
                 <li key={action}>{action}</li>
               ))}
             </ol>
+          </div>
+
+          <div className="stack-sm surface-form-shell">
+            <div className="stack-xs">
+              <p className="eyebrow">V1 milestone bar</p>
+              <h3>{snapshot.v1Readiness.statusLabel}</h3>
+              <p className="muted">
+                This tracks the acceptance bar from the execution plan so we can call the app a solid v1 based on shipped workflow coverage, not vibes.
+              </p>
+            </div>
+            <div className="stack-xs">
+              {snapshot.v1Readiness.items.map((item) => (
+                <article key={item.id} className="ops-list-card stack-xs">
+                  <div className="ops-list-card-header">
+                    <strong>{item.label}</strong>
+                    <span className={item.complete ? "status-pill status-pill--success" : "status-pill status-pill--warning"}>
+                      {item.complete ? "Complete" : "Open"}
+                    </span>
+                  </div>
+                  <p className="muted">{item.detail}</p>
+                </article>
+              ))}
+            </div>
           </div>
 
           <div className="stack-sm surface-form-shell">

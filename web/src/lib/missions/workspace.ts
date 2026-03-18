@@ -108,6 +108,21 @@ export type ActivityEventRecord = {
   href?: string;
 };
 
+export type V1ReadinessItem = {
+  id: string;
+  label: string;
+  complete: boolean;
+  detail: string;
+};
+
+export type V1ReadinessSummary = {
+  percent: number;
+  completeCount: number;
+  totalCount: number;
+  statusLabel: string;
+  items: V1ReadinessItem[];
+};
+
 export type MissionWorkspaceSnapshot = {
   workspaceLabel: string;
   entitlementLabel: string;
@@ -126,6 +141,7 @@ export type MissionWorkspaceSnapshot = {
   jobs: JobRecord[];
   outputArtifacts: OutputArtifactRecord[];
   activity: ActivityEventRecord[];
+  v1Readiness: V1ReadinessSummary;
   totals: {
     missionCount: number;
     totalAcres: number;
@@ -443,6 +459,86 @@ function sumOutputsByStatus(
     .length;
 }
 
+export function buildV1ReadinessSummary(input: {
+  missionCount: number;
+  datasetCount: number;
+  jobCount: number;
+  activity: ActivityEventRecord[];
+  outputArtifactCount: number;
+  deliverableReviewCount: number;
+  realDataBackbone: boolean;
+}): V1ReadinessSummary {
+  const items: V1ReadinessItem[] = [
+    {
+      id: "mission",
+      label: "Create/select mission",
+      complete: input.missionCount > 0,
+      detail: input.missionCount > 0 ? `${input.missionCount} mission record(s) are visible.` : "No mission records surfaced yet.",
+    },
+    {
+      id: "dataset",
+      label: "Attach dataset",
+      complete: input.datasetCount > 0,
+      detail: input.datasetCount > 0 ? `${input.datasetCount} dataset(s) are attached or tracked.` : "No datasets are attached yet.",
+    },
+    {
+      id: "job-submit",
+      label: "Submit processing job",
+      complete: input.jobCount > 0,
+      detail: input.jobCount > 0 ? `${input.jobCount} processing job(s) exist.` : "No processing jobs have been submitted yet.",
+    },
+    {
+      id: "job-watch",
+      label: "Watch job status and logs",
+      complete: input.jobCount > 0 && input.activity.some((event) => event.lane === "processing"),
+      detail:
+        input.jobCount > 0 && input.activity.some((event) => event.lane === "processing")
+          ? "Processing events are visible in the ops console."
+          : "Processing status/log visibility still looks thin.",
+    },
+    {
+      id: "artifact-readiness",
+      label: "See output artifact readiness",
+      complete: input.outputArtifactCount > 0,
+      detail:
+        input.outputArtifactCount > 0
+          ? `${input.outputArtifactCount} artifact(s) are surfaced in the review lane.`
+          : "No output artifacts are surfaced yet.",
+    },
+    {
+      id: "deliverable-review",
+      label: "Review/share/export a deliverable",
+      complete: input.deliverableReviewCount > 0,
+      detail:
+        input.deliverableReviewCount > 0
+          ? `${input.deliverableReviewCount} artifact(s) have entered reviewed/shared/exported state.`
+          : "No deliverable has moved through review/share/export yet.",
+    },
+  ];
+
+  const completeCount = items.filter((item) => item.complete).length;
+  const totalCount = items.length;
+  const rawPercent = Math.round((completeCount / totalCount) * 100);
+  const percent = input.realDataBackbone ? rawPercent : Math.min(rawPercent, 67);
+  const statusLabel = !input.realDataBackbone
+    ? "Prototype"
+    : percent >= 100
+      ? "Solid v1"
+      : percent >= 83
+        ? "Near v1"
+        : percent >= 50
+          ? "Advancing"
+          : "Early";
+
+  return {
+    percent,
+    completeCount,
+    totalCount,
+    statusLabel,
+    items,
+  };
+}
+
 function getMissionStageLabel(stage: MissionStage) {
   switch (stage) {
     case "capture-planned":
@@ -490,6 +586,16 @@ export function buildMissionWorkspaceSnapshot(options: {
     ? `${options.orgName} aerial operations`
     : "Aerial operations";
 
+  const v1Readiness = buildV1ReadinessSummary({
+    missionCount,
+    datasetCount,
+    jobCount: jobs.length,
+    activity,
+    outputArtifactCount: outputArtifacts.length,
+    deliverableReviewCount: outputArtifacts.filter((artifact) => artifact.handoffStage !== "pending_review").length,
+    realDataBackbone: false,
+  });
+
   const statusChips: StatusChip[] = [
     {
       label: "Mission health",
@@ -510,6 +616,11 @@ export function buildMissionWorkspaceSnapshot(options: {
       label: "Handoff lane",
       value: "2 queued · 0 exported",
       tone: "warning",
+    },
+    {
+      label: "V1 readiness",
+      value: `${v1Readiness.percent}% · ${v1Readiness.completeCount}/${v1Readiness.totalCount}`,
+      tone: v1Readiness.percent >= 100 ? "success" : v1Readiness.percent >= 67 ? "info" : "warning",
     },
   ];
 
@@ -576,6 +687,7 @@ export function buildMissionWorkspaceSnapshot(options: {
     jobs,
     outputArtifacts,
     activity,
+    v1Readiness,
     totals: {
       missionCount,
       totalAcres,

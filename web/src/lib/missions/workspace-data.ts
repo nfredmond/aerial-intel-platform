@@ -11,6 +11,7 @@ import type { Database, Json } from "@/lib/supabase/types";
 
 import {
   buildMissionWorkspaceSnapshot,
+  buildV1ReadinessSummary,
   type ActivityEventRecord,
   type DatasetRecord,
   type JobRecord,
@@ -192,6 +193,9 @@ function buildStatusChips(options: {
   draftOutputs: number;
   handoffBacklog: number;
   exportedArtifacts: number;
+  v1ReadinessPercent: number;
+  v1ReadinessComplete: number;
+  v1ReadinessTotal: number;
 }): StatusChip[] {
   return [
     {
@@ -213,6 +217,11 @@ function buildStatusChips(options: {
       label: "Handoff lane",
       value: `${options.handoffBacklog} queued · ${options.exportedArtifacts} exported`,
       tone: options.handoffBacklog > 0 ? "warning" : options.exportedArtifacts > 0 ? "success" : "info",
+    },
+    {
+      label: "V1 readiness",
+      value: `${options.v1ReadinessPercent}% · ${options.v1ReadinessComplete}/${options.v1ReadinessTotal}`,
+      tone: options.v1ReadinessPercent >= 100 ? "success" : options.v1ReadinessPercent >= 67 ? "info" : "warning",
     },
   ];
 }
@@ -455,6 +464,15 @@ function buildWorkspaceFromRows(params: {
     (output) => output.status === "ready" && output.handoffStage !== "exported",
   ).length;
   const exportedArtifactCount = outputRows.filter((output) => output.handoffStage === "exported").length;
+  const v1Readiness = buildV1ReadinessSummary({
+    missionCount: missionRows.length,
+    datasetCount: datasetRows.length,
+    jobCount: jobsRows.length,
+    activity,
+    outputArtifactCount: outputRows.length,
+    deliverableReviewCount: outputRows.filter((output) => output.handoffStage !== "pending_review").length,
+    realDataBackbone: true,
+  });
 
   const projectName = primaryProject?.name ?? `${access.org?.name ?? "DroneOps"} aerial operations`;
   const currentSiteName = sites[0]?.name ?? "No site selected yet";
@@ -488,12 +506,16 @@ function buildWorkspaceFromRows(params: {
       draftOutputs,
       handoffBacklog: handoffBacklogCount,
       exportedArtifacts: exportedArtifactCount,
+      v1ReadinessPercent: v1Readiness.percent,
+      v1ReadinessComplete: v1Readiness.completeCount,
+      v1ReadinessTotal: v1Readiness.totalCount,
     }),
     missions: missionRows,
     datasets: datasetRows,
     jobs: jobsRows,
     outputArtifacts: outputRows,
     activity,
+    v1Readiness,
     totals: {
       missionCount: missionRows.length,
       totalAcres: missionRows.reduce((sum, mission) => sum + mission.areaAcres, 0),
