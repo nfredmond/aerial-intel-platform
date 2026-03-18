@@ -89,6 +89,14 @@ function getOutputPillClassName(status: string) {
   }
 }
 
+function isProvingJobRecord(job: { preset_id: string | null; input_summary: unknown }) {
+  const inputSummary = job.input_summary && typeof job.input_summary === "object" && !Array.isArray(job.input_summary)
+    ? (job.input_summary as Record<string, unknown>)
+    : {};
+
+  return job.preset_id === "v1-proving-run" || inputSummary.source === "mission-proving-seed";
+}
+
 function getCalloutClassName(state: string) {
   if (state === "1" || state === "created") {
     return "callout callout-success";
@@ -1042,6 +1050,8 @@ export default async function MissionDetailPage({
   }
 
   const latestVersion = detail.versions[0] ?? null;
+  const provingJob = detail.jobs.find((job) => isProvingJobRecord(job)) ?? null;
+  const firstReadyArtifact = detail.outputs.find((output) => output.status === "ready") ?? null;
   const latestPlanPayload = ((latestVersion?.plan_payload as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
   const latestValidationSummary = ((latestVersion?.validation_summary as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
   const latestExportSummary = ((latestVersion?.export_summary as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
@@ -1451,6 +1461,65 @@ export default async function MissionDetailPage({
               Save AOI geometry
             </button>
           </form>
+
+          <div className="stack-xs surface-form-shell">
+            <div className="stack-xs">
+              <h3>Live proving path</h3>
+              <p className="muted">
+                Fastest honest next step for clearing the live v1 acceptance loop on this mission.
+              </p>
+            </div>
+            {detail.datasets.length === 0 && detail.jobs.length === 0 ? (
+              <>
+                <p className="muted">No live dataset or job exists yet for this mission.</p>
+                <form action={seedProvingRun}>
+                  <button
+                    type="submit"
+                    className="button button-primary"
+                    disabled={access.role === "viewer"}
+                  >
+                    Seed proving dataset + job
+                  </button>
+                </form>
+              </>
+            ) : detail.datasets.length > 0 && detail.jobs.length === 0 ? (
+              <>
+                <p className="muted">Dataset exists. Next step is to create a real processing run.</p>
+                <form action={queueMissionProcessing}>
+                  <button
+                    type="submit"
+                    className="button button-primary"
+                    disabled={access.role === "viewer"}
+                  >
+                    Queue processing job
+                  </button>
+                </form>
+              </>
+            ) : provingJob && ["queued", "running"].includes(provingJob.status) ? (
+              <>
+                <p className="muted">
+                  Proving job is {provingJob.status}. Advance it from the job detail page to move artifacts into the review lane.
+                </p>
+                <Link href={`/jobs/${provingJob.id}`} className="button button-primary">
+                  Open proving job
+                </Link>
+              </>
+            ) : firstReadyArtifact ? (
+              <>
+                <p className="muted">Artifacts are ready. Next step is to review/share/export through the delivery lane.</p>
+                <Link href={`/artifacts/${firstReadyArtifact.id}`} className="button button-primary">
+                  Review first ready artifact
+                </Link>
+              </>
+            ) : (
+              <>
+                <p className="muted">The live mission path exists. Review the processing runs to decide the next proving action.</p>
+                <Link href="#mission-jobs" className="button button-primary">
+                  Open mission jobs
+                </Link>
+              </>
+            )}
+          </div>
 
           <form action={queueMissionProcessing}>
             <button
