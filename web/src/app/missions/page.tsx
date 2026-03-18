@@ -6,7 +6,14 @@ import { getArtifactHandoff, updateArtifactHandoffMetadata } from "@/lib/artifac
 import { getMissionWorkspaceSnapshot } from "@/lib/missions/workspace-data";
 import { normalizeSlug } from "@/lib/slug";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { insertJobEvent, insertMission, insertMissionVersion, updateProcessingOutput } from "@/lib/supabase/admin";
+import {
+  insertJobEvent,
+  insertMission,
+  insertMissionVersion,
+  insertProject,
+  insertSite,
+  updateProcessingOutput,
+} from "@/lib/supabase/admin";
 
 import { MissionWorkspace } from "./mission-workspace";
 
@@ -43,6 +50,21 @@ function getWorkspaceNotice(states: { create?: string; handoff?: string }) {
       return {
         tone: "error" as const,
         message: "The mission draft could not be created. Check server configuration and try again.",
+      };
+    case "bootstrap-done":
+      return {
+        tone: "success" as const,
+        message: "Live aerial-ops workspace bootstrapped. You now have a real project/site/mission/version chain in the protected data path.",
+      };
+    case "bootstrap-denied":
+      return {
+        tone: "error" as const,
+        message: "Viewer access cannot bootstrap the live workspace.",
+      };
+    case "bootstrap-error":
+      return {
+        tone: "error" as const,
+        message: "The live workspace bootstrap failed. Check Supabase configuration and try again.",
       };
     default:
       break;
@@ -107,6 +129,157 @@ export default async function MissionsPage({
 
   if (!access.hasMembership || !access.hasActiveEntitlement) {
     return <BlockedAccessView access={access} />;
+  }
+
+  async function bootstrapLiveWorkspace() {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect("/missions?create=bootstrap-denied");
+    }
+
+    const supabase = await createServerSupabaseClient();
+
+    try {
+      const existingMissionResult = await supabase
+        .from("drone_missions")
+        .select("id")
+        .eq("org_id", refreshedAccess.org.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const existingMission = (existingMissionResult.data as { id: string } | null) ?? null;
+
+      if (existingMission?.id) {
+        redirect(`/missions/${existingMission.id}?created=1`);
+      }
+
+      const existingProjectResult = await supabase
+        .from("drone_projects")
+        .select("id, name")
+        .eq("org_id", refreshedAccess.org.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const existingProject = (existingProjectResult.data as { id: string; name: string } | null) ?? null;
+
+      const projectName = `${refreshedAccess.org.name} aerial operations`;
+      const projectId = existingProject?.id
+        ? existingProject.id
+        : (
+            await insertProject({
+              org_id: refreshedAccess.org.id,
+              name: projectName,
+              slug: normalizeSlug(projectName),
+              status: "active",
+              description: "Bootstrap project for the live aerial operations proving path.",
+              created_by: refreshedAccess.user.id,
+            })
+          )?.id;
+
+      if (!projectId) {
+        redirect("/missions?create=bootstrap-error");
+      }
+
+      const existingSiteResult = await supabase
+        .from("drone_sites")
+        .select("id, project_id")
+        .eq("org_id", refreshedAccess.org.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const existingSite = (existingSiteResult.data as { id: string; project_id: string } | null) ?? null;
+
+      const siteName = "Live v1 proving ground";
+      const siteId = existingSite?.id
+        ? existingSite.id
+        : (
+            await insertSite({
+              org_id: refreshedAccess.org.id,
+              project_id: projectId,
+              name: siteName,
+              slug: normalizeSlug(siteName),
+              description: "Bootstrap site for validating the live aerial-ops workflow.",
+              site_notes: {
+                bootstrap: true,
+                purpose: "Switch workspace from fallback to real database-backed mission flow.",
+              },
+              created_by: refreshedAccess.user.id,
+            })
+          )?.id;
+
+      if (!siteId) {
+        redirect("/missions?create=bootstrap-error");
+      }
+
+      const missionName = "Live v1 proving mission";
+      const insertedMissionId = (
+        await insertMission({
+          org_id: refreshedAccess.org.id,
+          project_id: projectId,
+          site_id: siteId,
+          name: missionName,
+          slug: normalizeSlug(missionName),
+          mission_type: "corridor",
+          status: "draft",
+          objective: "Bootstrap the real data-backed aerial-ops path so dataset attach, job queueing, and delivery review can happen on live records.",
+          summary: {
+            captureDate: new Date().toISOString(),
+            areaAcres: 12,
+            imageCount: 0,
+            gsdCm: 1.8,
+            coordinateSystem: "EPSG:26910 / NAD83 UTM Zone 10N",
+            processingProfile: "Bootstrap proving mission",
+            targetDevice: "DJI Mavic 3 Enterprise / Pilot 2",
+            batteryPlan: "TBD",
+            compatibility: "Bootstrap flow",
+            healthScore: 40,
+            blockers: ["Attach the first dataset to move this live mission toward the v1 acceptance bar."],
+            warnings: ["This record was bootstrapped to switch the workspace onto the live data path."],
+          },
+          created_by: refreshedAccess.user.id,
+        })
+      )?.id;
+
+      if (!insertedMissionId) {
+        redirect("/missions?create=bootstrap-error");
+      }
+
+      await insertMissionVersion({
+        org_id: refreshedAccess.org.id,
+        mission_id: insertedMissionId,
+        version_number: 1,
+        source_format: "bootstrap",
+        status: "draft",
+        plan_payload: {
+          bootstrap: true,
+          objective: "Create the first real mission/version pair in the protected aerial-ops workspace.",
+        },
+        validation_summary: {
+          bootstrap: true,
+          checks: [],
+        },
+        export_summary: {
+          bootstrap: true,
+          outputs: [],
+        },
+        created_by: refreshedAccess.user.id,
+      });
+    } catch {
+      redirect("/missions?create=bootstrap-error");
+    }
+
+    redirect("/missions?create=bootstrap-done");
   }
 
   async function createMissionDraft(formData: FormData) {
@@ -417,6 +590,7 @@ export default async function MissionsPage({
       source={source}
       canManageOperations={access.role !== "viewer"}
       createMissionAction={createMissionDraft}
+      bootstrapLiveWorkspaceAction={bootstrapLiveWorkspace}
       advanceArtifactHandoffAction={advanceArtifactHandoff}
       saveWorkspaceHandoffNoteAction={saveWorkspaceHandoffNote}
       notice={notice}

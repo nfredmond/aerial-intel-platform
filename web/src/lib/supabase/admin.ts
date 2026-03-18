@@ -40,6 +40,27 @@ async function adminRestRequest<T>(path: string, options: RequestInit = {}) {
   return payload as T;
 }
 
+export type ProjectInsert = {
+  org_id: string;
+  name: string;
+  slug: string;
+  status?: string;
+  description?: string | null;
+  created_by?: string | null;
+};
+
+export type SiteInsert = {
+  org_id: string;
+  project_id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  boundary?: Json | null;
+  center?: Json | null;
+  site_notes?: Json;
+  created_by?: string | null;
+};
+
 export type MissionInsert = {
   org_id: string;
   project_id: string;
@@ -155,6 +176,30 @@ export type ProcessingOutputPatch = {
   storage_path?: string | null;
   metadata?: Json;
 };
+
+export async function insertProject(input: ProjectInsert) {
+  const rows = await adminRestRequest<Array<{ id: string }>>(
+    "drone_projects?select=id",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+
+  return rows[0] ?? null;
+}
+
+export async function insertSite(input: SiteInsert) {
+  const rows = await adminRestRequest<Array<{ id: string }>>(
+    "drone_sites?select=id",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+
+  return rows[0] ?? null;
+}
 
 export async function insertMission(input: MissionInsert) {
   const rows = await adminRestRequest<Array<{ id: string }>>(

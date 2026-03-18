@@ -17,6 +17,7 @@ type MissionWorkspaceProps = {
   source: "database" | "fallback";
   canManageOperations: boolean;
   createMissionAction: (formData: FormData) => Promise<void>;
+  bootstrapLiveWorkspaceAction: () => Promise<void>;
   advanceArtifactHandoffAction: (formData: FormData) => Promise<void>;
   saveWorkspaceHandoffNoteAction: (formData: FormData) => Promise<void>;
   notice?: {
@@ -171,6 +172,7 @@ export function MissionWorkspace({
   source,
   canManageOperations,
   createMissionAction,
+  bootstrapLiveWorkspaceAction,
   advanceArtifactHandoffAction,
   saveWorkspaceHandoffNoteAction,
   notice,
@@ -660,6 +662,13 @@ export function MissionWorkspace({
                     Apply/populate the protected aerial-ops tables so mission, dataset, job, event, and artifact flows are real instead of fallback-only.
                   </p>
                   <div className="header-actions">
+                    {canManageOperations ? (
+                      <form action={bootstrapLiveWorkspaceAction}>
+                        <button type="submit" className="button button-primary">
+                          Bootstrap live workspace
+                        </button>
+                      </form>
+                    ) : null}
                     <Link href="/missions" className="button button-secondary">
                       Open workspace
                     </Link>
