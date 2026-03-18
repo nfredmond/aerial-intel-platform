@@ -64,6 +64,11 @@ function getWorkspaceNotice(states: { create?: string; handoff?: string }) {
         tone: "success" as const,
         message: "Artifact marked exported from the workspace queue.",
       };
+    case "note-saved":
+      return {
+        tone: "success" as const,
+        message: "Artifact handoff note saved from the workspace queue.",
+      };
     case "denied":
       return {
         tone: "error" as const,
@@ -325,6 +330,78 @@ export default async function MissionsPage({
     redirect(`/missions?handoff=${targetAction}`);
   }
 
+  async function saveWorkspaceHandoffNote(formData: FormData) {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect("/missions?handoff=denied");
+    }
+
+    const artifactId = getFormString(formData, "artifactId");
+    if (!artifactId) {
+      redirect("/missions?handoff=error");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const outputResult = await supabase
+      .from("drone_processing_outputs")
+      .select("id, org_id, job_id, kind, metadata")
+      .eq("org_id", refreshedAccess.org.id)
+      .eq("id", artifactId)
+      .maybeSingle();
+
+    const output = outputResult.data as
+      | { id: string; org_id: string; job_id: string; kind: string; metadata: Record<string, unknown> | null }
+      | null;
+
+    if (!output?.id) {
+      redirect("/missions?handoff=missing-artifact");
+    }
+
+    const noteValue = getFormString(formData, "handoffNote");
+    const nextActionValue = getFormString(formData, "handoffNextAction");
+    const handoffNote = noteValue || null;
+    const handoffNextAction = nextActionValue || null;
+    const artifactLabel = typeof output.metadata?.name === "string" && output.metadata.name.trim().length > 0
+      ? output.metadata.name
+      : output.kind.replaceAll("_", " ");
+
+    const nextMetadata = updateArtifactHandoffMetadata((output.metadata as Record<string, never> | null) ?? {}, {
+      note: handoffNote,
+      nextAction: handoffNextAction,
+    });
+
+    try {
+      await updateProcessingOutput(output.id, {
+        metadata: nextMetadata,
+      });
+
+      await insertJobEvent({
+        org_id: refreshedAccess.org.id,
+        job_id: output.job_id,
+        event_type: "artifact.note.updated",
+        payload: {
+          title: "Artifact handoff note updated",
+          detail: `${artifactLabel} handoff note was updated from the workspace queue.`,
+        },
+      });
+    } catch {
+      redirect("/missions?handoff=error");
+    }
+
+    redirect("/missions?handoff=note-saved");
+  }
+
   const { snapshot, source } = await getMissionWorkspaceSnapshot(access);
   const resolvedSearchParams = await searchParams;
   const notice = getWorkspaceNotice({
@@ -339,6 +416,7 @@ export default async function MissionsPage({
       canManageOperations={access.role !== "viewer"}
       createMissionAction={createMissionDraft}
       advanceArtifactHandoffAction={advanceArtifactHandoff}
+      saveWorkspaceHandoffNoteAction={saveWorkspaceHandoffNote}
       notice={notice}
     />
   );

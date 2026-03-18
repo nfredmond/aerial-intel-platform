@@ -18,6 +18,7 @@ type MissionWorkspaceProps = {
   canManageOperations: boolean;
   createMissionAction: (formData: FormData) => Promise<void>;
   advanceArtifactHandoffAction: (formData: FormData) => Promise<void>;
+  saveWorkspaceHandoffNoteAction: (formData: FormData) => Promise<void>;
   notice?: {
     tone: "success" | "warning" | "error";
     message: string;
@@ -127,6 +128,7 @@ export function MissionWorkspace({
   canManageOperations,
   createMissionAction,
   advanceArtifactHandoffAction,
+  saveWorkspaceHandoffNoteAction,
   notice,
 }: MissionWorkspaceProps) {
   const selectedMission = snapshot.missions[0] ?? null;
@@ -407,6 +409,32 @@ export function MissionWorkspace({
                                     fallbackHintMessage="Press Ctrl/Cmd+C, then paste this export packet into docs, tickets, or a delivery note."
                                   />
                                 </div>
+                                {canManageOperations ? (
+                                  <form action={saveWorkspaceHandoffNoteAction} className="stack-sm surface-form-shell">
+                                    <input type="hidden" name="artifactId" value={artifact.id} />
+                                    <label className="stack-xs">
+                                      <span>Handoff note</span>
+                                      <textarea
+                                        name="handoffNote"
+                                        defaultValue={artifact.handoffNotePreview ?? ""}
+                                        placeholder="Capture reviewer context, delivery caveats, or client-safe notes."
+                                        rows={3}
+                                      />
+                                    </label>
+                                    <label className="stack-xs">
+                                      <span>Next action</span>
+                                      <input
+                                        name="handoffNextAction"
+                                        type="text"
+                                        defaultValue={artifact.nextAction}
+                                        placeholder="Optional next-step override"
+                                      />
+                                    </label>
+                                    <button type="submit" className="button button-secondary">
+                                      Save note
+                                    </button>
+                                  </form>
+                                ) : null}
                               </article>
                             ))
                           ) : (
