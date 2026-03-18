@@ -94,7 +94,7 @@ function getCalloutClassName(state: string) {
     return "callout callout-success";
   }
 
-  if (state === "missing-dataset" || state === "missing-name" || state === "missing-version") {
+  if (state === "missing-dataset" || state === "missing-name" || state === "missing-version" || state === "already") {
     return "callout callout-warning";
   }
 
@@ -148,6 +148,7 @@ function buildPreflightSummary(input: {
 function getCalloutMessage(options: {
   queued?: string;
   attached?: string;
+  seeded?: string;
   bundled?: string;
   approved?: string;
   installed?: string;
@@ -178,6 +179,16 @@ function getCalloutMessage(options: {
         : options.queued === "denied"
           ? "Viewer access cannot queue processing jobs."
           : "The processing job could not be queued. Check server configuration and try again.";
+  }
+
+  if (options.seeded) {
+    return options.seeded === "1"
+      ? "Live proving run seeded. This mission now has a real dataset, queued job, events, and placeholder outputs in the protected data path."
+      : options.seeded === "already"
+        ? "This mission already has datasets or jobs, so no proving run seed was added."
+        : options.seeded === "denied"
+          ? "Viewer access cannot seed a proving run."
+          : "The proving run seed failed. Check server configuration and try again.";
   }
 
   if (options.bundled) {
@@ -244,7 +255,7 @@ export default async function MissionDetailPage({
   searchParams,
 }: {
   params: Promise<{ missionId: string }>;
-  searchParams: Promise<{ queued?: string; attached?: string; bundled?: string; approved?: string; installed?: string; delivered?: string; aoi?: string; overlay?: string; created?: string; dataset?: string }>;
+  searchParams: Promise<{ queued?: string; attached?: string; seeded?: string; bundled?: string; approved?: string; installed?: string; delivered?: string; aoi?: string; overlay?: string; created?: string; dataset?: string }>;
 }) {
   const access = await getDroneOpsAccess();
 
@@ -484,6 +495,201 @@ export default async function MissionDetailPage({
     }
 
     redirect(`/missions/${missionId}?queued=1`);
+  }
+
+  async function seedProvingRun() {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/missions/${missionId}?seeded=denied`);
+    }
+
+    const refreshedDetail = await getMissionDetail(refreshedAccess, missionId);
+    if (!refreshedDetail) {
+      redirect("/missions");
+    }
+
+    if (refreshedDetail.datasets.length > 0 || refreshedDetail.jobs.length > 0) {
+      redirect(`/missions/${missionId}?seeded=already`);
+    }
+
+    const seedDatasetName = `${refreshedDetail.mission.name} proving dataset`;
+    const seedSlug = `${normalizeSlug(seedDatasetName) || "proving-dataset"}-1`;
+
+    try {
+      const dataset = await insertDataset({
+        org_id: refreshedAccess.org.id,
+        project_id: refreshedDetail.mission.project_id,
+        site_id: refreshedDetail.mission.site_id,
+        mission_id: refreshedDetail.mission.id,
+        name: seedDatasetName,
+        slug: seedSlug,
+        kind: "image",
+        status: "ready",
+        captured_at: new Date().toISOString(),
+        metadata: {
+          imageCount: 420,
+          footprint: "Bootstrap proving footprint",
+          finding: "Seeded from mission detail to stand up the live proving loop.",
+          preflight: {
+            status: "ready",
+            findings: [
+              "Seeded proving dataset meets baseline overlap and count checks.",
+            ],
+            overlapFront: 80,
+            overlapSide: 70,
+            gcpCaptured: false,
+            reviewed: false,
+          },
+        },
+        created_by: refreshedAccess.user.id,
+      });
+
+      if (!dataset?.id) {
+        redirect(`/missions/${missionId}?seeded=error`);
+      }
+
+      const jobName = `${refreshedDetail.mission.name} proving run`;
+      const insertedJob = await insertProcessingJob({
+        org_id: refreshedAccess.org.id,
+        project_id: refreshedDetail.mission.project_id,
+        site_id: refreshedDetail.mission.site_id,
+        mission_id: refreshedDetail.mission.id,
+        dataset_id: dataset.id,
+        engine: "odm",
+        preset_id: "v1-proving-run",
+        status: "queued",
+        stage: "queued",
+        progress: 0,
+        queue_position: 1,
+        input_summary: {
+          name: jobName,
+          requestedByUserId: refreshedAccess.user.id,
+          requestedByEmail: refreshedAccess.user.email,
+          source: "mission-proving-seed",
+        },
+        output_summary: {
+          eta: "Pending queue pickup",
+          notes: "Live proving run seeded from mission detail.",
+          logTail: [
+            "Queue accepted proving run.",
+            "Awaiting worker pickup.",
+          ],
+        },
+        external_job_reference: null,
+        created_by: refreshedAccess.user.id,
+      });
+
+      if (!insertedJob?.id) {
+        redirect(`/missions/${missionId}?seeded=error`);
+      }
+
+      await insertProcessingOutputs([
+        {
+          org_id: refreshedAccess.org.id,
+          job_id: insertedJob.id,
+          mission_id: refreshedDetail.mission.id,
+          dataset_id: dataset.id,
+          kind: "orthomosaic",
+          status: "pending",
+          storage_bucket: "drone-ops",
+          storage_path: `${refreshedAccess.org.slug}/jobs/${insertedJob.id}/orthomosaic.tif`,
+          metadata: {
+            name: `${refreshedDetail.mission.name} orthomosaic`,
+            format: "COG",
+            delivery: "Review pending",
+          },
+        },
+        {
+          org_id: refreshedAccess.org.id,
+          job_id: insertedJob.id,
+          mission_id: refreshedDetail.mission.id,
+          dataset_id: dataset.id,
+          kind: "dsm",
+          status: "pending",
+          storage_bucket: "drone-ops",
+          storage_path: `${refreshedAccess.org.slug}/jobs/${insertedJob.id}/dsm.tif`,
+          metadata: {
+            name: `${refreshedDetail.mission.name} surface model`,
+            format: "COG",
+            delivery: "Review pending",
+          },
+        },
+        {
+          org_id: refreshedAccess.org.id,
+          job_id: insertedJob.id,
+          mission_id: refreshedDetail.mission.id,
+          dataset_id: dataset.id,
+          kind: "point_cloud",
+          status: "pending",
+          storage_bucket: "drone-ops",
+          storage_path: `${refreshedAccess.org.slug}/jobs/${insertedJob.id}/cloud.laz`,
+          metadata: {
+            name: `${refreshedDetail.mission.name} point cloud`,
+            format: "LAZ",
+            delivery: "Hold for QA",
+          },
+        },
+        {
+          org_id: refreshedAccess.org.id,
+          job_id: insertedJob.id,
+          mission_id: refreshedDetail.mission.id,
+          dataset_id: dataset.id,
+          kind: "report",
+          status: "pending",
+          storage_bucket: "drone-ops",
+          storage_path: `${refreshedAccess.org.slug}/jobs/${insertedJob.id}/mission-brief.pdf`,
+          metadata: {
+            name: `${refreshedDetail.mission.name} mission brief`,
+            format: "PDF",
+            delivery: "Share/export pending",
+          },
+        },
+      ]);
+
+      await insertJobEvent({
+        org_id: refreshedAccess.org.id,
+        job_id: insertedJob.id,
+        event_type: "upload.completed",
+        payload: {
+          title: "Proving dataset attached",
+          detail: `Seeded dataset ${seedDatasetName} attached to the live mission path.`,
+        },
+      });
+
+      await insertJobEvent({
+        org_id: refreshedAccess.org.id,
+        job_id: insertedJob.id,
+        event_type: "job.queued",
+        payload: {
+          title: "Proving run queued",
+          detail: "A real queued job was seeded to exercise the live aerial-ops path.",
+        },
+      });
+
+      await insertJobEvent({
+        org_id: refreshedAccess.org.id,
+        job_id: insertedJob.id,
+        event_type: "artifact.generated",
+        payload: {
+          title: "Proving outputs staged",
+          detail: "Orthomosaic, DSM, point cloud, and report placeholders were created for the live proving run.",
+        },
+      });
+    } catch {
+      redirect(`/missions/${missionId}?seeded=error`);
+    }
+
+    redirect(`/missions/${missionId}?seeded=1`);
   }
 
   async function generateInstallBundle() {
@@ -1002,6 +1208,7 @@ export default async function MissionDetailPage({
   const calloutState =
     resolvedSearchParams.created
     ?? resolvedSearchParams.attached
+    ?? resolvedSearchParams.seeded
     ?? resolvedSearchParams.queued
     ?? resolvedSearchParams.bundled
     ?? resolvedSearchParams.approved
@@ -1257,6 +1464,25 @@ export default async function MissionDetailPage({
           {detail.datasets.length === 0 ? (
             <p className="muted">A dataset must exist before a job can be queued.</p>
           ) : null}
+
+          <form action={seedProvingRun} className="stack-xs surface-form-shell">
+            <div className="stack-xs">
+              <h3>Seed live proving run</h3>
+              <p className="muted">
+                Create a real dataset, queued job, events, and placeholder outputs for this mission in one step. This is meant to accelerate the live v1 proving path, not fake delivery completion.
+              </p>
+            </div>
+            <button
+              type="submit"
+              className="button button-secondary"
+              disabled={access.role === "viewer" || detail.datasets.length > 0 || detail.jobs.length > 0}
+            >
+              Seed proving dataset + job
+            </button>
+            {detail.datasets.length > 0 || detail.jobs.length > 0 ? (
+              <p className="muted">This mission already has live datasets or jobs, so the proving seed is locked.</p>
+            ) : null}
+          </form>
 
           <form action={generateInstallBundle} className="stack-xs surface-form-shell">
             <div className="stack-xs">
