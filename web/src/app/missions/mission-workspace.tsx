@@ -138,6 +138,34 @@ function getArtifactAuditLine(artifact: MissionWorkspaceSnapshot["outputArtifact
   return null;
 }
 
+function getReadinessAction(
+  item: MissionWorkspaceSnapshot["v1Readiness"]["items"][number],
+  snapshot: MissionWorkspaceSnapshot,
+  selectedMission: MissionWorkspaceSnapshot["missions"][number] | null,
+) {
+  const missionHref = selectedMission ? `/missions/${selectedMission.id}` : "/missions";
+  const firstJob = snapshot.jobs[0] ?? null;
+  const firstArtifact = snapshot.outputArtifacts[0] ?? null;
+  const firstReadyArtifact = snapshot.outputArtifacts.find((artifact) => artifact.status === "ready") ?? firstArtifact;
+
+  switch (item.id) {
+    case "mission":
+      return { href: "/missions", label: "Open workspace" };
+    case "dataset":
+      return { href: `${missionHref}#mission-live-action`, label: "Open dataset attach" };
+    case "job-submit":
+      return { href: `${missionHref}#mission-live-action`, label: "Open job controls" };
+    case "job-watch":
+      return firstJob ? { href: `/jobs/${firstJob.id}`, label: "Open job detail" } : { href: `${missionHref}#mission-jobs`, label: "Open mission jobs" };
+    case "artifact-readiness":
+      return { href: `${missionHref}#mission-artifacts`, label: "Open artifact trail" };
+    case "deliverable-review":
+      return firstReadyArtifact ? { href: `/artifacts/${firstReadyArtifact.id}`, label: "Open deliverable" } : { href: `${missionHref}#mission-handoff`, label: "Open handoff posture" };
+    default:
+      return null;
+  }
+}
+
 export function MissionWorkspace({
   snapshot,
   source,
@@ -584,17 +612,28 @@ export function MissionWorkspace({
               </p>
             </div>
             <div className="stack-xs">
-              {snapshot.v1Readiness.items.map((item) => (
-                <article key={item.id} className="ops-list-card stack-xs">
-                  <div className="ops-list-card-header">
-                    <strong>{item.label}</strong>
-                    <span className={item.complete ? "status-pill status-pill--success" : "status-pill status-pill--warning"}>
-                      {item.complete ? "Complete" : "Open"}
-                    </span>
-                  </div>
-                  <p className="muted">{item.detail}</p>
-                </article>
-              ))}
+              {snapshot.v1Readiness.items.map((item) => {
+                const action = getReadinessAction(item, snapshot, selectedMission);
+
+                return (
+                  <article key={item.id} className="ops-list-card stack-xs">
+                    <div className="ops-list-card-header">
+                      <strong>{item.label}</strong>
+                      <span className={item.complete ? "status-pill status-pill--success" : "status-pill status-pill--warning"}>
+                        {item.complete ? "Complete" : "Open"}
+                      </span>
+                    </div>
+                    <p className="muted">{item.detail}</p>
+                    {action ? (
+                      <div className="header-actions">
+                        <Link href={action.href} className="button button-secondary">
+                          {action.label}
+                        </Link>
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })}
             </div>
           </div>
 
@@ -620,18 +659,34 @@ export function MissionWorkspace({
                   <p className="muted">
                     Apply/populate the protected aerial-ops tables so mission, dataset, job, event, and artifact flows are real instead of fallback-only.
                   </p>
+                  <div className="header-actions">
+                    <Link href="/missions" className="button button-secondary">
+                      Open workspace
+                    </Link>
+                  </div>
                 </article>
               ) : null}
               {openV1Items.length > 0 ? (
-                openV1Items.map((item) => (
-                  <article key={`blocker-${item.id}`} className="ops-list-card stack-xs">
-                    <div className="ops-list-card-header">
-                      <strong>{item.label}</strong>
-                      <span className="status-pill status-pill--warning">Open</span>
-                    </div>
-                    <p className="muted">{item.detail}</p>
-                  </article>
-                ))
+                openV1Items.map((item) => {
+                  const action = getReadinessAction(item, snapshot, selectedMission);
+
+                  return (
+                    <article key={`blocker-${item.id}`} className="ops-list-card stack-xs">
+                      <div className="ops-list-card-header">
+                        <strong>{item.label}</strong>
+                        <span className="status-pill status-pill--warning">Open</span>
+                      </div>
+                      <p className="muted">{item.detail}</p>
+                      {action ? (
+                        <div className="header-actions">
+                          <Link href={action.href} className="button button-secondary">
+                            {action.label}
+                          </Link>
+                        </div>
+                      ) : null}
+                    </article>
+                  );
+                })
               ) : source === "database" ? (
                 <article className="ops-list-card stack-xs">
                   <div className="ops-list-card-header">

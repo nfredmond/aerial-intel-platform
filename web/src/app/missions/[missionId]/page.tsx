@@ -1148,7 +1148,7 @@ export default async function MissionDetailPage({
           </div>
         </article>
 
-        <aside className="surface stack-sm">
+        <aside id="mission-live-action" className="surface stack-sm">
           <div className="stack-xs">
             <p className="eyebrow">Live action</p>
             <h2>Attach data, geometry, queue processing, and stage install handoff</h2>
@@ -1585,7 +1585,7 @@ export default async function MissionDetailPage({
           )}
         </article>
 
-        <article className="surface stack-sm info-card">
+        <article id="mission-handoff" className="surface stack-sm info-card">
           <div className="stack-xs">
             <p className="eyebrow">Delivery status</p>
             <h2>Client handoff posture</h2>
@@ -1654,7 +1654,7 @@ export default async function MissionDetailPage({
           </div>
         </article>
 
-        <article className="surface stack-sm">
+        <article id="mission-artifacts" className="surface stack-sm">
           <div className="stack-xs">
             <p className="eyebrow">Outputs + events</p>
             <h2>Artifact trail</h2>
