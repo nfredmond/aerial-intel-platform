@@ -18,6 +18,7 @@ import {
   insertJobEvent,
   insertProcessingJob,
   updateProcessingJob,
+  updateProcessingOutput,
 } from "@/lib/supabase/admin";
 
 function formatDateTime(value: string | null) {
@@ -44,9 +45,32 @@ function statusClass(status: string) {
   }
 }
 
+function isManualProvingJob(detail: Awaited<ReturnType<typeof getJobDetail>>) {
+  if (!detail) {
+    return false;
+  }
+
+  return detail.job.preset_id === "v1-proving-run"
+    || getString(detail.inputSummary.source as string | undefined, "") === "mission-proving-seed";
+}
+
 function getCalloutMessage(actionState?: string) {
   if (!actionState) {
     return null;
+  }
+
+  if (actionState === "started") {
+    return {
+      tone: "success",
+      text: "Proving job started. The live run is now in an active processing state.",
+    } as const;
+  }
+
+  if (actionState === "completed") {
+    return {
+      tone: "success",
+      text: "Proving job completed. Output artifacts are now ready for real review/share/export work.",
+    } as const;
   }
 
   if (actionState === "canceled") {
@@ -60,6 +84,13 @@ function getCalloutMessage(actionState?: string) {
     return {
       tone: "success",
       text: "Retry job queued. A new processing run has been created from this job configuration.",
+    } as const;
+  }
+
+  if (actionState === "not-proving") {
+    return {
+      tone: "error",
+      text: "This job is not marked as a manual proving run, so the proving controls are unavailable.",
     } as const;
   }
 
@@ -221,6 +252,156 @@ export default async function JobDetailPage({
     }
   }
 
+  async function startProvingJob() {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/jobs/${jobId}?action=denied`);
+    }
+
+    const refreshedDetail = await getJobDetail(refreshedAccess, jobId);
+    if (!refreshedDetail) {
+      redirect("/missions");
+    }
+
+    if (!isManualProvingJob(refreshedDetail)) {
+      redirect(`/jobs/${jobId}?action=not-proving`);
+    }
+
+    try {
+      await updateProcessingJob(refreshedDetail.job.id, {
+        status: "running",
+        stage: "orthomosaic",
+        progress: 45,
+        queue_position: null,
+        started_at: refreshedDetail.job.started_at ?? new Date().toISOString(),
+        output_summary: {
+          ...refreshedDetail.outputSummary,
+          eta: "In progress",
+          notes: "Manual proving run started from the job detail page.",
+          logTail: [
+            "Worker picked up proving run.",
+            "Orthomosaic stage started.",
+          ],
+        },
+      });
+
+      await insertJobEvent({
+        org_id: refreshedAccess.org.id,
+        job_id: refreshedDetail.job.id,
+        event_type: "job.stage.changed",
+        payload: {
+          title: "Proving run started",
+          detail: "Manual proving run advanced to active processing from the job detail page.",
+        },
+      });
+    } catch {
+      redirect(`/jobs/${jobId}?action=error`);
+    }
+
+    redirect(`/jobs/${jobId}?action=started`);
+  }
+
+  async function completeProvingJob() {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/jobs/${jobId}?action=denied`);
+    }
+
+    const refreshedDetail = await getJobDetail(refreshedAccess, jobId);
+    if (!refreshedDetail) {
+      redirect("/missions");
+    }
+
+    if (!isManualProvingJob(refreshedDetail)) {
+      redirect(`/jobs/${jobId}?action=not-proving`);
+    }
+
+    try {
+      await updateProcessingJob(refreshedDetail.job.id, {
+        status: "succeeded",
+        stage: "complete",
+        progress: 100,
+        queue_position: null,
+        started_at: refreshedDetail.job.started_at ?? new Date().toISOString(),
+        completed_at: new Date().toISOString(),
+        output_summary: {
+          ...refreshedDetail.outputSummary,
+          eta: "Complete",
+          notes: "Manual proving run completed from the job detail page.",
+          logTail: [
+            "Orthomosaic generated.",
+            "DSM generated.",
+            "Point cloud generated.",
+            "Mission brief exported.",
+          ],
+        },
+      });
+
+      await Promise.all(
+        refreshedDetail.outputs.map((output) =>
+          updateProcessingOutput(output.id, {
+            status: "ready",
+            metadata: {
+              ...(output.metadata && typeof output.metadata === "object" && !Array.isArray(output.metadata)
+                ? output.metadata
+                : {}),
+              delivery:
+                output.kind === "report"
+                  ? "Share/export pending"
+                  : output.kind === "point_cloud"
+                    ? "Hold for QA"
+                    : "Review pending",
+            },
+          }),
+        ),
+      );
+
+      await insertJobEvent({
+        org_id: refreshedAccess.org.id,
+        job_id: refreshedDetail.job.id,
+        event_type: "job.stage.changed",
+        payload: {
+          title: "Proving run completed",
+          detail: "Manual proving run advanced to complete and output artifacts are now ready for review.",
+        },
+      });
+
+      await insertJobEvent({
+        org_id: refreshedAccess.org.id,
+        job_id: refreshedDetail.job.id,
+        event_type: "artifact.generated",
+        payload: {
+          title: "Artifacts ready for review",
+          detail: "All proving-run placeholder outputs are now marked ready for the delivery lane.",
+        },
+      });
+    } catch {
+      redirect(`/jobs/${jobId}?action=error`);
+    }
+
+    redirect(`/jobs/${jobId}?action=completed`);
+  }
+
   const benchmarkSummary = getBenchmarkSummaryView(detail.outputSummary.benchmarkSummary ?? detail.outputSummary);
   const logTail = Array.isArray(detail.outputSummary.logTail)
     ? detail.outputSummary.logTail.filter((line): line is string => typeof line === "string")
@@ -232,6 +413,7 @@ export default async function JobDetailPage({
         : {},
     ),
   );
+  const provingJob = isManualProvingJob(detail);
   const callout = getCalloutMessage(resolvedSearchParams.action);
 
   return (
@@ -347,10 +529,37 @@ export default async function JobDetailPage({
                 Cancel job
               </button>
             </form>
-            {!(["queued", "running"].includes(detail.job.status)) ? (
+            {!( ["queued", "running"].includes(detail.job.status)) ? (
               <p className="muted">Cancel is only available for queued or running jobs.</p>
             ) : null}
           </div>
+
+          {provingJob ? (
+            <div className="stack-xs surface-form-shell">
+              <h3>Manual proving controls</h3>
+              <p className="muted">
+                Use these only for the live v1 proving lane while the full asynchronous worker backend is still under construction.
+              </p>
+              <form action={startProvingJob}>
+                <button
+                  type="submit"
+                  className="button button-secondary"
+                  disabled={access.role === "viewer" || detail.job.status !== "queued"}
+                >
+                  Start proving job
+                </button>
+              </form>
+              <form action={completeProvingJob}>
+                <button
+                  type="submit"
+                  className="button button-primary"
+                  disabled={access.role === "viewer" || !["queued", "running"].includes(detail.job.status)}
+                >
+                  Complete proving job
+                </button>
+              </form>
+            </div>
+          ) : null}
         </aside>
       </section>
 

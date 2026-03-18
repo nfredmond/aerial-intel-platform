@@ -167,6 +167,7 @@ export type ProcessingJobPatch = {
   queue_position?: number | null;
   input_summary?: Json;
   output_summary?: Json;
+  started_at?: string | null;
   completed_at?: string | null;
 };
 
