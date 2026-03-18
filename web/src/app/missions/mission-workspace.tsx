@@ -122,6 +122,22 @@ function getActivityPillClassName(tone: "success" | "info" | "warning") {
   }
 }
 
+function getArtifactAuditLine(artifact: MissionWorkspaceSnapshot["outputArtifacts"][number]) {
+  if (artifact.exportedAt) {
+    return `Exported ${formatDateTime(artifact.exportedAt)}${artifact.exportedByEmail ? ` by ${artifact.exportedByEmail}` : ""}`;
+  }
+
+  if (artifact.sharedAt) {
+    return `Shared ${formatDateTime(artifact.sharedAt)}${artifact.sharedByEmail ? ` by ${artifact.sharedByEmail}` : ""}`;
+  }
+
+  if (artifact.reviewedAt) {
+    return `Reviewed ${formatDateTime(artifact.reviewedAt)}${artifact.reviewedByEmail ? ` by ${artifact.reviewedByEmail}` : ""}`;
+  }
+
+  return null;
+}
+
 export function MissionWorkspace({
   snapshot,
   source,
@@ -370,6 +386,9 @@ export function MissionWorkspace({
                                 {artifact.handoffNotePreview ? (
                                   <p className="muted">Note: {artifact.handoffNotePreview}</p>
                                 ) : null}
+                                {getArtifactAuditLine(artifact) ? (
+                                  <p className="muted">{getArtifactAuditLine(artifact)}</p>
+                                ) : null}
                                 <p className="muted">{artifact.delivery} · Source: {artifact.sourceJob}</p>
                                 <div className="header-actions">
                                   {canManageOperations ? (
@@ -469,6 +488,9 @@ export function MissionWorkspace({
                         </p>
                         {artifact.handoffNotePreview ? (
                           <p className="muted">Note: {artifact.handoffNotePreview}</p>
+                        ) : null}
+                        {getArtifactAuditLine(artifact) ? (
+                          <p className="muted">{getArtifactAuditLine(artifact)}</p>
                         ) : null}
                         <p className="muted">Next: {artifact.nextAction}</p>
                         <div className="header-actions">

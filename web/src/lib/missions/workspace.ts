@@ -84,6 +84,12 @@ export type OutputArtifactRecord = {
   delivery: string;
   handoffStage: "pending_review" | "reviewed" | "shared" | "exported";
   handoffLabel: string;
+  reviewedAt?: string | null;
+  reviewedByEmail?: string | null;
+  sharedAt?: string | null;
+  sharedByEmail?: string | null;
+  exportedAt?: string | null;
+  exportedByEmail?: string | null;
   handoffNotePreview?: string | null;
   nextAction: string;
   shareSummary: string;
@@ -316,10 +322,16 @@ const DEMO_OUTPUTS: OutputArtifactRecord[] = [
     delivery: "Internal QA share",
     handoffStage: "reviewed",
     handoffLabel: "Reviewed",
+    reviewedAt: "2026-03-17T21:05:00Z",
+    reviewedByEmail: "priya.nanduri@natfordplanning.com",
+    sharedAt: null,
+    sharedByEmail: null,
+    exportedAt: null,
+    exportedByEmail: null,
     handoffNotePreview: "QA check complete; seam lines look acceptable for internal share.",
     nextAction: "Share the reviewed artifact summary with the client or field handoff lane.",
-    shareSummary: "Downtown corridor orthomosaic · Mission: Grass Valley downtown curb inventory · Project: Nat Ford Planning aerial operations · Status: ready · Handoff: Reviewed · Path: aerial/gv/orthomosaic.tif",
-    exportPacket: "Artifact: Downtown corridor orthomosaic\nKind: Raster deliverable\nStatus: ready\nFormat: COG + map tiles\nMission: Grass Valley downtown curb inventory\nProject: Nat Ford Planning aerial operations\nDataset: Corridor capture batch A\nStorage path: aerial/gv/orthomosaic.tif\nDelivery note: Internal QA share\nHandoff stage: Reviewed\nReviewed at: Not recorded\nShared at: Not recorded\nExported at: Not recorded\nNext action: Share the reviewed artifact summary with the client or field handoff lane.",
+    shareSummary: "Downtown corridor orthomosaic · Mission: Grass Valley downtown curb inventory · Project: Nat Ford Planning aerial operations · Status: ready · Handoff: Reviewed · Note: QA check complete; seam lines look acceptable for internal share. · Path: aerial/gv/orthomosaic.tif",
+    exportPacket: "Artifact: Downtown corridor orthomosaic\nKind: Raster deliverable\nStatus: ready\nFormat: COG + map tiles\nMission: Grass Valley downtown curb inventory\nProject: Nat Ford Planning aerial operations\nDataset: Corridor capture batch A\nStorage path: aerial/gv/orthomosaic.tif\nDelivery note: Internal QA share\nHandoff stage: Reviewed\nHandoff note: QA check complete; seam lines look acceptable for internal share.\nReviewed at: 2026-03-17T21:05:00Z\nShared at: Not recorded\nExported at: Not recorded\nNext action: Share the reviewed artifact summary with the client or field handoff lane.",
     sourceJob: "GV corridor dense cloud refresh",
   },
   {
@@ -331,10 +343,16 @@ const DEMO_OUTPUTS: OutputArtifactRecord[] = [
     delivery: "Ready for TiTiler publishing",
     handoffStage: "shared",
     handoffLabel: "Shared",
+    reviewedAt: "2026-03-17T20:40:00Z",
+    reviewedByEmail: "priya.nanduri@natfordplanning.com",
+    sharedAt: "2026-03-17T21:20:00Z",
+    sharedByEmail: "ops@natfordplanning.com",
+    exportedAt: null,
+    exportedByEmail: null,
     handoffNotePreview: "Shared with internal ops for TiTiler publishing review.",
     nextAction: "Export/package the artifact and record final delivery traceability.",
-    shareSummary: "Downtown surface model · Mission: Grass Valley downtown curb inventory · Project: Nat Ford Planning aerial operations · Status: ready · Handoff: Shared · Path: aerial/gv/dsm.tif",
-    exportPacket: "Artifact: Downtown surface model\nKind: Elevation\nStatus: ready\nFormat: COG\nMission: Grass Valley downtown curb inventory\nProject: Nat Ford Planning aerial operations\nDataset: Corridor capture batch A\nStorage path: aerial/gv/dsm.tif\nDelivery note: Ready for TiTiler publishing\nHandoff stage: Shared\nReviewed at: Not recorded\nShared at: Not recorded\nExported at: Not recorded\nNext action: Export/package the artifact and record final delivery traceability.",
+    shareSummary: "Downtown surface model · Mission: Grass Valley downtown curb inventory · Project: Nat Ford Planning aerial operations · Status: ready · Handoff: Shared · Note: Shared with internal ops for TiTiler publishing review. · Path: aerial/gv/dsm.tif",
+    exportPacket: "Artifact: Downtown surface model\nKind: Elevation\nStatus: ready\nFormat: COG\nMission: Grass Valley downtown curb inventory\nProject: Nat Ford Planning aerial operations\nDataset: Corridor capture batch A\nStorage path: aerial/gv/dsm.tif\nDelivery note: Ready for TiTiler publishing\nHandoff stage: Shared\nHandoff note: Shared with internal ops for TiTiler publishing review.\nReviewed at: 2026-03-17T20:40:00Z\nShared at: 2026-03-17T21:20:00Z\nExported at: Not recorded\nNext action: Export/package the artifact and record final delivery traceability.",
     sourceJob: "GV corridor dense cloud refresh",
   },
   {
@@ -346,6 +364,12 @@ const DEMO_OUTPUTS: OutputArtifactRecord[] = [
     delivery: "Hold for QA",
     handoffStage: "pending_review",
     handoffLabel: "Pending review",
+    reviewedAt: null,
+    reviewedByEmail: null,
+    sharedAt: null,
+    sharedByEmail: null,
+    exportedAt: null,
+    exportedByEmail: null,
     handoffNotePreview: null,
     nextAction: "Wait for processing readiness, then review artifact quality and GIS posture.",
     shareSummary: "Downtown point cloud · Mission: Grass Valley downtown curb inventory · Project: Nat Ford Planning aerial operations · Status: processing · Handoff: Pending review · Path: aerial/gv/point-cloud.copc.laz",

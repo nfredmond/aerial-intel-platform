@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildArtifactExportPacket,
   buildArtifactShareSummary,
+  formatArtifactHandoffAuditLine,
   getArtifactHandoff,
   summarizeArtifactHandoffs,
   updateArtifactHandoffMetadata,
@@ -95,6 +96,21 @@ describe("artifact handoff helpers", () => {
     const summary = getArtifactHandoff(updated);
     expect(summary.note).toContain("extra QA note");
     expect(summary.nextAction).toContain("field lead");
+  });
+
+  it("formats audit line from the latest recorded handoff stage", () => {
+    const summary = getArtifactHandoff(
+      updateArtifactHandoffMetadata({}, {
+        reviewedAt: "2026-03-17T19:35:00.000Z",
+        reviewedByEmail: "reviewer@example.com",
+        sharedAt: "2026-03-17T19:45:00.000Z",
+        sharedByEmail: "ops@example.com",
+      }),
+    );
+
+    const auditLine = formatArtifactHandoffAuditLine(summary);
+    expect(auditLine).toContain("Shared");
+    expect(auditLine).toContain("ops@example.com");
   });
 
   it("builds share and export packet strings with handoff context", () => {

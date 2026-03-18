@@ -401,6 +401,12 @@ function buildWorkspaceFromRows(params: {
       delivery: deliveryNote,
       handoffStage: handoff.stage,
       handoffLabel: handoff.stageLabel,
+      reviewedAt: handoff.reviewedAt,
+      reviewedByEmail: handoff.reviewedByEmail,
+      sharedAt: handoff.sharedAt,
+      sharedByEmail: handoff.sharedByEmail,
+      exportedAt: handoff.exportedAt,
+      exportedByEmail: handoff.exportedByEmail,
       handoffNotePreview: handoff.note,
       nextAction: handoff.nextAction,
       shareSummary: buildArtifactShareSummary({

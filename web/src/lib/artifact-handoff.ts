@@ -178,6 +178,34 @@ export function summarizeArtifactHandoffs(metadataRecords: ArtifactMetadataRecor
   );
 }
 
+export function formatArtifactHandoffAuditLine(handoff: ArtifactHandoffSummary) {
+  const formatTimestamp = (value: string) => {
+    const timestamp = new Date(value);
+    if (Number.isNaN(timestamp.getTime())) {
+      return value;
+    }
+
+    return new Intl.DateTimeFormat("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(timestamp);
+  };
+
+  if (handoff.exportedAt) {
+    return `Exported ${formatTimestamp(handoff.exportedAt)}${handoff.exportedByEmail ? ` by ${handoff.exportedByEmail}` : ""}`;
+  }
+
+  if (handoff.sharedAt) {
+    return `Shared ${formatTimestamp(handoff.sharedAt)}${handoff.sharedByEmail ? ` by ${handoff.sharedByEmail}` : ""}`;
+  }
+
+  if (handoff.reviewedAt) {
+    return `Reviewed ${formatTimestamp(handoff.reviewedAt)}${handoff.reviewedByEmail ? ` by ${handoff.reviewedByEmail}` : ""}`;
+  }
+
+  return null;
+}
+
 export function buildArtifactShareSummary(input: {
   artifactName: string;
   missionName?: string | null;

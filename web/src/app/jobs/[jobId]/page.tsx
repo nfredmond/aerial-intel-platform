@@ -5,6 +5,7 @@ import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import {
+  formatArtifactHandoffAuditLine,
   getArtifactHandoff,
   summarizeArtifactHandoffs,
   type ArtifactMetadataRecord,
@@ -376,6 +377,7 @@ export default async function JobDetailPage({
                   <p className="muted">{output.storage_path ?? "Storage path pending"}</p>
                   <p className="muted">Handoff: {handoff.stageLabel}</p>
                   {handoff.note ? <p className="muted">Note: {handoff.note}</p> : null}
+                  {formatArtifactHandoffAuditLine(handoff) ? <p className="muted">{formatArtifactHandoffAuditLine(handoff)}</p> : null}
                   <div className="header-actions">
                     <Link href={`/artifacts/${output.id}`} className="button button-secondary">
                       Review artifact

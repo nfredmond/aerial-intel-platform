@@ -9,6 +9,7 @@ import { GeometryPreviewCard } from "@/components/geometry-preview-card";
 import { MissionStatusDashboard } from "@/components/mission-status-dashboard";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import {
+  formatArtifactHandoffAuditLine,
   getArtifactHandoff,
   summarizeArtifactHandoffs,
   type ArtifactMetadataRecord,
@@ -1683,6 +1684,7 @@ export default async function MissionDetailPage({
                   <p className="muted">{output.storage_path ?? "Storage path pending"}</p>
                   <p className="muted">Handoff: {handoff.stageLabel}</p>
                   {handoff.note ? <p className="muted">Note: {handoff.note}</p> : null}
+                  {formatArtifactHandoffAuditLine(handoff) ? <p className="muted">{formatArtifactHandoffAuditLine(handoff)}</p> : null}
                   <div className="header-actions">
                     <Link href={`/artifacts/${output.id}`} className="button button-secondary">
                       Review artifact
