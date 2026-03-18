@@ -410,6 +410,7 @@ function buildWorkspaceFromRows(params: {
         status: output.status,
         storagePath,
         handoffStageLabel: handoff.stageLabel,
+        handoffNote: handoff.note,
       }),
       exportPacket: buildArtifactExportPacket({
         artifactName,

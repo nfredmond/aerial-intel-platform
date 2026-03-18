@@ -112,9 +112,11 @@ describe("artifact handoff helpers", () => {
       status: "ready",
       storagePath: "acme/missions/123/ortho.tif",
       handoffStageLabel: handoff.stageLabel,
+      handoffNote: "Internal QA complete; safe to share with field lead.",
     });
 
     expect(shareSummary).toContain("Handoff: Reviewed");
+    expect(shareSummary).toContain("Note: Internal QA complete");
     expect(shareSummary).toContain("Path: acme/missions/123/ortho.tif");
 
     const packet = buildArtifactExportPacket({
@@ -131,6 +133,7 @@ describe("artifact handoff helpers", () => {
     });
 
     expect(packet).toContain("Handoff stage: Reviewed");
+    expect(packet).toContain("Handoff note: Not recorded");
     expect(packet).toContain("Next action:");
   });
 });

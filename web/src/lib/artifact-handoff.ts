@@ -185,6 +185,7 @@ export function buildArtifactShareSummary(input: {
   status: string;
   storagePath: string;
   handoffStageLabel: string;
+  handoffNote?: string | null;
 }) {
   return [
     input.artifactName,
@@ -192,6 +193,7 @@ export function buildArtifactShareSummary(input: {
     input.projectName ? `Project: ${input.projectName}` : null,
     `Status: ${input.status}`,
     `Handoff: ${input.handoffStageLabel}`,
+    input.handoffNote ? `Note: ${input.handoffNote}` : null,
     `Path: ${input.storagePath}`,
   ]
     .filter(Boolean)
@@ -221,6 +223,7 @@ export function buildArtifactExportPacket(input: {
     `Storage path: ${input.storagePath}`,
     `Delivery note: ${input.deliveryNote}`,
     `Handoff stage: ${input.handoff.stageLabel}`,
+    `Handoff note: ${input.handoff.note ?? "Not recorded"}`,
     `Reviewed at: ${input.handoff.reviewedAt ?? "Not recorded"}`,
     `Shared at: ${input.handoff.sharedAt ?? "Not recorded"}`,
     `Exported at: ${input.handoff.exportedAt ?? "Not recorded"}`,

@@ -247,7 +247,9 @@ export default async function ArtifactDetailPage({
         event_type: "artifact.note.updated",
         payload: {
           title: "Artifact handoff note updated",
-          detail: `${artifactLabel} handoff note was updated from the artifact detail page.`,
+          detail: handoffNote
+            ? `${artifactLabel} handoff note updated from the artifact detail page: ${handoffNote}`
+            : `${artifactLabel} handoff note was cleared from the artifact detail page.`,
         },
       });
     } catch {
@@ -282,6 +284,7 @@ export default async function ArtifactDetailPage({
     status: detail.output.status,
     storagePath,
     handoffStageLabel: handoff.stageLabel,
+    handoffNote: handoff.note,
   });
   const callout = getCalloutMessage(resolvedSearchParams.action);
 

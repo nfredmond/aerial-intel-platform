@@ -392,7 +392,9 @@ export default async function MissionsPage({
         event_type: "artifact.note.updated",
         payload: {
           title: "Artifact handoff note updated",
-          detail: `${artifactLabel} handoff note was updated from the workspace queue.`,
+          detail: handoffNote
+            ? `${artifactLabel} handoff note updated from the workspace queue: ${handoffNote}`
+            : `${artifactLabel} handoff note was cleared from the workspace queue.`,
         },
       });
     } catch {
