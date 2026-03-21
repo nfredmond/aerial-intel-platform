@@ -113,6 +113,19 @@ function getMissionRiskLabel(mission: Mission) {
   return { label: "In progress", className: "status-pill status-pill--info" };
 }
 
+function getProvingStatusClass(status?: string | null) {
+  switch (status) {
+    case "completed":
+      return "status-pill status-pill--success";
+    case "running":
+      return "status-pill status-pill--info";
+    case "queued":
+      return "status-pill status-pill--warning";
+    default:
+      return "status-pill status-pill--warning";
+  }
+}
+
 export function MissionBoardClient({ missions }: MissionBoardClientProps) {
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("all");
@@ -269,6 +282,11 @@ export function MissionBoardClient({ missions }: MissionBoardClientProps) {
                 <p className="muted">
                   {readinessPercent}% ready · {readyOutputs}/{mission.outputs.length} outputs ready · {mission.blockers.length} blockers · {mission.warnings.length} warnings
                 </p>
+                {mission.provingJobStatus ? (
+                  <p className="muted">
+                    Proving: {mission.provingJobStatus}{mission.provingCheckpoint ? ` · ${mission.provingCheckpoint}` : ""}
+                  </p>
+                ) : null}
               </article>
             );
           })}
@@ -316,6 +334,20 @@ export function MissionBoardClient({ missions }: MissionBoardClientProps) {
                     <span><strong>{mission.healthScore}</strong> health</span>
                   </div>
                 </div>
+
+                {mission.provingJobStatus ? (
+                  <div className="surface-form-shell stack-sm">
+                    <div className="ops-list-card-header">
+                      <strong>Live proving posture</strong>
+                      <span className={getProvingStatusClass(mission.provingJobStatus)}>{mission.provingJobStatus}</span>
+                    </div>
+                    <p className="muted">{mission.provingCheckpoint ?? "No proving checkpoint recorded yet."}</p>
+                    <div className="mission-inline-stats">
+                      <span><strong>{mission.provingStage ?? "Unknown stage"}</strong> current stage</span>
+                      <span><strong>{typeof mission.provingProgress === "number" ? mission.provingProgress : 0}%</strong> progress</span>
+                    </div>
+                  </div>
+                ) : null}
 
                 <dl className="mission-meta-grid">
                   <div className="kv-row">

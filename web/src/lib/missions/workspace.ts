@@ -13,6 +13,11 @@ export type MissionOutput = {
   format: string;
 };
 
+export type StageChecklistRecord = {
+  label: string;
+  status: string;
+};
+
 export type MissionRecord = {
   id: string;
   name: string;
@@ -34,6 +39,10 @@ export type MissionRecord = {
   outputs: MissionOutput[];
   blockers: string[];
   warnings: string[];
+  provingJobStatus?: string | null;
+  provingCheckpoint?: string | null;
+  provingStage?: string | null;
+  provingProgress?: number | null;
 };
 
 export type WorkspaceRailSection = {
@@ -76,6 +85,8 @@ export type JobRecord = {
   queuePosition: string;
   startedAt: string;
   notes: string;
+  latestCheckpoint?: string | null;
+  stageChecklist?: StageChecklistRecord[];
 };
 
 export type OutputArtifactRecord = {

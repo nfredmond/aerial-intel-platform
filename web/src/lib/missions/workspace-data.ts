@@ -19,6 +19,7 @@ import {
   type MissionRecord,
   type MissionWorkspaceSnapshot,
   type OutputArtifactRecord,
+  type StageChecklistRecord,
   type StatusChip,
   type WorkspaceRailSection,
 } from "./workspace";
@@ -56,6 +57,29 @@ function asStringArray(value: Json | undefined) {
   }
 
   return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+}
+
+function getStageChecklist(value: Json | undefined) {
+  if (!Array.isArray(value)) {
+    return [] as StageChecklistRecord[];
+  }
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      return [];
+    }
+
+    const record = item as JsonRecord;
+    return [{
+      label: asString(record.label, "Unnamed stage"),
+      status: asString(record.status, "pending"),
+    }];
+  });
+}
+
+function isProvingJob(job: JobRow) {
+  const inputSummary = asRecord(job.input_summary);
+  return job.preset_id === "v1-proving-run" || inputSummary.source === "mission-proving-seed";
 }
 
 function mapMissionStatusToStage(
@@ -390,6 +414,33 @@ function buildWorkspaceFromRows(params: {
         typeof job.queue_position === "number" ? `Queue position ${job.queue_position}` : job.status === "running" ? "Running now" : "Queued",
       startedAt: job.started_at ?? job.created_at,
       notes: asString(outputSummary.notes, "No job notes recorded yet."),
+      latestCheckpoint: typeof outputSummary.latestCheckpoint === "string" ? outputSummary.latestCheckpoint : null,
+      stageChecklist: getStageChecklist(outputSummary.stageChecklist),
+    };
+  });
+
+  const provingJobByMissionId = new Map<string, JobRecord>();
+  for (const job of jobsRows) {
+    if (!job.missionId || provingJobByMissionId.has(job.missionId)) {
+      continue;
+    }
+
+    const rawJob = jobs.find((candidate) => candidate.id === job.id);
+    if (!rawJob || !isProvingJob(rawJob)) {
+      continue;
+    }
+
+    provingJobByMissionId.set(job.missionId, job);
+  }
+
+  const missionRowsWithProving: MissionRecord[] = missionRows.map((mission) => {
+    const provingJob = provingJobByMissionId.get(mission.id);
+    return {
+      ...mission,
+      provingJobStatus: provingJob?.status ?? null,
+      provingCheckpoint: provingJob?.latestCheckpoint ?? null,
+      provingStage: provingJob?.stage ?? null,
+      provingProgress: typeof provingJob?.progress === "number" ? provingJob.progress : null,
     };
   });
 
@@ -513,7 +564,7 @@ function buildWorkspaceFromRows(params: {
       v1ReadinessComplete: v1Readiness.completeCount,
       v1ReadinessTotal: v1Readiness.totalCount,
     }),
-    missions: missionRows,
+    missions: missionRowsWithProving,
     datasets: datasetRows,
     jobs: jobsRows,
     outputArtifacts: outputRows,

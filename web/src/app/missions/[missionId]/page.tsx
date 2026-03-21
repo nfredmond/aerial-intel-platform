@@ -94,6 +94,39 @@ function getOutputPillClassName(status: string) {
   }
 }
 
+function getChecklistStatusClass(status: string) {
+  switch (status) {
+    case "complete":
+      return "status-pill status-pill--success";
+    case "running":
+      return "status-pill status-pill--info";
+    default:
+      return "status-pill status-pill--warning";
+  }
+}
+
+function getStageChecklist(summary: unknown) {
+  if (!summary || typeof summary !== "object" || Array.isArray(summary)) {
+    return [] as Array<{ label: string; status: string }>;
+  }
+
+  const record = summary as Record<string, unknown>;
+  if (!Array.isArray(record.stageChecklist)) {
+    return [] as Array<{ label: string; status: string }>;
+  }
+
+  return record.stageChecklist.flatMap((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      return [];
+    }
+
+    return [{
+      label: typeof item.label === "string" ? item.label : "Unnamed stage",
+      status: typeof item.status === "string" ? item.status : "pending",
+    }];
+  });
+}
+
 function getCalloutClassName(state: string) {
   if (state === "1" || state === "created") {
     return "callout callout-success";
@@ -1984,30 +2017,48 @@ export default async function MissionDetailPage({
             <h2>Mission processing runs</h2>
           </div>
           <div className="stack-xs">
-            {detail.jobs.map((job) => (
-              <article key={job.id} className="ops-job-card stack-xs">
-                <div className="ops-list-card-header">
-                  <div className="stack-xs">
-                    <strong>{getString((job.input_summary as Record<string, unknown>).name as string | undefined, `${job.engine.toUpperCase()} job`)}</strong>
-                    <span className="muted">{job.engine} · {job.stage}</span>
+            {detail.jobs.map((job) => {
+              const outputSummary = job.output_summary && typeof job.output_summary === "object" && !Array.isArray(job.output_summary)
+                ? (job.output_summary as Record<string, unknown>)
+                : {};
+              const latestCheckpoint = getString(outputSummary.latestCheckpoint as string | undefined, "");
+              const stageChecklist = getStageChecklist(outputSummary);
+
+              return (
+                <article key={job.id} className="ops-job-card stack-xs">
+                  <div className="ops-list-card-header">
+                    <div className="stack-xs">
+                      <strong>{getString((job.input_summary as Record<string, unknown>).name as string | undefined, `${job.engine.toUpperCase()} job`)}</strong>
+                      <span className="muted">{job.engine} · {job.stage}</span>
+                    </div>
+                    <span className={getJobPillClassName(job.status === "succeeded" ? "completed" : job.status)}>
+                      {formatJobStatus(job.status === "succeeded" ? "completed" : job.status === "queued" ? "queued" : job.status === "running" ? "running" : "needs_review")}
+                    </span>
                   </div>
-                  <span className={getJobPillClassName(job.status === "succeeded" ? "completed" : job.status)}>
-                    {formatJobStatus(job.status === "succeeded" ? "completed" : job.status === "queued" ? "queued" : job.status === "running" ? "running" : "needs_review")}
-                  </span>
-                </div>
-                <div className="ops-progress-row">
-                  <div className="ops-progress-track" aria-hidden="true">
-                    <span className="ops-progress-fill" style={{ width: `${job.progress}%` }} />
+                  <div className="ops-progress-row">
+                    <div className="ops-progress-track" aria-hidden="true">
+                      <span className="ops-progress-fill" style={{ width: `${job.progress}%` }} />
+                    </div>
+                    <strong>{job.progress}%</strong>
                   </div>
-                  <strong>{job.progress}%</strong>
-                </div>
-                <div className="header-actions">
-                  <Link href={`/jobs/${job.id}`} className="button button-secondary">
-                    View job detail
-                  </Link>
-                </div>
-              </article>
-            ))}
+                  {latestCheckpoint ? <p className="muted">Checkpoint: {latestCheckpoint}</p> : null}
+                  {stageChecklist.length > 0 ? (
+                    <div className="header-actions">
+                      {stageChecklist.map((item) => (
+                        <span key={`${job.id}-${item.label}-${item.status}`} className={getChecklistStatusClass(item.status)}>
+                          {item.label}: {item.status}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="header-actions">
+                    <Link href={`/jobs/${job.id}`} className="button button-secondary">
+                      View job detail
+                    </Link>
+                  </div>
+                </article>
+              );
+            })}
             {detail.jobs.length === 0 ? <p className="muted">No processing jobs yet.</p> : null}
           </div>
         </article>

@@ -124,6 +124,30 @@ function getActivityPillClassName(tone: "success" | "info" | "warning") {
   }
 }
 
+function getChecklistStatusClass(status: string) {
+  switch (status) {
+    case "complete":
+      return "status-pill status-pill--success";
+    case "running":
+      return "status-pill status-pill--info";
+    default:
+      return "status-pill status-pill--warning";
+  }
+}
+
+function getStageChecklistSummary(stageChecklist?: MissionWorkspaceSnapshot["jobs"][number]["stageChecklist"]) {
+  if (!stageChecklist || stageChecklist.length === 0) {
+    return null;
+  }
+
+  const counts = new Map<string, number>();
+  for (const item of stageChecklist) {
+    counts.set(item.status, (counts.get(item.status) ?? 0) + 1);
+  }
+
+  return Array.from(counts.entries()).map(([status, count]) => `${count} ${status}`).join(" · ");
+}
+
 function getArtifactAuditLine(artifact: MissionWorkspaceSnapshot["outputArtifacts"][number]) {
   if (artifact.exportedAt) {
     return `Exported ${formatDateTime(artifact.exportedAt)}${artifact.exportedByEmail ? ` by ${artifact.exportedByEmail}` : ""}`;
@@ -731,6 +755,12 @@ export function MissionWorkspace({
                 <p className="muted">
                   Active proving job: {activeProvingJob.name} ({activeProvingJob.status}). Advance it here to keep the live path moving, or open the full job page for deeper triage.
                 </p>
+                {activeProvingJob.latestCheckpoint ? (
+                  <p className="muted">Checkpoint: {activeProvingJob.latestCheckpoint}</p>
+                ) : null}
+                {getStageChecklistSummary(activeProvingJob.stageChecklist) ? (
+                  <p className="muted">Checklist: {getStageChecklistSummary(activeProvingJob.stageChecklist)}</p>
+                ) : null}
                 <div className="header-actions">
                   <form action={advanceWorkspaceProvingJobAction}>
                     <input type="hidden" name="jobId" value={activeProvingJob.id} />
@@ -861,7 +891,17 @@ export function MissionWorkspace({
                   <span>{job.queuePosition}</span>
                   <span>ETA: {job.eta}</span>
                 </div>
+                {job.latestCheckpoint ? <p className="muted">Checkpoint: {job.latestCheckpoint}</p> : null}
                 <p className="muted">{job.notes}</p>
+                {job.stageChecklist && job.stageChecklist.length > 0 ? (
+                  <div className="header-actions">
+                    {job.stageChecklist.map((item) => (
+                      <span key={`${job.id}-${item.label}-${item.status}`} className={getChecklistStatusClass(item.status)}>
+                        {item.label}: {item.status}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
                 <div className="header-actions">
                   <Link href={`/jobs/${job.id}`} className="button button-secondary">
                     View job
