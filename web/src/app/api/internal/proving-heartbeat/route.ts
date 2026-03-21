@@ -44,9 +44,18 @@ export async function GET(request: NextRequest) {
       updates: result.updates,
       started: result.started,
       completed: result.completed,
+      targets: result.auditTargets,
     });
 
-    return NextResponse.json({ ok: true, heartbeat, auditRecorded, ...result });
+    return NextResponse.json({
+      ok: true,
+      heartbeat,
+      auditRecorded,
+      scanned: result.scanned,
+      updates: result.updates,
+      started: result.started,
+      completed: result.completed,
+    });
   } catch (error) {
     return NextResponse.json(
       {

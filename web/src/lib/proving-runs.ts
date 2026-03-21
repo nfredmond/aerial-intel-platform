@@ -186,8 +186,9 @@ export async function recordProvingHeartbeatAudit(options: {
   updates: number;
   started: number;
   completed: number;
+  targets?: HeartbeatAuditTarget[];
 }) {
-  const targets = await getLatestProvingJobsByOrg();
+  const targets = options.targets ?? await getLatestProvingJobsByOrg();
 
   for (const target of targets) {
     const inputSummary = target.input_summary && typeof target.input_summary === "object" && !Array.isArray(target.input_summary)
@@ -374,6 +375,7 @@ export async function reconcileProvingJobsOutOfBand() {
   let updates = 0;
   let started = 0;
   let completed = 0;
+  const auditTargetsByOrg = new Map<string, HeartbeatAuditTarget>();
   const now = Date.now();
 
   for (const row of rows) {
@@ -384,6 +386,21 @@ export async function reconcileProvingJobsOutOfBand() {
     const detail = await getProvingJobDetailAdmin(row.id);
     if (!detail || !isManualProvingJobDetail(detail)) {
       continue;
+    }
+
+    if (!auditTargetsByOrg.has(detail.job.org_id)) {
+      auditTargetsByOrg.set(detail.job.org_id, {
+        id: detail.job.id,
+        org_id: detail.job.org_id,
+        engine: detail.job.engine,
+        status: detail.job.status,
+        stage: detail.job.stage,
+        input_summary: detail.job.input_summary,
+        created_at: detail.job.created_at,
+        started_at: detail.job.started_at,
+        updated_at: detail.job.updated_at,
+        preset_id: detail.job.preset_id,
+      });
     }
 
     if (detail.job.status === "queued") {
@@ -419,5 +436,6 @@ export async function reconcileProvingJobsOutOfBand() {
     updates,
     started,
     completed,
+    auditTargets: Array.from(auditTargetsByOrg.values()),
   };
 }
