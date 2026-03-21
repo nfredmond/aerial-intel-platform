@@ -15,10 +15,13 @@ import {
 } from "@/lib/benchmark-summary";
 import { getJobDetail, getString } from "@/lib/missions/detail-data";
 import {
+  advanceManualProvingJob,
+  isManualProvingJobDetail,
+} from "@/lib/proving-runs";
+import {
   insertJobEvent,
   insertProcessingJob,
   updateProcessingJob,
-  updateProcessingOutput,
 } from "@/lib/supabase/admin";
 
 function formatDateTime(value: string | null) {
@@ -43,15 +46,6 @@ function statusClass(status: string) {
     default:
       return "status-pill status-pill--warning";
   }
-}
-
-function isManualProvingJob(detail: Awaited<ReturnType<typeof getJobDetail>>) {
-  if (!detail) {
-    return false;
-  }
-
-  return detail.job.preset_id === "v1-proving-run"
-    || getString(detail.inputSummary.source as string | undefined, "") === "mission-proving-seed";
 }
 
 function getCalloutMessage(actionState?: string) {
@@ -273,36 +267,14 @@ export default async function JobDetailPage({
       redirect("/missions");
     }
 
-    if (!isManualProvingJob(refreshedDetail)) {
+    if (!isManualProvingJobDetail(refreshedDetail)) {
       redirect(`/jobs/${jobId}?action=not-proving`);
     }
 
     try {
-      await updateProcessingJob(refreshedDetail.job.id, {
-        status: "running",
-        stage: "orthomosaic",
-        progress: 45,
-        queue_position: null,
-        started_at: refreshedDetail.job.started_at ?? new Date().toISOString(),
-        output_summary: {
-          ...refreshedDetail.outputSummary,
-          eta: "In progress",
-          notes: "Manual proving run started from the job detail page.",
-          logTail: [
-            "Worker picked up proving run.",
-            "Orthomosaic stage started.",
-          ],
-        },
-      });
-
-      await insertJobEvent({
-        org_id: refreshedAccess.org.id,
-        job_id: refreshedDetail.job.id,
-        event_type: "job.stage.changed",
-        payload: {
-          title: "Proving run started",
-          detail: "Manual proving run advanced to active processing from the job detail page.",
-        },
+      await advanceManualProvingJob({
+        orgId: refreshedAccess.org.id,
+        detail: refreshedDetail,
       });
     } catch {
       redirect(`/jobs/${jobId}?action=error`);
@@ -332,68 +304,14 @@ export default async function JobDetailPage({
       redirect("/missions");
     }
 
-    if (!isManualProvingJob(refreshedDetail)) {
+    if (!isManualProvingJobDetail(refreshedDetail)) {
       redirect(`/jobs/${jobId}?action=not-proving`);
     }
 
     try {
-      await updateProcessingJob(refreshedDetail.job.id, {
-        status: "succeeded",
-        stage: "complete",
-        progress: 100,
-        queue_position: null,
-        started_at: refreshedDetail.job.started_at ?? new Date().toISOString(),
-        completed_at: new Date().toISOString(),
-        output_summary: {
-          ...refreshedDetail.outputSummary,
-          eta: "Complete",
-          notes: "Manual proving run completed from the job detail page.",
-          logTail: [
-            "Orthomosaic generated.",
-            "DSM generated.",
-            "Point cloud generated.",
-            "Mission brief exported.",
-          ],
-        },
-      });
-
-      await Promise.all(
-        refreshedDetail.outputs.map((output) =>
-          updateProcessingOutput(output.id, {
-            status: "ready",
-            metadata: {
-              ...(output.metadata && typeof output.metadata === "object" && !Array.isArray(output.metadata)
-                ? output.metadata
-                : {}),
-              delivery:
-                output.kind === "report"
-                  ? "Share/export pending"
-                  : output.kind === "point_cloud"
-                    ? "Hold for QA"
-                    : "Review pending",
-            },
-          }),
-        ),
-      );
-
-      await insertJobEvent({
-        org_id: refreshedAccess.org.id,
-        job_id: refreshedDetail.job.id,
-        event_type: "job.stage.changed",
-        payload: {
-          title: "Proving run completed",
-          detail: "Manual proving run advanced to complete and output artifacts are now ready for review.",
-        },
-      });
-
-      await insertJobEvent({
-        org_id: refreshedAccess.org.id,
-        job_id: refreshedDetail.job.id,
-        event_type: "artifact.generated",
-        payload: {
-          title: "Artifacts ready for review",
-          detail: "All proving-run placeholder outputs are now marked ready for the delivery lane.",
-        },
+      await advanceManualProvingJob({
+        orgId: refreshedAccess.org.id,
+        detail: refreshedDetail,
       });
     } catch {
       redirect(`/jobs/${jobId}?action=error`);
@@ -413,7 +331,7 @@ export default async function JobDetailPage({
         : {},
     ),
   );
-  const provingJob = isManualProvingJob(detail);
+  const provingJob = isManualProvingJobDetail(detail);
   const firstReadyOutput = detail.outputs.find((output) => output.status === "ready") ?? null;
   const callout = getCalloutMessage(resolvedSearchParams.action);
 

@@ -39,11 +39,16 @@ import {
   getMissionSpatialInsight,
 } from "@/lib/gis-insights";
 import {
+  getJobDetail,
   getMissionDetail,
   getNumber,
   getString,
   getStringArray,
 } from "@/lib/missions/detail-data";
+import {
+  advanceManualProvingJob,
+  isProvingJobRecord,
+} from "@/lib/proving-runs";
 import { normalizeSlug } from "@/lib/slug";
 import { formatJobStatus, formatOutputArtifactStatus } from "@/lib/missions/workspace";
 import {
@@ -87,14 +92,6 @@ function getOutputPillClassName(status: string) {
     default:
       return "status-pill status-pill--warning";
   }
-}
-
-function isProvingJobRecord(job: { preset_id: string | null; input_summary: unknown }) {
-  const inputSummary = job.input_summary && typeof job.input_summary === "object" && !Array.isArray(job.input_summary)
-    ? (job.input_summary as Record<string, unknown>)
-    : {};
-
-  return job.preset_id === "v1-proving-run" || inputSummary.source === "mission-proving-seed";
 }
 
 function getCalloutClassName(state: string) {
@@ -157,6 +154,7 @@ function getCalloutMessage(options: {
   queued?: string;
   attached?: string;
   seeded?: string;
+  proving?: string;
   bundled?: string;
   approved?: string;
   installed?: string;
@@ -197,6 +195,20 @@ function getCalloutMessage(options: {
         : options.seeded === "denied"
           ? "Viewer access cannot seed a proving run."
           : "The proving run seed failed. Check server configuration and try again.";
+  }
+
+  if (options.proving) {
+    return options.proving === "started"
+      ? "Proving job started from the mission page. The live run is now in active processing."
+      : options.proving === "completed"
+        ? "Proving job completed from the mission page. Ready artifacts are now waiting in the delivery lane."
+        : options.proving === "not-found"
+          ? "No active proving job was available to advance from this mission."
+          : options.proving === "noop"
+            ? "This proving job does not have a next-step automation available right now. Open the job detail if you need deeper triage."
+            : options.proving === "denied"
+              ? "Viewer access cannot advance proving jobs from the mission page."
+              : "The proving job could not be advanced from the mission page. Check server configuration and try again.";
   }
 
   if (options.bundled) {
@@ -263,7 +275,7 @@ export default async function MissionDetailPage({
   searchParams,
 }: {
   params: Promise<{ missionId: string }>;
-  searchParams: Promise<{ queued?: string; attached?: string; seeded?: string; bundled?: string; approved?: string; installed?: string; delivered?: string; aoi?: string; overlay?: string; created?: string; dataset?: string }>;
+  searchParams: Promise<{ queued?: string; attached?: string; seeded?: string; proving?: string; bundled?: string; approved?: string; installed?: string; delivered?: string; aoi?: string; overlay?: string; created?: string; dataset?: string }>;
 }) {
   const access = await getDroneOpsAccess();
 
@@ -698,6 +710,49 @@ export default async function MissionDetailPage({
     }
 
     redirect(`/missions/${missionId}?seeded=1`);
+  }
+
+  async function advanceProvingJob() {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/missions/${missionId}?proving=denied`);
+    }
+
+    const refreshedMission = await getMissionDetail(refreshedAccess, missionId);
+    if (!refreshedMission) {
+      redirect("/missions");
+    }
+
+    const refreshedProvingJob = refreshedMission.jobs.find((job) => isProvingJobRecord(job)) ?? null;
+    if (!refreshedProvingJob) {
+      redirect(`/missions/${missionId}?proving=not-found`);
+    }
+
+    const refreshedJobDetail = await getJobDetail(refreshedAccess, refreshedProvingJob.id);
+    if (!refreshedJobDetail) {
+      redirect(`/missions/${missionId}?proving=not-found`);
+    }
+
+    try {
+      const result = await advanceManualProvingJob({
+        orgId: refreshedAccess.org.id,
+        detail: refreshedJobDetail,
+      });
+
+      redirect(`/missions/${missionId}?proving=${result}`);
+    } catch {
+      redirect(`/missions/${missionId}?proving=error`);
+    }
   }
 
   async function generateInstallBundle() {
@@ -1498,11 +1553,18 @@ export default async function MissionDetailPage({
             ) : provingJob && ["queued", "running"].includes(provingJob.status) ? (
               <>
                 <p className="muted">
-                  Proving job is {provingJob.status}. Advance it from the job detail page to move artifacts into the review lane.
+                  Proving job is {provingJob.status}. Advance it here to push the live run to its next honest state, or open the job detail for deeper triage.
                 </p>
-                <Link href={`/jobs/${provingJob.id}`} className="button button-primary">
-                  Open proving job
-                </Link>
+                <div className="header-actions">
+                  <form action={advanceProvingJob}>
+                    <button type="submit" className="button button-primary" disabled={access.role === "viewer"}>
+                      {provingJob.status === "queued" ? "Start proving job now" : "Complete proving job now"}
+                    </button>
+                  </form>
+                  <Link href={`/jobs/${provingJob.id}`} className="button button-secondary">
+                    Open proving job
+                  </Link>
+                </div>
               </>
             ) : firstReadyArtifact ? (
               <>
