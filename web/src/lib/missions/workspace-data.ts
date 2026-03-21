@@ -123,9 +123,16 @@ function getLatestProvingHeartbeatEvidence(params: {
 
   return {
     latestWorkerHeartbeatAt: latestWorkerHeartbeatEvent?.created_at ?? null,
-    latestWorkerHeartbeatSummary: latestWorkerHeartbeatJob
-      ? `${asString(latestWorkerJobInput?.name, `${latestWorkerHeartbeatJob.engine.toUpperCase()} job`)} advanced from the worker heartbeat lane.`
-      : null,
+    latestWorkerHeartbeatSummary: latestWorkerPayload
+      ? asString(
+        latestWorkerPayload.summary,
+        latestWorkerHeartbeatJob
+          ? `${asString(latestWorkerJobInput?.name, `${latestWorkerHeartbeatJob.engine.toUpperCase()} job`)} advanced from the worker heartbeat lane.`
+          : "Worker heartbeat event recorded for the proving lane.",
+      )
+      : latestWorkerHeartbeatJob
+        ? `${asString(latestWorkerJobInput?.name, `${latestWorkerHeartbeatJob.engine.toUpperCase()} job`)} advanced from the worker heartbeat lane.`
+        : null,
     latestWorkerHeartbeatDetail: latestWorkerPayload
       ? asString(latestWorkerPayload.detail, "Worker heartbeat event recorded for the proving lane.")
       : null,

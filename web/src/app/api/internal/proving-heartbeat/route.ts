@@ -6,7 +6,7 @@ import {
   getProvingHeartbeatAuthModeLabel,
   getProvingHeartbeatCadenceLabel,
 } from "@/lib/proving-heartbeat";
-import { reconcileProvingJobsOutOfBand } from "@/lib/proving-runs";
+import { recordProvingHeartbeatAudit, reconcileProvingJobsOutOfBand } from "@/lib/proving-runs";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +38,15 @@ export async function GET(request: NextRequest) {
 
   try {
     const result = await reconcileProvingJobsOutOfBand();
-    return NextResponse.json({ ok: true, heartbeat, ...result });
+    const auditRecorded = await recordProvingHeartbeatAudit({
+      invokedAt,
+      scanned: result.scanned,
+      updates: result.updates,
+      started: result.started,
+      completed: result.completed,
+    });
+
+    return NextResponse.json({ ok: true, heartbeat, auditRecorded, ...result });
   } catch (error) {
     return NextResponse.json(
       {

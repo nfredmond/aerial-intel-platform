@@ -1,5 +1,9 @@
 import { getJobDetail, getString, type JobDetail } from "@/lib/missions/detail-data";
 import {
+  PROVING_HEARTBEAT_CRON_SCHEDULE,
+  PROVING_HEARTBEAT_ROUTE_PATH,
+} from "@/lib/proving-heartbeat";
+import {
   adminSelect,
   insertJobEvent,
   updateProcessingJob,
@@ -11,6 +15,10 @@ type JobDetailResult = NonNullable<Awaited<ReturnType<typeof getJobDetail>>>;
 type ProcessingJobRow = Database["public"]["Tables"]["drone_processing_jobs"]["Row"];
 type ProcessingOutputRow = Database["public"]["Tables"]["drone_processing_outputs"]["Row"];
 type JsonRecord = Record<string, Json | undefined>;
+type HeartbeatAuditTarget = Pick<
+  ProcessingJobRow,
+  "id" | "org_id" | "engine" | "status" | "stage" | "input_summary" | "created_at" | "started_at" | "updated_at" | "preset_id"
+>;
 export type ProvingActionSource = "job-detail" | "mission-detail" | "workspace" | "worker-heartbeat";
 
 const PROVING_QUEUE_PICKUP_MS = 15_000;
@@ -153,6 +161,68 @@ export function isProvingJobRecord(job: { preset_id: string | null; input_summar
     : {};
 
   return job.preset_id === "v1-proving-run" || inputSummary.source === "mission-proving-seed";
+}
+
+async function getLatestProvingJobsByOrg() {
+  const rows = await adminSelect<HeartbeatAuditTarget[]>(
+    "drone_processing_jobs?select=id,org_id,engine,preset_id,status,stage,input_summary,created_at,updated_at,started_at&order=updated_at.desc&limit=100",
+  );
+
+  const latestByOrg = new Map<string, HeartbeatAuditTarget>();
+  for (const row of rows) {
+    if (!isProvingJobRecord(row) || latestByOrg.has(row.org_id)) {
+      continue;
+    }
+
+    latestByOrg.set(row.org_id, row);
+  }
+
+  return Array.from(latestByOrg.values());
+}
+
+export async function recordProvingHeartbeatAudit(options: {
+  invokedAt: string;
+  scanned: number;
+  updates: number;
+  started: number;
+  completed: number;
+}) {
+  const targets = await getLatestProvingJobsByOrg();
+
+  for (const target of targets) {
+    const inputSummary = target.input_summary && typeof target.input_summary === "object" && !Array.isArray(target.input_summary)
+      ? (target.input_summary as Record<string, unknown>)
+      : {};
+    const jobName = typeof inputSummary.name === "string" && inputSummary.name.trim()
+      ? inputSummary.name
+      : `${target.engine.toUpperCase()} job`;
+    const detail = options.updates > 0
+      ? `Worker heartbeat ran at ${options.invokedAt}, scanned ${options.scanned} proving jobs, and applied ${options.updates} proving-lane updates (${options.started} started, ${options.completed} completed).`
+      : `Worker heartbeat ran at ${options.invokedAt}, scanned ${options.scanned} proving jobs, and found no state changes to apply.`;
+
+    await insertJobEvent({
+      org_id: target.org_id,
+      job_id: target.id,
+      event_type: "system.worker_heartbeat",
+      payload: {
+        source: "worker-heartbeat",
+        title: "Worker heartbeat observed",
+        summary: `${jobName} was used as the proving-lane heartbeat audit anchor.`,
+        detail,
+        routePath: PROVING_HEARTBEAT_ROUTE_PATH,
+        schedule: PROVING_HEARTBEAT_CRON_SCHEDULE,
+        scanned: options.scanned,
+        updates: options.updates,
+        started: options.started,
+        completed: options.completed,
+        invokedAt: options.invokedAt,
+        jobStatus: target.status,
+        jobStage: target.stage,
+      },
+    });
+  }
+
+  return targets.length;
 }
 
 async function getProvingJobDetailAdmin(jobId: string): Promise<JobDetail | null> {
