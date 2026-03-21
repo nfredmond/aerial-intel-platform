@@ -580,6 +580,7 @@ export default async function MissionsPage({
       const result = await advanceManualProvingJob({
         orgId: refreshedAccess.org.id,
         detail: refreshedDetail,
+        source: "workspace",
       });
 
       redirect(`/missions?proving=${result}`);

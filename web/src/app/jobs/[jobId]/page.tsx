@@ -275,6 +275,7 @@ export default async function JobDetailPage({
       await advanceManualProvingJob({
         orgId: refreshedAccess.org.id,
         detail: refreshedDetail,
+        source: "job-detail",
       });
     } catch {
       redirect(`/jobs/${jobId}?action=error`);
@@ -312,6 +313,7 @@ export default async function JobDetailPage({
       await advanceManualProvingJob({
         orgId: refreshedAccess.org.id,
         detail: refreshedDetail,
+        source: "job-detail",
       });
     } catch {
       redirect(`/jobs/${jobId}?action=error`);
