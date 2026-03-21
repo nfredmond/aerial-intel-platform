@@ -1,6 +1,7 @@
 import type { DroneMembershipRole } from "@/lib/supabase/types";
 
 import { formatEntitlementTier } from "@/lib/auth/access-insights";
+import { buildProvingHeartbeatSummary, type ProvingHeartbeatSummary } from "@/lib/proving-heartbeat";
 
 export type MissionStage = "capture-planned" | "processing" | "ready-for-qa";
 export type MissionOutputStatus = "ready" | "processing" | "missing";
@@ -150,6 +151,7 @@ export type MissionWorkspaceSnapshot = {
   };
   rail: WorkspaceRailSection[];
   statusChips: StatusChip[];
+  provingHeartbeat: ProvingHeartbeatSummary;
   missions: MissionRecord[];
   datasets: DatasetRecord[];
   jobs: JobRecord[];
@@ -658,6 +660,16 @@ export function buildMissionWorkspaceSnapshot(options: {
     },
   ];
 
+  const provingHeartbeat = buildProvingHeartbeatSummary({
+    queuedProvingJobCount,
+    runningProvingJobCount,
+    completedProvingJobCount,
+    latestProvingJobActivityAt: jobs.find((job) => job.presetId === "v1-proving-run")?.startedAt ?? null,
+    latestProvingJobActivitySummary: "Fallback workspace is showing proving-lane job activity only.",
+    latestProvingJobActivityDetail:
+      "The demo workspace does not fabricate persisted cron-run state. It shows the proving route posture plus the latest surfaced proving job activity instead.",
+  });
+
   const rail: WorkspaceRailSection[] = [
     {
       label: "Projects",
@@ -716,6 +728,7 @@ export function buildMissionWorkspaceSnapshot(options: {
     },
     rail,
     statusChips,
+    provingHeartbeat,
     missions,
     datasets,
     jobs,

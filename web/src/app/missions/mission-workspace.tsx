@@ -751,6 +751,45 @@ export function MissionWorkspace({
 
           <div className="stack-sm surface-form-shell">
             <div className="stack-xs">
+              <p className="eyebrow">Proving heartbeat</p>
+              <h3>{snapshot.provingHeartbeat.statusLabel}</h3>
+              <p className="muted">
+                Operators can verify that the proving cron route exists, how often it should run, and what the most recent auditable proving-lane signal looks like.
+              </p>
+            </div>
+            <div className="ops-list-card stack-xs">
+              <div className="ops-list-card-header">
+                <strong>{snapshot.provingHeartbeat.cadenceLabel}</strong>
+                <span className={getToneClassName(snapshot.provingHeartbeat.tone)}>
+                  {snapshot.provingHeartbeat.evidenceLabel}
+                </span>
+              </div>
+              <p className="muted">{snapshot.provingHeartbeat.schedulePosture}</p>
+              <dl className="kv-grid">
+                <div className="kv-row">
+                  <dt>Route</dt>
+                  <dd>{snapshot.provingHeartbeat.routePath}</dd>
+                </div>
+                <div className="kv-row">
+                  <dt>Schedule</dt>
+                  <dd>{snapshot.provingHeartbeat.schedule}</dd>
+                </div>
+                <div className="kv-row">
+                  <dt>Auth posture</dt>
+                  <dd>{snapshot.provingHeartbeat.authModeLabel}</dd>
+                </div>
+                <div className="kv-row">
+                  <dt>Last signal</dt>
+                  <dd>{snapshot.provingHeartbeat.lastSignalAt ? formatDateTime(snapshot.provingHeartbeat.lastSignalAt) : "No persisted signal yet"}</dd>
+                </div>
+              </dl>
+              <p className="muted">{snapshot.provingHeartbeat.lastSignalSummary}</p>
+              <p className="muted">{snapshot.provingHeartbeat.lastSignalDetail}</p>
+            </div>
+          </div>
+
+          <div className="stack-sm surface-form-shell">
+            <div className="stack-xs">
               <p className="eyebrow">Live proving focus</p>
               <h3>Continue the real-data path</h3>
               <p className="muted">

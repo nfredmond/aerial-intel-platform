@@ -23,6 +23,9 @@ describe("missions/workspace", () => {
     expect(snapshot.rail).toHaveLength(3);
     expect(snapshot.statusChips).toHaveLength(6);
     expect(snapshot.statusChips.some((chip) => chip.label === "Proving lane")).toBe(true);
+    expect(snapshot.provingHeartbeat.routePath).toBe("/api/internal/proving-heartbeat");
+    expect(snapshot.provingHeartbeat.schedule).toBe("* * * * *");
+    expect(snapshot.provingHeartbeat.evidenceKind).toBe("proving-job-activity");
     expect(snapshot.totals.missionCount).toBe(3);
     expect(snapshot.totals.totalAcres).toBe(130);
     expect(snapshot.totals.datasetCount).toBe(3);
@@ -52,6 +55,7 @@ describe("missions/workspace", () => {
     expect(snapshot.workspaceLabel).toBe("Mission workspace");
     expect(snapshot.entitlementLabel).toBe("Unknown tier");
     expect(snapshot.currentProject.name).toBe("Aerial operations");
+    expect(snapshot.provingHeartbeat.statusLabel).toBe("Awaiting durable heartbeat proof");
     expect(snapshot.nextActions.at(-1)).toContain("org owner");
   });
 

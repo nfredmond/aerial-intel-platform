@@ -8,6 +8,7 @@ import {
 } from "@/lib/artifact-handoff";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
+import { buildProvingHeartbeatSummary } from "@/lib/proving-heartbeat";
 
 import {
   buildMissionWorkspaceSnapshot,
@@ -80,6 +81,62 @@ function getStageChecklist(value: Json | undefined) {
 function isProvingJob(job: JobRow) {
   const inputSummary = asRecord(job.input_summary);
   return job.preset_id === "v1-proving-run" || inputSummary.source === "mission-proving-seed";
+}
+
+function includesWorkerHeartbeatSignal(value: string) {
+  return value.toLowerCase().includes("worker heartbeat");
+}
+
+function getLatestProvingHeartbeatEvidence(params: {
+  jobs: JobRow[];
+  events: JobEventRow[];
+}) {
+  const provingJobs = params.jobs.filter(isProvingJob);
+  const provingJobsById = new Map(provingJobs.map((job) => [job.id, job]));
+
+  const latestWorkerHeartbeatEvent = params.events.find((event) => {
+    const job = provingJobsById.get(event.job_id);
+    if (!job) {
+      return false;
+    }
+
+    const payload = asRecord(event.payload);
+    const title = asString(payload.title, "");
+    const detail = asString(payload.detail, "");
+    return includesWorkerHeartbeatSignal(title) || includesWorkerHeartbeatSignal(detail);
+  });
+
+  const latestProvingJob = provingJobs
+    .slice()
+    .sort(
+      (left, right) =>
+        new Date(right.updated_at ?? right.started_at ?? right.created_at).getTime()
+        - new Date(left.updated_at ?? left.started_at ?? left.created_at).getTime(),
+    )[0];
+
+  const latestWorkerHeartbeatJob = latestWorkerHeartbeatEvent
+    ? provingJobsById.get(latestWorkerHeartbeatEvent.job_id) ?? null
+    : null;
+  const latestWorkerPayload = latestWorkerHeartbeatEvent ? asRecord(latestWorkerHeartbeatEvent.payload) : null;
+  const latestWorkerJobInput = latestWorkerHeartbeatJob ? asRecord(latestWorkerHeartbeatJob.input_summary) : null;
+  const latestProvingJobInput = latestProvingJob ? asRecord(latestProvingJob.input_summary) : null;
+
+  return {
+    latestWorkerHeartbeatAt: latestWorkerHeartbeatEvent?.created_at ?? null,
+    latestWorkerHeartbeatSummary: latestWorkerHeartbeatJob
+      ? `${asString(latestWorkerJobInput?.name, `${latestWorkerHeartbeatJob.engine.toUpperCase()} job`)} advanced from the worker heartbeat lane.`
+      : null,
+    latestWorkerHeartbeatDetail: latestWorkerPayload
+      ? asString(latestWorkerPayload.detail, "Worker heartbeat event recorded for the proving lane.")
+      : null,
+    latestProvingJobActivityAt: latestProvingJob?.updated_at ?? latestProvingJob?.started_at ?? latestProvingJob?.created_at ?? null,
+    latestProvingJobActivitySummary: latestProvingJob
+      ? `${asString(latestProvingJobInput?.name, `${latestProvingJob.engine.toUpperCase()} job`)} is the latest proving-lane activity signal.`
+      : null,
+    latestProvingJobActivityDetail: latestProvingJob
+      ? `Latest proving job status is ${latestProvingJob.status} at stage ${latestProvingJob.stage}.`
+      : null,
+  };
 }
 
 function mapMissionStatusToStage(
@@ -531,6 +588,12 @@ function buildWorkspaceFromRows(params: {
   const runningProvingJobs = provingJobs.filter((job) => job.status === "running").length;
   const queuedProvingJobs = provingJobs.filter((job) => job.status === "queued").length;
   const completedProvingJobs = provingJobs.filter((job) => job.status === "completed").length;
+  const provingHeartbeat = buildProvingHeartbeatSummary({
+    queuedProvingJobCount: queuedProvingJobs,
+    runningProvingJobCount: runningProvingJobs,
+    completedProvingJobCount: completedProvingJobs,
+    ...getLatestProvingHeartbeatEvidence({ jobs, events }),
+  });
   const draftOutputs = outputRows.filter((output) => output.status !== "ready").length;
   const handoffBacklogCount = outputRows.filter(
     (output) => output.status === "ready" && output.handoffStage !== "exported",
@@ -585,6 +648,7 @@ function buildWorkspaceFromRows(params: {
       v1ReadinessComplete: v1Readiness.completeCount,
       v1ReadinessTotal: v1Readiness.totalCount,
     }),
+    provingHeartbeat,
     missions: missionRowsWithProving,
     datasets: datasetRows,
     jobs: jobsRows,
