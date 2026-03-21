@@ -54,6 +54,38 @@ function handoffClass(stage: ArtifactHandoffStage) {
   }
 }
 
+type StageChecklistItem = {
+  label: string;
+  status: string;
+};
+
+function getStageChecklist(summary: Record<string, unknown>) {
+  if (!Array.isArray(summary.stageChecklist)) {
+    return [] as StageChecklistItem[];
+  }
+
+  return summary.stageChecklist.flatMap((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      return [];
+    }
+
+    const label = typeof item.label === "string" ? item.label : "Unnamed stage";
+    const status = typeof item.status === "string" ? item.status : "pending";
+    return [{ label, status }];
+  });
+}
+
+function getChecklistStatusClass(status: string) {
+  switch (status) {
+    case "complete":
+      return "status-pill status-pill--success";
+    case "running":
+      return "status-pill status-pill--info";
+    default:
+      return "status-pill status-pill--warning";
+  }
+}
+
 function getCalloutMessage(action?: string) {
   switch (action) {
     case "reviewed":
@@ -263,6 +295,8 @@ export default async function ArtifactDetailPage({
   const storagePath = detail.output.storage_path ?? "Storage path pending";
   const benchmarkSummary = getBenchmarkSummaryView(detail.outputSummary.benchmarkSummary ?? detail.outputSummary);
   const benchmarkOutput = getBenchmarkOutputForArtifact(benchmarkSummary, detail.output.kind);
+  const latestCheckpoint = getString(detail.outputSummary.latestCheckpoint, "No checkpoint recorded yet.");
+  const stageChecklist = getStageChecklist(detail.outputSummary);
   const handoff = getArtifactHandoff(detail.metadata);
   const exportPacket = buildArtifactExportPacket({
     artifactName,
@@ -505,8 +539,36 @@ export default async function ArtifactDetailPage({
             <h2>Current processing context</h2>
           </div>
           <p className="muted">{getString(detail.outputSummary.notes, "No job notes recorded yet.")}</p>
+          <p className="muted">Latest checkpoint: {latestCheckpoint}</p>
           <p className="muted">{handoff.note ?? "No artifact-specific handoff note recorded yet."}</p>
         </article>
+      </section>
+
+      <section className="surface stack-sm">
+        <div className="stack-xs">
+          <p className="eyebrow">Processing checkpoints</p>
+          <h2>Stage checklist</h2>
+          <p className="muted">
+            This artifact inherits the current proving checklist from its source job so reviewers can see whether the run is still active or fully assembled.
+          </p>
+        </div>
+        {stageChecklist.length > 0 ? (
+          <div className="stack-xs">
+            {stageChecklist.map((item) => (
+              <article key={`${item.label}-${item.status}`} className="ops-list-card">
+                <div className="ops-list-card-header">
+                  <strong>{item.label}</strong>
+                  <span className={getChecklistStatusClass(item.status)}>{item.status}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="muted">No proving stage checklist has been recorded for the source job yet.</p>
+        )}
+      </section>
+
+      <section className="grid-cards">
       </section>
 
       {benchmarkSummary ? (

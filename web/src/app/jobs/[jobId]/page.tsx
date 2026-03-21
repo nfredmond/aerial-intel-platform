@@ -48,6 +48,38 @@ function statusClass(status: string) {
   }
 }
 
+type StageChecklistItem = {
+  label: string;
+  status: string;
+};
+
+function getStageChecklist(summary: Record<string, unknown>) {
+  if (!Array.isArray(summary.stageChecklist)) {
+    return [] as StageChecklistItem[];
+  }
+
+  return summary.stageChecklist.flatMap((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      return [];
+    }
+
+    const label = typeof item.label === "string" ? item.label : "Unnamed stage";
+    const status = typeof item.status === "string" ? item.status : "pending";
+    return [{ label, status }];
+  });
+}
+
+function getChecklistStatusClass(status: string) {
+  switch (status) {
+    case "complete":
+      return "status-pill status-pill--success";
+    case "running":
+      return "status-pill status-pill--info";
+    default:
+      return "status-pill status-pill--warning";
+  }
+}
+
 function getCalloutMessage(actionState?: string) {
   if (!actionState) {
     return null;
@@ -323,6 +355,8 @@ export default async function JobDetailPage({
   }
 
   const benchmarkSummary = getBenchmarkSummaryView(detail.outputSummary.benchmarkSummary ?? detail.outputSummary);
+  const latestCheckpoint = getString(detail.outputSummary.latestCheckpoint, "No checkpoint recorded yet.");
+  const stageChecklist = getStageChecklist(detail.outputSummary);
   const logTail = Array.isArray(detail.outputSummary.logTail)
     ? detail.outputSummary.logTail.filter((line): line is string => typeof line === "string")
     : [];
@@ -676,23 +710,54 @@ export default async function JobDetailPage({
 
       <section className="surface stack-sm">
         <div className="stack-xs">
-          <p className="eyebrow">Run logs</p>
-          <h2>Execution log tail</h2>
+          <p className="eyebrow">Processing checkpoints</p>
+          <h2>Current proving posture</h2>
           <p className="muted">
-            This surfaces imported log context when available so operators can inspect recent run output without leaving the app.
+            This surfaces the latest proving checkpoint and stage-by-stage posture so operators can see where the live run actually stands before reading the raw logs.
           </p>
         </div>
-        <dl className="kv-grid">
-          <div className="kv-row">
-            <dt>Log path</dt>
-            <dd>{getString(detail.outputSummary.runLogPath, benchmarkSummary?.runLog ?? "No log path recorded")}</dd>
-          </div>
-        </dl>
-        {logTail.length > 0 ? (
-          <pre className="log-panel">{logTail.join("\n")}</pre>
-        ) : (
-          <p className="muted">No log tail has been imported for this job yet.</p>
-        )}
+        <div className="grid-cards">
+          <article className="surface-form-shell stack-sm">
+            <dl className="kv-grid">
+              <div className="kv-row">
+                <dt>Latest checkpoint</dt>
+                <dd>{latestCheckpoint}</dd>
+              </div>
+              <div className="kv-row">
+                <dt>Log path</dt>
+                <dd>{getString(detail.outputSummary.runLogPath, benchmarkSummary?.runLog ?? "No log path recorded")}</dd>
+              </div>
+            </dl>
+          </article>
+          <article className="surface-form-shell stack-sm">
+            <div className="stack-xs">
+              <h3>Stage checklist</h3>
+              <p className="muted">Checkpoint status written by the proving-flow helper.</p>
+            </div>
+            {stageChecklist.length > 0 ? (
+              <div className="stack-xs">
+                {stageChecklist.map((item) => (
+                  <article key={`${item.label}-${item.status}`} className="ops-list-card">
+                    <div className="ops-list-card-header">
+                      <strong>{item.label}</strong>
+                      <span className={getChecklistStatusClass(item.status)}>{item.status}</span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="muted">No proving stage checklist has been recorded for this job yet.</p>
+            )}
+          </article>
+        </div>
+        <div className="stack-xs">
+          <h3>Execution log tail</h3>
+          {logTail.length > 0 ? (
+            <pre className="log-panel">{logTail.join("\n")}</pre>
+          ) : (
+            <p className="muted">No log tail has been imported for this job yet.</p>
+          )}
+        </div>
       </section>
 
       <section className="surface stack-sm">
