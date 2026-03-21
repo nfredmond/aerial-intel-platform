@@ -1,12 +1,17 @@
+import type { DroneOpsAccessResult } from "@/lib/auth/drone-ops-access";
 import { getJobDetail, getString } from "@/lib/missions/detail-data";
 import {
   insertJobEvent,
   updateProcessingJob,
   updateProcessingOutput,
 } from "@/lib/supabase/admin";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 type JobDetailResult = NonNullable<Awaited<ReturnType<typeof getJobDetail>>>;
-export type ProvingActionSource = "job-detail" | "mission-detail" | "workspace";
+export type ProvingActionSource = "job-detail" | "mission-detail" | "workspace" | "worker-heartbeat";
+
+const PROVING_QUEUE_PICKUP_MS = 15_000;
+const PROVING_AUTO_COMPLETE_MS = 45_000;
 
 type ProvingEvent = {
   eventType: string;
@@ -20,6 +25,8 @@ function getSourceLabel(source: ProvingActionSource) {
       return "mission detail";
     case "workspace":
       return "workspace";
+    case "worker-heartbeat":
+      return "worker heartbeat";
     default:
       return "job detail";
   }
@@ -27,9 +34,12 @@ function getSourceLabel(source: ProvingActionSource) {
 
 function buildStartedLogTail(source: ProvingActionSource) {
   const sourceLabel = getSourceLabel(source);
+  const opener = source === "worker-heartbeat"
+    ? `Worker heartbeat advanced proving run from ${sourceLabel}.`
+    : `Operator advanced proving run from ${sourceLabel}.`;
 
   return [
-    `Operator advanced proving run from ${sourceLabel}.`,
+    opener,
     "Queue handoff cleared.",
     "Worker picked up proving run.",
     "Orthomosaic stage started.",
@@ -39,9 +49,12 @@ function buildStartedLogTail(source: ProvingActionSource) {
 
 function buildCompletedLogTail(source: ProvingActionSource) {
   const sourceLabel = getSourceLabel(source);
+  const opener = source === "worker-heartbeat"
+    ? `Worker heartbeat completed proving run from ${sourceLabel}.`
+    : `Operator completed proving run from ${sourceLabel}.`;
 
   return [
-    `Operator completed proving run from ${sourceLabel}.`,
+    opener,
     "Orthomosaic generated.",
     "DSM generated.",
     "Point cloud generated.",
@@ -52,12 +65,15 @@ function buildCompletedLogTail(source: ProvingActionSource) {
 
 function buildStartedEvents(source: ProvingActionSource): ProvingEvent[] {
   const sourceLabel = getSourceLabel(source);
+  const detail = source === "worker-heartbeat"
+    ? `Worker heartbeat advanced the proving run to active processing from ${sourceLabel}.`
+    : `Manual proving run advanced to active processing from ${sourceLabel}.`;
 
   return [
     {
       eventType: "job.stage.changed",
       title: "Proving run started",
-      detail: `Manual proving run advanced to active processing from ${sourceLabel}.`,
+      detail,
     },
     {
       eventType: "job.progress.updated",
@@ -74,6 +90,9 @@ function buildStartedEvents(source: ProvingActionSource): ProvingEvent[] {
 
 function buildCompletedEvents(source: ProvingActionSource): ProvingEvent[] {
   const sourceLabel = getSourceLabel(source);
+  const completionDetail = source === "worker-heartbeat"
+    ? "Worker heartbeat advanced the proving run to complete and output artifacts are now ready for review."
+    : "Manual proving run advanced to complete and output artifacts are now ready for review.";
 
   return [
     {
@@ -84,7 +103,7 @@ function buildCompletedEvents(source: ProvingActionSource): ProvingEvent[] {
     {
       eventType: "job.stage.changed",
       title: "Proving run completed",
-      detail: "Manual proving run advanced to complete and output artifacts are now ready for review.",
+      detail: completionDetail,
     },
     {
       eventType: "artifact.generated",
@@ -237,4 +256,83 @@ export async function advanceManualProvingJob(options: {
   }
 
   return "noop" as const;
+}
+
+export async function reconcileProvingJobs(
+  access: DroneOpsAccessResult,
+  options?: { missionId?: string; jobId?: string },
+) {
+  if (!access.org?.id) {
+    return 0;
+  }
+
+  const supabase = await createServerSupabaseClient();
+  let query = supabase
+    .from("drone_processing_jobs")
+    .select("id, mission_id, preset_id, status, input_summary, created_at, started_at, updated_at")
+    .eq("org_id", access.org.id)
+    .in("status", ["queued", "running"])
+    .order("updated_at", { ascending: false })
+    .limit(options?.jobId ? 1 : 20);
+
+  if (options?.jobId) {
+    query = query.eq("id", options.jobId);
+  }
+
+  if (options?.missionId) {
+    query = query.eq("mission_id", options.missionId);
+  }
+
+  const result = await query;
+  const rows = (result.data ?? []) as Array<{
+    id: string;
+    mission_id: string | null;
+    preset_id: string | null;
+    status: string;
+    input_summary: unknown;
+    created_at: string;
+    started_at: string | null;
+    updated_at: string;
+  }>;
+
+  let updates = 0;
+  const now = Date.now();
+
+  for (const row of rows) {
+    if (!isProvingJobRecord(row)) {
+      continue;
+    }
+
+    const detail = await getJobDetail(access, row.id);
+    if (!detail || !isManualProvingJobDetail(detail)) {
+      continue;
+    }
+
+    if (detail.job.status === "queued") {
+      const queuedSince = new Date(detail.job.created_at).getTime();
+      if (Number.isFinite(queuedSince) && now - queuedSince >= PROVING_QUEUE_PICKUP_MS) {
+        await startManualProvingJob({
+          orgId: access.org.id,
+          detail,
+          source: "worker-heartbeat",
+        });
+        updates += 1;
+      }
+      continue;
+    }
+
+    if (detail.job.status === "running") {
+      const runningSince = new Date(detail.job.started_at ?? detail.job.updated_at).getTime();
+      if (Number.isFinite(runningSince) && now - runningSince >= PROVING_AUTO_COMPLETE_MS) {
+        await completeManualProvingJob({
+          orgId: access.org.id,
+          detail,
+          source: "worker-heartbeat",
+        });
+        updates += 1;
+      }
+    }
+  }
+
+  return updates;
 }

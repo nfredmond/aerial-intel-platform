@@ -48,6 +48,7 @@ import {
 import {
   advanceManualProvingJob,
   isProvingJobRecord,
+  reconcileProvingJobs,
 } from "@/lib/proving-runs";
 import { normalizeSlug } from "@/lib/slug";
 import { formatJobStatus, formatOutputArtifactStatus } from "@/lib/missions/workspace";
@@ -322,6 +323,7 @@ export default async function MissionDetailPage({
 
   const { missionId } = await params;
   const resolvedSearchParams = await searchParams;
+  await reconcileProvingJobs(access, { missionId });
   const detail = await getMissionDetail(access, missionId);
 
   if (!detail) {
@@ -1587,12 +1589,12 @@ export default async function MissionDetailPage({
             ) : provingJob && ["queued", "running"].includes(provingJob.status) ? (
               <>
                 <p className="muted">
-                  Proving job is {provingJob.status}. Advance it here to push the live run to its next honest state, or open the job detail for deeper triage.
+                  Proving job is {provingJob.status}. The worker heartbeat now auto-progresses the live path on page loads; use this control only if you want to force the next honest state immediately.
                 </p>
                 <div className="header-actions">
                   <form action={advanceProvingJob}>
                     <button type="submit" className="button button-primary" disabled={access.role === "viewer"}>
-                      {provingJob.status === "queued" ? "Start proving job now" : "Complete proving job now"}
+                      {provingJob.status === "queued" ? "Force start now" : "Force complete now"}
                     </button>
                   </form>
                   <Link href={`/jobs/${provingJob.id}`} className="button button-secondary">

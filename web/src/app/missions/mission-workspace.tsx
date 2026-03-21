@@ -747,13 +747,13 @@ export function MissionWorkspace({
               <p className="eyebrow">Live proving focus</p>
               <h3>Continue the real-data path</h3>
               <p className="muted">
-                Top-level shortcut into the fastest honest next action on the live proving lane.
+                Top-level shortcut into the live proving lane. The worker heartbeat now auto-progresses queued/running proving jobs on page loads.
               </p>
             </div>
             {activeProvingJob ? (
               <>
                 <p className="muted">
-                  Active proving job: {activeProvingJob.name} ({activeProvingJob.status}). Advance it here to keep the live path moving, or open the full job page for deeper triage.
+                  Active proving job: {activeProvingJob.name} ({activeProvingJob.status}). The worker heartbeat should keep the live path moving automatically; use this control only if you want to force the next honest state immediately.
                 </p>
                 {activeProvingJob.latestCheckpoint ? (
                   <p className="muted">Checkpoint: {activeProvingJob.latestCheckpoint}</p>
@@ -765,7 +765,7 @@ export function MissionWorkspace({
                   <form action={advanceWorkspaceProvingJobAction}>
                     <input type="hidden" name="jobId" value={activeProvingJob.id} />
                     <button type="submit" className="button button-primary" disabled={!canManageOperations}>
-                      {activeProvingJob.status === "queued" ? "Start proving job now" : "Complete proving job now"}
+                      {activeProvingJob.status === "queued" ? "Force start now" : "Force complete now"}
                     </button>
                   </form>
                   <Link href={`/jobs/${activeProvingJob.id}`} className="button button-secondary">

@@ -17,6 +17,7 @@ import { getJobDetail, getString } from "@/lib/missions/detail-data";
 import {
   advanceManualProvingJob,
   isManualProvingJobDetail,
+  reconcileProvingJobs,
 } from "@/lib/proving-runs";
 import {
   insertJobEvent,
@@ -116,7 +117,7 @@ function getCalloutMessage(actionState?: string) {
   if (actionState === "not-proving") {
     return {
       tone: "error",
-      text: "This job is not marked as a manual proving run, so the proving controls are unavailable.",
+      text: "This job is not marked as a proving run, so the proving controls are unavailable.",
     } as const;
   }
 
@@ -152,6 +153,7 @@ export default async function JobDetailPage({
 
   const { jobId } = await params;
   const resolvedSearchParams = await searchParams;
+  await reconcileProvingJobs(access, { jobId });
   const detail = await getJobDetail(access, jobId);
 
   if (!detail) {
@@ -491,9 +493,9 @@ export default async function JobDetailPage({
 
           {provingJob ? (
             <div className="stack-xs surface-form-shell">
-              <h3>Manual proving controls</h3>
+              <h3>Proving override controls</h3>
               <p className="muted">
-                Use these only for the live v1 proving lane while the full asynchronous worker backend is still under construction.
+                The proving worker heartbeat now auto-progresses queued/running proving jobs on page loads. Use these only as manual overrides if you need to force the next honest state immediately.
               </p>
               <form action={startProvingJob}>
                 <button
@@ -521,27 +523,27 @@ export default async function JobDetailPage({
               <h3>Live proving next step</h3>
               {detail.job.status === "queued" ? (
                 <>
-                  <p className="muted">This proving job is queued. Start it to move the live run into active processing.</p>
+                  <p className="muted">This proving job is queued. The worker heartbeat will pick it up automatically after a short delay, or you can force-start it here.</p>
                   <form action={startProvingJob}>
                     <button
                       type="submit"
                       className="button button-primary"
                       disabled={access.role === "viewer"}
                     >
-                      Start proving job now
+                      Force start now
                     </button>
                   </form>
                 </>
               ) : detail.job.status === "running" ? (
                 <>
-                  <p className="muted">This proving job is running. Complete it once you want ready artifacts for the delivery lane.</p>
+                  <p className="muted">This proving job is running. The worker heartbeat will complete it automatically after enough elapsed time, or you can force-complete it here.</p>
                   <form action={completeProvingJob}>
                     <button
                       type="submit"
                       className="button button-primary"
                       disabled={access.role === "viewer"}
                     >
-                      Complete proving job now
+                      Force complete now
                     </button>
                   </form>
                 </>

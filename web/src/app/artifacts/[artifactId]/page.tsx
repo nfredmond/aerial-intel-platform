@@ -17,6 +17,7 @@ import {
   getBenchmarkSummaryView,
 } from "@/lib/benchmark-summary";
 import { getArtifactDetail, getString } from "@/lib/missions/detail-data";
+import { reconcileProvingJobs } from "@/lib/proving-runs";
 import { insertJobEvent, updateProcessingOutput } from "@/lib/supabase/admin";
 
 function formatDateTime(value: string | null) {
@@ -147,6 +148,7 @@ export default async function ArtifactDetailPage({
 
   const { artifactId } = await params;
   const resolvedSearchParams = await searchParams;
+  await reconcileProvingJobs(access);
   const detail = await getArtifactDetail(access, artifactId);
 
   if (!detail) {
