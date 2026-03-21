@@ -5,7 +5,7 @@ import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import { getArtifactHandoff, updateArtifactHandoffMetadata } from "@/lib/artifact-handoff";
 import { getJobDetail } from "@/lib/missions/detail-data";
 import { getMissionWorkspaceSnapshot } from "@/lib/missions/workspace-data";
-import { advanceManualProvingJob, isManualProvingJobDetail, reconcileProvingJobs } from "@/lib/proving-runs";
+import { advanceManualProvingJob, isManualProvingJobDetail } from "@/lib/proving-runs";
 import { normalizeSlug } from "@/lib/slug";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
@@ -172,8 +172,6 @@ export default async function MissionsPage({
   if (!access.hasMembership || !access.hasActiveEntitlement) {
     return <BlockedAccessView access={access} />;
   }
-
-  await reconcileProvingJobs(access);
 
   async function bootstrapLiveWorkspace() {
     "use server";

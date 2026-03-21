@@ -364,6 +364,13 @@ export function MissionWorkspace({
               <p className="muted">Processing, validation, and install-bundle work visible in the bottom console.</p>
             </article>
             <article className="surface stat-card stack-xs">
+              <span className="eyebrow">Live proving lane</span>
+              <strong className="stat-value">{formatWholeNumber(snapshot.totals.runningProvingJobCount + snapshot.totals.queuedProvingJobCount)}</strong>
+              <p className="muted">
+                {snapshot.totals.runningProvingJobCount} running · {snapshot.totals.queuedProvingJobCount} queued · {snapshot.totals.completedProvingJobCount} complete
+              </p>
+            </article>
+            <article className="surface stat-card stack-xs">
               <span className="eyebrow">Handoff backlog</span>
               <strong className="stat-value">{formatWholeNumber(snapshot.totals.handoffBacklogCount)}</strong>
               <p className="muted">Ready artifacts that still need review/share/export follow-through.</p>
@@ -747,7 +754,7 @@ export function MissionWorkspace({
               <p className="eyebrow">Live proving focus</p>
               <h3>Continue the real-data path</h3>
               <p className="muted">
-                Top-level shortcut into the live proving lane. The worker heartbeat now auto-progresses queued/running proving jobs on page loads.
+                Top-level shortcut into the live proving lane. The worker heartbeat now auto-progresses queued/running proving jobs out of band.
               </p>
             </div>
             {activeProvingJob ? (

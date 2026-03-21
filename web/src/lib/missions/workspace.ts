@@ -167,6 +167,9 @@ export type MissionWorkspaceSnapshot = {
     activeJobCount: number;
     handoffBacklogCount: number;
     exportedArtifactCount: number;
+    queuedProvingJobCount: number;
+    runningProvingJobCount: number;
+    completedProvingJobCount: number;
   };
   nextActions: string[];
 };
@@ -596,6 +599,9 @@ export function buildMissionWorkspaceSnapshot(options: {
   ).length;
   const datasetCount = datasets.length;
   const activeJobCount = jobs.filter((job) => job.status !== "completed").length;
+  const queuedProvingJobCount = jobs.filter((job) => job.presetId === "v1-proving-run" && job.status === "queued").length;
+  const runningProvingJobCount = jobs.filter((job) => job.presetId === "v1-proving-run" && job.status === "running").length;
+  const completedProvingJobCount = jobs.filter((job) => job.presetId === "v1-proving-run" && job.status === "completed").length;
   const handoffBacklogCount = outputArtifacts.filter(
     (artifact) => artifact.status === "ready" && artifact.handoffStage !== "exported",
   ).length;
@@ -634,6 +640,11 @@ export function buildMissionWorkspaceSnapshot(options: {
       label: "Processing lane",
       value: "1 running · 1 queued",
       tone: "success",
+    },
+    {
+      label: "Proving lane",
+      value: `${runningProvingJobCount} running · ${queuedProvingJobCount} queued · ${completedProvingJobCount} complete`,
+      tone: runningProvingJobCount > 0 ? "info" : queuedProvingJobCount > 0 ? "warning" : "success",
     },
     {
       label: "Handoff lane",
@@ -722,6 +733,9 @@ export function buildMissionWorkspaceSnapshot(options: {
       activeJobCount,
       handoffBacklogCount,
       exportedArtifactCount,
+      queuedProvingJobCount,
+      runningProvingJobCount,
+      completedProvingJobCount,
     },
     nextActions,
   };

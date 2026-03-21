@@ -48,7 +48,6 @@ import {
 import {
   advanceManualProvingJob,
   isProvingJobRecord,
-  reconcileProvingJobs,
 } from "@/lib/proving-runs";
 import { normalizeSlug } from "@/lib/slug";
 import { formatJobStatus, formatOutputArtifactStatus } from "@/lib/missions/workspace";
@@ -323,7 +322,6 @@ export default async function MissionDetailPage({
 
   const { missionId } = await params;
   const resolvedSearchParams = await searchParams;
-  await reconcileProvingJobs(access, { missionId });
   const detail = await getMissionDetail(access, missionId);
 
   if (!detail) {
@@ -1589,7 +1587,7 @@ export default async function MissionDetailPage({
             ) : provingJob && ["queued", "running"].includes(provingJob.status) ? (
               <>
                 <p className="muted">
-                  Proving job is {provingJob.status}. The worker heartbeat now auto-progresses the live path on page loads; use this control only if you want to force the next honest state immediately.
+                  Proving job is {provingJob.status}. The worker heartbeat now auto-progresses the live path out of band; use this control only if you want to force the next honest state immediately.
                 </p>
                 <div className="header-actions">
                   <form action={advanceProvingJob}>

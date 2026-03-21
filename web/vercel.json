@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/internal/proving-heartbeat",
+      "schedule": "* * * * *"
+    }
+  ]
+}

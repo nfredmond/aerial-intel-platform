@@ -21,11 +21,15 @@ describe("missions/workspace", () => {
     expect(snapshot.entitlementLabel).toBe("Drone Professional");
     expect(snapshot.currentProject.name).toBe("Nat Ford Planning aerial operations");
     expect(snapshot.rail).toHaveLength(3);
-    expect(snapshot.statusChips).toHaveLength(5);
+    expect(snapshot.statusChips).toHaveLength(6);
+    expect(snapshot.statusChips.some((chip) => chip.label === "Proving lane")).toBe(true);
     expect(snapshot.totals.missionCount).toBe(3);
     expect(snapshot.totals.totalAcres).toBe(130);
     expect(snapshot.totals.datasetCount).toBe(3);
     expect(snapshot.totals.activeJobCount).toBe(3);
+    expect(snapshot.totals.runningProvingJobCount).toBe(1);
+    expect(snapshot.totals.queuedProvingJobCount).toBe(0);
+    expect(snapshot.totals.completedProvingJobCount).toBe(0);
     expect(snapshot.totals.readyOutputCount).toBe(2);
     expect(snapshot.totals.outputsInProgressCount).toBe(4);
     expect(snapshot.totals.outputsMissingCount).toBe(6);

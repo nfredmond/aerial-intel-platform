@@ -1,13 +1,16 @@
-import type { DroneOpsAccessResult } from "@/lib/auth/drone-ops-access";
-import { getJobDetail, getString } from "@/lib/missions/detail-data";
+import { getJobDetail, getString, type JobDetail } from "@/lib/missions/detail-data";
 import {
+  adminSelect,
   insertJobEvent,
   updateProcessingJob,
   updateProcessingOutput,
 } from "@/lib/supabase/admin";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import type { Database, Json } from "@/lib/supabase/types";
 
 type JobDetailResult = NonNullable<Awaited<ReturnType<typeof getJobDetail>>>;
+type ProcessingJobRow = Database["public"]["Tables"]["drone_processing_jobs"]["Row"];
+type ProcessingOutputRow = Database["public"]["Tables"]["drone_processing_outputs"]["Row"];
+type JsonRecord = Record<string, Json | undefined>;
 export type ProvingActionSource = "job-detail" | "mission-detail" | "workspace" | "worker-heartbeat";
 
 const PROVING_QUEUE_PICKUP_MS = 15_000;
@@ -18,6 +21,14 @@ type ProvingEvent = {
   title: string;
   detail: string;
 };
+
+function asRecord(value: Json | undefined) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {} as JsonRecord;
+  }
+
+  return value as JsonRecord;
+}
 
 function getSourceLabel(source: ProvingActionSource) {
   switch (source) {
@@ -144,6 +155,33 @@ export function isProvingJobRecord(job: { preset_id: string | null; input_summar
   return job.preset_id === "v1-proving-run" || inputSummary.source === "mission-proving-seed";
 }
 
+async function getProvingJobDetailAdmin(jobId: string): Promise<JobDetail | null> {
+  const jobRows = await adminSelect<ProcessingJobRow[]>(
+    `drone_processing_jobs?id=eq.${encodeURIComponent(jobId)}&select=id,org_id,project_id,site_id,mission_id,dataset_id,engine,preset_id,status,stage,progress,queue_position,input_summary,output_summary,external_job_reference,created_by,created_at,updated_at,started_at,completed_at`,
+  );
+  const job = jobRows[0] ?? null;
+
+  if (!job) {
+    return null;
+  }
+
+  const outputs = await adminSelect<ProcessingOutputRow[]>(
+    `drone_processing_outputs?org_id=eq.${encodeURIComponent(job.org_id)}&job_id=eq.${encodeURIComponent(job.id)}&select=id,org_id,job_id,mission_id,dataset_id,kind,status,storage_bucket,storage_path,metadata,created_at,updated_at&order=updated_at.desc`,
+  );
+
+  return {
+    job,
+    mission: null,
+    project: null,
+    site: null,
+    dataset: null,
+    outputs,
+    events: [],
+    inputSummary: asRecord(job.input_summary),
+    outputSummary: asRecord(job.output_summary),
+  };
+}
+
 export async function startManualProvingJob(options: {
   orgId: string;
   detail: JobDetailResult;
@@ -258,44 +296,14 @@ export async function advanceManualProvingJob(options: {
   return "noop" as const;
 }
 
-export async function reconcileProvingJobs(
-  access: DroneOpsAccessResult,
-  options?: { missionId?: string; jobId?: string },
-) {
-  if (!access.org?.id) {
-    return 0;
-  }
-
-  const supabase = await createServerSupabaseClient();
-  let query = supabase
-    .from("drone_processing_jobs")
-    .select("id, mission_id, preset_id, status, input_summary, created_at, started_at, updated_at")
-    .eq("org_id", access.org.id)
-    .in("status", ["queued", "running"])
-    .order("updated_at", { ascending: false })
-    .limit(options?.jobId ? 1 : 20);
-
-  if (options?.jobId) {
-    query = query.eq("id", options.jobId);
-  }
-
-  if (options?.missionId) {
-    query = query.eq("mission_id", options.missionId);
-  }
-
-  const result = await query;
-  const rows = (result.data ?? []) as Array<{
-    id: string;
-    mission_id: string | null;
-    preset_id: string | null;
-    status: string;
-    input_summary: unknown;
-    created_at: string;
-    started_at: string | null;
-    updated_at: string;
-  }>;
+export async function reconcileProvingJobsOutOfBand() {
+  const rows = await adminSelect<Array<Pick<ProcessingJobRow, "id" | "org_id" | "preset_id" | "status" | "input_summary" | "created_at" | "started_at" | "updated_at">>>(
+    "drone_processing_jobs?status=in.(queued,running)&select=id,org_id,preset_id,status,input_summary,created_at,started_at,updated_at&order=updated_at.desc&limit=50",
+  );
 
   let updates = 0;
+  let started = 0;
+  let completed = 0;
   const now = Date.now();
 
   for (const row of rows) {
@@ -303,7 +311,7 @@ export async function reconcileProvingJobs(
       continue;
     }
 
-    const detail = await getJobDetail(access, row.id);
+    const detail = await getProvingJobDetailAdmin(row.id);
     if (!detail || !isManualProvingJobDetail(detail)) {
       continue;
     }
@@ -312,11 +320,12 @@ export async function reconcileProvingJobs(
       const queuedSince = new Date(detail.job.created_at).getTime();
       if (Number.isFinite(queuedSince) && now - queuedSince >= PROVING_QUEUE_PICKUP_MS) {
         await startManualProvingJob({
-          orgId: access.org.id,
+          orgId: detail.job.org_id,
           detail,
           source: "worker-heartbeat",
         });
         updates += 1;
+        started += 1;
       }
       continue;
     }
@@ -325,14 +334,20 @@ export async function reconcileProvingJobs(
       const runningSince = new Date(detail.job.started_at ?? detail.job.updated_at).getTime();
       if (Number.isFinite(runningSince) && now - runningSince >= PROVING_AUTO_COMPLETE_MS) {
         await completeManualProvingJob({
-          orgId: access.org.id,
+          orgId: detail.job.org_id,
           detail,
           source: "worker-heartbeat",
         });
         updates += 1;
+        completed += 1;
       }
     }
   }
 
-  return updates;
+  return {
+    scanned: rows.length,
+    updates,
+    started,
+    completed,
+  };
 }

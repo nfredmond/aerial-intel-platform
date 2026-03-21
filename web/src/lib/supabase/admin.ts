@@ -40,6 +40,10 @@ async function adminRestRequest<T>(path: string, options: RequestInit = {}) {
   return payload as T;
 }
 
+export async function adminSelect<T>(path: string) {
+  return adminRestRequest<T>(path, { method: "GET" });
+}
+
 export type ProjectInsert = {
   org_id: string;
   name: string;

@@ -213,6 +213,9 @@ function buildStatusChips(options: {
   missionsNeedingAttention: number;
   runningJobs: number;
   queuedJobs: number;
+  queuedProvingJobs: number;
+  runningProvingJobs: number;
+  completedProvingJobs: number;
   readyOutputs: number;
   draftOutputs: number;
   handoffBacklog: number;
@@ -236,6 +239,17 @@ function buildStatusChips(options: {
       label: "Deliverables",
       value: `${options.readyOutputs} ready · ${options.draftOutputs} pending`,
       tone: options.readyOutputs > 0 ? "success" : "warning",
+    },
+    {
+      label: "Proving lane",
+      value: `${options.runningProvingJobs} running · ${options.queuedProvingJobs} queued · ${options.completedProvingJobs} complete`,
+      tone: options.runningProvingJobs > 0
+        ? "info"
+        : options.queuedProvingJobs > 0
+          ? "warning"
+          : options.completedProvingJobs > 0
+            ? "success"
+            : "warning",
     },
     {
       label: "Handoff lane",
@@ -513,6 +527,10 @@ function buildWorkspaceFromRows(params: {
   ).length;
   const runningJobs = jobs.filter((job) => job.status === "running").length;
   const queuedJobs = jobs.filter((job) => job.status === "queued").length;
+  const provingJobs = jobsRows.filter((job) => job.presetId === "v1-proving-run" || job.source === "mission-proving-seed");
+  const runningProvingJobs = provingJobs.filter((job) => job.status === "running").length;
+  const queuedProvingJobs = provingJobs.filter((job) => job.status === "queued").length;
+  const completedProvingJobs = provingJobs.filter((job) => job.status === "completed").length;
   const draftOutputs = outputRows.filter((output) => output.status !== "ready").length;
   const handoffBacklogCount = outputRows.filter(
     (output) => output.status === "ready" && output.handoffStage !== "exported",
@@ -556,6 +574,9 @@ function buildWorkspaceFromRows(params: {
       missionsNeedingAttention,
       runningJobs,
       queuedJobs,
+      queuedProvingJobs,
+      runningProvingJobs,
+      completedProvingJobs,
       readyOutputs: readyOutputCount,
       draftOutputs,
       handoffBacklog: handoffBacklogCount,
@@ -581,6 +602,9 @@ function buildWorkspaceFromRows(params: {
       activeJobCount: jobsRows.filter((job) => job.status !== "completed").length,
       handoffBacklogCount,
       exportedArtifactCount,
+      queuedProvingJobCount: queuedProvingJobs,
+      runningProvingJobCount: runningProvingJobs,
+      completedProvingJobCount: completedProvingJobs,
     },
     nextActions: [
       handoffBacklogCount > 0

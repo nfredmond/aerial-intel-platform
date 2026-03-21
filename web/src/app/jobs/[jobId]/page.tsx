@@ -17,7 +17,6 @@ import { getJobDetail, getString } from "@/lib/missions/detail-data";
 import {
   advanceManualProvingJob,
   isManualProvingJobDetail,
-  reconcileProvingJobs,
 } from "@/lib/proving-runs";
 import {
   insertJobEvent,
@@ -153,7 +152,6 @@ export default async function JobDetailPage({
 
   const { jobId } = await params;
   const resolvedSearchParams = await searchParams;
-  await reconcileProvingJobs(access, { jobId });
   const detail = await getJobDetail(access, jobId);
 
   if (!detail) {
@@ -495,7 +493,7 @@ export default async function JobDetailPage({
             <div className="stack-xs surface-form-shell">
               <h3>Proving override controls</h3>
               <p className="muted">
-                The proving worker heartbeat now auto-progresses queued/running proving jobs on page loads. Use these only as manual overrides if you need to force the next honest state immediately.
+                The proving worker heartbeat now auto-progresses queued/running proving jobs out of band. Use these only as manual overrides if you need to force the next honest state immediately.
               </p>
               <form action={startProvingJob}>
                 <button
