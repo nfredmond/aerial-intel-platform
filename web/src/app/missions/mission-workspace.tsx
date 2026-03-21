@@ -19,6 +19,7 @@ type MissionWorkspaceProps = {
   createMissionAction: (formData: FormData) => Promise<void>;
   bootstrapLiveWorkspaceAction: () => Promise<void>;
   advanceArtifactHandoffAction: (formData: FormData) => Promise<void>;
+  advanceWorkspaceProvingJobAction: (formData: FormData) => Promise<void>;
   saveWorkspaceHandoffNoteAction: (formData: FormData) => Promise<void>;
   notice?: {
     tone: "success" | "warning" | "error";
@@ -178,6 +179,7 @@ export function MissionWorkspace({
   createMissionAction,
   bootstrapLiveWorkspaceAction,
   advanceArtifactHandoffAction,
+  advanceWorkspaceProvingJobAction,
   saveWorkspaceHandoffNoteAction,
   notice,
 }: MissionWorkspaceProps) {
@@ -727,11 +729,19 @@ export function MissionWorkspace({
             {activeProvingJob ? (
               <>
                 <p className="muted">
-                  Active proving job: {activeProvingJob.name} ({activeProvingJob.status}). Continue it from the job page.
+                  Active proving job: {activeProvingJob.name} ({activeProvingJob.status}). Advance it here to keep the live path moving, or open the full job page for deeper triage.
                 </p>
-                <Link href={`/jobs/${activeProvingJob.id}`} className="button button-primary">
-                  Open proving job
-                </Link>
+                <div className="header-actions">
+                  <form action={advanceWorkspaceProvingJobAction}>
+                    <input type="hidden" name="jobId" value={activeProvingJob.id} />
+                    <button type="submit" className="button button-primary" disabled={!canManageOperations}>
+                      {activeProvingJob.status === "queued" ? "Start proving job now" : "Complete proving job now"}
+                    </button>
+                  </form>
+                  <Link href={`/jobs/${activeProvingJob.id}`} className="button button-secondary">
+                    Open proving job
+                  </Link>
+                </div>
               </>
             ) : firstReadyArtifact ? (
               <>

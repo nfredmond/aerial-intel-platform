@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import { getArtifactHandoff, updateArtifactHandoffMetadata } from "@/lib/artifact-handoff";
+import { getJobDetail } from "@/lib/missions/detail-data";
 import { getMissionWorkspaceSnapshot } from "@/lib/missions/workspace-data";
+import { advanceManualProvingJob, isManualProvingJobDetail } from "@/lib/proving-runs";
 import { normalizeSlug } from "@/lib/slug";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
@@ -29,7 +31,7 @@ function getFormNumber(formData: FormData, key: string, fallback: number) {
   return Number.isFinite(value) ? value : fallback;
 }
 
-function getWorkspaceNotice(states: { create?: string; handoff?: string }) {
+function getWorkspaceNotice(states: { create?: string; handoff?: string; proving?: string }) {
   switch (states.create) {
     case "denied":
       return {
@@ -112,6 +114,46 @@ function getWorkspaceNotice(states: { create?: string; handoff?: string }) {
         message: "The artifact handoff update could not be completed. Check server configuration and try again.",
       };
     default:
+      break;
+  }
+
+  switch (states.proving) {
+    case "started":
+      return {
+        tone: "success" as const,
+        message: "Proving job started from the workspace. The live run is now in active processing.",
+      };
+    case "completed":
+      return {
+        tone: "success" as const,
+        message: "Proving job completed from the workspace. Ready artifacts are now waiting in the delivery lane.",
+      };
+    case "denied":
+      return {
+        tone: "error" as const,
+        message: "Viewer access cannot advance proving jobs from the workspace.",
+      };
+    case "missing-job":
+      return {
+        tone: "warning" as const,
+        message: "No active proving job was available to advance from the workspace.",
+      };
+    case "not-proving":
+      return {
+        tone: "warning" as const,
+        message: "That workspace job is not marked as a proving run.",
+      };
+    case "noop":
+      return {
+        tone: "warning" as const,
+        message: "This proving job does not have a next-step automation available right now.",
+      };
+    case "error":
+      return {
+        tone: "error" as const,
+        message: "The workspace proving-step action failed. Check server configuration and try again.",
+      };
+    default:
       return null;
   }
 }
@@ -119,7 +161,7 @@ function getWorkspaceNotice(states: { create?: string; handoff?: string }) {
 export default async function MissionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ create?: string; handoff?: string }>;
+  searchParams: Promise<{ create?: string; handoff?: string; proving?: string }>;
 }) {
   const access = await getDroneOpsAccess();
 
@@ -503,6 +545,49 @@ export default async function MissionsPage({
     redirect(`/missions?handoff=${targetAction}`);
   }
 
+  async function advanceWorkspaceProvingJob(formData: FormData) {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect("/missions?proving=denied");
+    }
+
+    const jobId = getFormString(formData, "jobId");
+    if (!jobId) {
+      redirect("/missions?proving=missing-job");
+    }
+
+    const refreshedDetail = await getJobDetail(refreshedAccess, jobId);
+    if (!refreshedDetail) {
+      redirect("/missions?proving=missing-job");
+    }
+
+    if (!isManualProvingJobDetail(refreshedDetail)) {
+      redirect("/missions?proving=not-proving");
+    }
+
+    try {
+      const result = await advanceManualProvingJob({
+        orgId: refreshedAccess.org.id,
+        detail: refreshedDetail,
+      });
+
+      redirect(`/missions?proving=${result}`);
+    } catch {
+      redirect("/missions?proving=error");
+    }
+  }
+
   async function saveWorkspaceHandoffNote(formData: FormData) {
     "use server";
 
@@ -582,6 +667,7 @@ export default async function MissionsPage({
   const notice = getWorkspaceNotice({
     create: resolvedSearchParams.create,
     handoff: resolvedSearchParams.handoff,
+    proving: resolvedSearchParams.proving,
   });
 
   return (
@@ -592,6 +678,7 @@ export default async function MissionsPage({
       createMissionAction={createMissionDraft}
       bootstrapLiveWorkspaceAction={bootstrapLiveWorkspace}
       advanceArtifactHandoffAction={advanceArtifactHandoff}
+      advanceWorkspaceProvingJobAction={advanceWorkspaceProvingJob}
       saveWorkspaceHandoffNoteAction={saveWorkspaceHandoffNote}
       notice={notice}
     />
