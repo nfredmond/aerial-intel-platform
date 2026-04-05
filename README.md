@@ -24,6 +24,7 @@ See the charter and docs folder for current scope and architecture. The repo is 
 - Imported benchmark-backed jobs/artifacts can render in `/jobs/[jobId]` and `/artifacts/[artifactId]`
 - Artifact review/share/export audit surfaces exist in the web app
 - Mission detail can record honest v1 intake sessions for ZIP evidence, benchmark paths, and review-bundle readiness while browser upload is still pending
+- Mission detail now includes a browser file-picker lane that records ZIP filename/size into a new ingest session without pretending durable upload/storage or orchestration already exists
 
 ### Not real yet
 - Browser-native ZIP upload and resumable ingest
