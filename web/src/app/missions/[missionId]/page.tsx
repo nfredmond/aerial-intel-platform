@@ -52,7 +52,12 @@ import {
 import { normalizeSlug } from "@/lib/slug";
 import { formatJobStatus, formatOutputArtifactStatus } from "@/lib/missions/workspace";
 import {
+  formatFileSize,
+  summarizeV1IngestSession,
+} from "@/lib/v1-ingest";
+import {
   insertDataset,
+  insertIngestSession,
   insertJobEvent,
   insertProcessingJob,
   insertProcessingOutputs,
@@ -103,6 +108,18 @@ function getChecklistStatusClass(status: string) {
     default:
       return "status-pill status-pill--warning";
   }
+}
+
+function getIngestStatusPillClassName(contractCleared: boolean, reviewBundleReady: boolean) {
+  if (contractCleared) {
+    return "status-pill status-pill--success";
+  }
+
+  if (reviewBundleReady) {
+    return "status-pill status-pill--info";
+  }
+
+  return "status-pill status-pill--warning";
 }
 
 function getStageChecklist(summary: unknown) {
@@ -186,6 +203,7 @@ function buildPreflightSummary(input: {
 function getCalloutMessage(options: {
   queued?: string;
   attached?: string;
+  ingest?: string;
   seeded?: string;
   proving?: string;
   bundled?: string;
@@ -208,6 +226,16 @@ function getCalloutMessage(options: {
         : options.attached === "denied"
           ? "Viewer access cannot attach datasets."
           : "The dataset could not be attached. Check server configuration and try again.";
+  }
+
+  if (options.ingest) {
+    return options.ingest === "1"
+      ? "Truthful v1 intake session recorded. Use it to track ZIP evidence, benchmark paths, and review-bundle readiness without pretending browser upload already exists."
+      : options.ingest === "missing-label"
+        ? "An intake label is required before the session can be recorded."
+        : options.ingest === "denied"
+          ? "Viewer access cannot record intake sessions."
+          : "The intake session could not be recorded. Check server configuration and try again.";
   }
 
   if (options.queued) {
@@ -308,7 +336,7 @@ export default async function MissionDetailPage({
   searchParams,
 }: {
   params: Promise<{ missionId: string }>;
-  searchParams: Promise<{ queued?: string; attached?: string; seeded?: string; proving?: string; bundled?: string; approved?: string; installed?: string; delivered?: string; aoi?: string; overlay?: string; created?: string; dataset?: string }>;
+  searchParams: Promise<{ queued?: string; attached?: string; ingest?: string; seeded?: string; proving?: string; bundled?: string; approved?: string; installed?: string; delivered?: string; aoi?: string; overlay?: string; created?: string; dataset?: string }>;
 }) {
   const access = await getDroneOpsAccess();
 
@@ -404,6 +432,136 @@ export default async function MissionDetailPage({
     }
 
     redirect(`/missions/${missionId}?attached=1`);
+  }
+
+  async function recordIngestSession(formData: FormData) {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/missions/${missionId}?ingest=denied`);
+    }
+
+    const refreshedDetail = await getMissionDetail(refreshedAccess, missionId);
+    if (!refreshedDetail) {
+      redirect("/missions");
+    }
+
+    const labelValue = formData.get("sessionLabel");
+    const sessionLabel = typeof labelValue === "string" ? labelValue.trim() : "";
+    if (!sessionLabel) {
+      redirect(`/missions/${missionId}?ingest=missing-label`);
+    }
+
+    const sourceTypeValue = formData.get("sourceType");
+    const sourceType = typeof sourceTypeValue === "string" && sourceTypeValue.trim().length > 0
+      ? sourceTypeValue.trim()
+      : "local_zip";
+
+    const statusValue = formData.get("sessionStatus");
+    const sessionStatus = typeof statusValue === "string" && statusValue.trim().length > 0
+      ? statusValue.trim()
+      : "recorded";
+
+    const sourceFilenameValue = formData.get("sourceFilename");
+    const sourceFilename = typeof sourceFilenameValue === "string" && sourceFilenameValue.trim().length > 0
+      ? sourceFilenameValue.trim()
+      : null;
+
+    const sourceZipPathValue = formData.get("sourceZipPath");
+    const sourceZipPath = typeof sourceZipPathValue === "string" && sourceZipPathValue.trim().length > 0
+      ? sourceZipPathValue.trim()
+      : null;
+
+    const extractedDatasetPathValue = formData.get("extractedDatasetPath");
+    const extractedDatasetPath = typeof extractedDatasetPathValue === "string" && extractedDatasetPathValue.trim().length > 0
+      ? extractedDatasetPathValue.trim()
+      : null;
+
+    const benchmarkSummaryPathValue = formData.get("benchmarkSummaryPath");
+    const benchmarkSummaryPath = typeof benchmarkSummaryPathValue === "string" && benchmarkSummaryPathValue.trim().length > 0
+      ? benchmarkSummaryPathValue.trim()
+      : null;
+
+    const runLogPathValue = formData.get("runLogPath");
+    const runLogPath = typeof runLogPathValue === "string" && runLogPathValue.trim().length > 0
+      ? runLogPathValue.trim()
+      : null;
+
+    const reviewBundleZipPathValue = formData.get("reviewBundleZipPath");
+    const reviewBundleZipPath = typeof reviewBundleZipPathValue === "string" && reviewBundleZipPathValue.trim().length > 0
+      ? reviewBundleZipPathValue.trim()
+      : null;
+
+    const imageCountValue = Number(formData.get("imageCount"));
+    const imageCount = Number.isFinite(imageCountValue) && imageCountValue >= 0
+      ? imageCountValue
+      : null;
+
+    const fileSizeBytesValue = Number(formData.get("fileSizeBytes"));
+    const fileSizeBytes = Number.isFinite(fileSizeBytesValue) && fileSizeBytesValue >= 0
+      ? fileSizeBytesValue
+      : null;
+
+    const reviewBundleReady = formData.get("reviewBundleReady") === "on";
+    const truthfulPassValue = formData.get("truthfulPass");
+    const truthfulPass = truthfulPassValue === "pass"
+      ? true
+      : truthfulPassValue === "fail"
+        ? false
+        : null;
+
+    const notesValue = formData.get("sessionNotes");
+    const notes = typeof notesValue === "string" && notesValue.trim().length > 0
+      ? notesValue.trim()
+      : null;
+
+    try {
+      const linkedDatasetIdValue = formData.get("linkedDatasetId");
+      const linkedDatasetId = typeof linkedDatasetIdValue === "string" && linkedDatasetIdValue.trim().length > 0
+        ? linkedDatasetIdValue.trim()
+        : null;
+
+      await insertIngestSession({
+        org_id: refreshedAccess.org.id,
+        mission_id: refreshedDetail.mission.id,
+        dataset_id: linkedDatasetId,
+        session_label: sessionLabel,
+        source_type: sourceType,
+        status: sessionStatus,
+        source_filename: sourceFilename,
+        source_zip_path: sourceZipPath,
+        extracted_dataset_path: extractedDatasetPath,
+        benchmark_summary_path: benchmarkSummaryPath,
+        run_log_path: runLogPath,
+        review_bundle_zip_path: reviewBundleZipPath,
+        image_count: imageCount,
+        file_size_bytes: fileSizeBytes,
+        review_bundle_ready: reviewBundleReady,
+        truthful_pass: truthfulPass,
+        metadata: {
+          sourceType,
+          sourceFilename,
+          imageCount,
+          reviewBundleReady,
+          truthfulPass,
+        },
+        notes,
+        created_by: refreshedAccess.user.id,
+      });
+    } catch {
+      redirect(`/missions/${missionId}?ingest=error`);
+    }
+
+    redirect(`/missions/${missionId}?ingest=1`);
   }
 
   async function queueMissionProcessing() {
@@ -1156,6 +1314,24 @@ export default async function MissionDetailPage({
   const blockers = getStringArray(detail.summary.blockers);
   const warnings = getStringArray(detail.summary.warnings);
   const calloutMessage = getCalloutMessage(resolvedSearchParams);
+  const ingestSessions = detail.ingestSessions.map((session) => ({
+    session,
+    posture: summarizeV1IngestSession({
+      status: session.status,
+      sourceType: session.source_type,
+      sourceFilename: session.source_filename,
+      sourceZipPath: session.source_zip_path,
+      extractedDatasetPath: session.extracted_dataset_path,
+      benchmarkSummaryPath: session.benchmark_summary_path,
+      runLogPath: session.run_log_path,
+      reviewBundleZipPath: session.review_bundle_zip_path,
+      imageCount: session.image_count,
+      fileSizeBytes: session.file_size_bytes,
+      reviewBundleReady: session.review_bundle_ready,
+      truthfulPass: session.truthful_pass,
+    }),
+  }));
+  const truthfulReadyIngestCount = ingestSessions.filter((item) => item.posture.contractCleared).length;
   const deliverySummary = ((detail.summary.delivery as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
   const missionGeometry = (detail.mission.planning_geometry as Json | null) ?? null;
   const defaultDataset = detail.datasets[0] ?? null;
@@ -1459,7 +1635,7 @@ export default async function MissionDetailPage({
             <p className="eyebrow">Live action</p>
             <h2>Attach data, geometry, queue processing, and stage install handoff</h2>
             <p className="muted">
-              This mission page now supports the next real v1 loop: attach a dataset, attach AOI geometry, queue a job, and generate install-handoff artifacts for field use.
+              This mission page now supports the next real v1 loop: record intake evidence, attach a dataset, attach AOI geometry, queue a job, and generate install-handoff artifacts for field use.
             </p>
           </div>
 
@@ -1467,6 +1643,10 @@ export default async function MissionDetailPage({
             <div className="kv-row">
               <dt>Datasets attached</dt>
               <dd>{detail.datasets.length}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Intake sessions</dt>
+              <dd>{detail.ingestSessions.length} total · {truthfulReadyIngestCount} truthful-ready</dd>
             </div>
             <div className="kv-row">
               <dt>Current jobs</dt>
@@ -1485,6 +1665,116 @@ export default async function MissionDetailPage({
               </dd>
             </div>
           </dl>
+
+          <form action={recordIngestSession} className="stack-sm surface-form-shell">
+            <div className="stack-xs">
+              <h3>Record truthful v1 intake session</h3>
+              <p className="muted">
+                Capture the real ZIP, benchmark, and review-bundle evidence path for this mission. This records intake honestly while browser upload is still pending.
+              </p>
+            </div>
+            <div className="form-grid-2">
+              <label className="stack-xs">
+                <span>Session label</span>
+                <input name="sessionLabel" type="text" placeholder="e.g. GV downtown local ODM run 2026-04-05" required />
+              </label>
+              <label className="stack-xs">
+                <span>Source type</span>
+                <select name="sourceType" defaultValue="local_zip">
+                  <option value="local_zip">Local ZIP run</option>
+                  <option value="browser_zip">Browser ZIP intake</option>
+                  <option value="external_zip">External ZIP handoff</option>
+                </select>
+              </label>
+            </div>
+            <div className="form-grid-2">
+              <label className="stack-xs">
+                <span>Recorded stage</span>
+                <select name="sessionStatus" defaultValue="recorded">
+                  <option value="recorded">Recorded</option>
+                  <option value="zip_received">ZIP received</option>
+                  <option value="extracted">Extracted</option>
+                  <option value="benchmark_complete">Benchmark complete</option>
+                  <option value="review_bundle_ready">Review bundle ready</option>
+                  <option value="blocked">Blocked</option>
+                </select>
+              </label>
+              <label className="stack-xs">
+                <span>Linked dataset</span>
+                <select name="linkedDatasetId" defaultValue="">
+                  <option value="">No linked dataset yet</option>
+                  {detail.datasets.map((dataset) => (
+                    <option key={dataset.id} value={dataset.id}>{dataset.name}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="form-grid-2">
+              <label className="stack-xs">
+                <span>Source ZIP filename</span>
+                <input name="sourceFilename" type="text" placeholder="e.g. gv-downtown.zip" />
+              </label>
+              <label className="stack-xs">
+                <span>Source ZIP path</span>
+                <input name="sourceZipPath" type="text" placeholder="/data/uploads/gv-downtown.zip" />
+              </label>
+            </div>
+            <div className="form-grid-2">
+              <label className="stack-xs">
+                <span>Extracted dataset path</span>
+                <input name="extractedDatasetPath" type="text" placeholder="/workspace/.data/v1_slice_gv/dataset" />
+              </label>
+              <label className="stack-xs">
+                <span>Benchmark summary path</span>
+                <input name="benchmarkSummaryPath" type="text" placeholder="benchmark/20260405T190000Z_gv/summary.json" />
+              </label>
+            </div>
+            <div className="form-grid-2">
+              <label className="stack-xs">
+                <span>Run log path</span>
+                <input name="runLogPath" type="text" placeholder="benchmark/20260405T190000Z_gv/run.log" />
+              </label>
+              <label className="stack-xs">
+                <span>Review bundle ZIP path</span>
+                <input name="reviewBundleZipPath" type="text" placeholder=".data/v1_slice_gv/export_bundle_gv.zip" />
+              </label>
+            </div>
+            <div className="form-grid-2">
+              <label className="stack-xs">
+                <span>Image count</span>
+                <input name="imageCount" type="number" min="0" step="1" defaultValue="0" />
+              </label>
+              <label className="stack-xs">
+                <span>ZIP size (bytes)</span>
+                <input name="fileSizeBytes" type="number" min="0" step="1" placeholder="734003200" />
+              </label>
+            </div>
+            <div className="form-grid-2">
+              <label className="stack-xs">
+                <span>Truthful v1 result</span>
+                <select name="truthfulPass" defaultValue="pending">
+                  <option value="pending">Pending / not recorded</option>
+                  <option value="pass">Pass</option>
+                  <option value="fail">Fail</option>
+                </select>
+              </label>
+              <label className="stack-xs checkbox-row">
+                <input name="reviewBundleReady" type="checkbox" value="on" />
+                <span>Review bundle ZIP is ready for operator download</span>
+              </label>
+            </div>
+            <label className="stack-xs">
+              <span>Operator notes</span>
+              <textarea name="sessionNotes" rows={3} placeholder="Exact blockers, dataset provenance, or import notes."></textarea>
+            </label>
+            <button
+              type="submit"
+              className="button button-secondary"
+              disabled={access.role === "viewer"}
+            >
+              Record intake session
+            </button>
+          </form>
 
           <form action={attachDataset} className="stack-sm surface-form-shell">
             <div className="stack-xs">
@@ -1669,6 +1959,60 @@ export default async function MissionDetailPage({
       </section>
 
       <section className="grid-cards">
+        <article className="surface stack-sm info-card">
+          <div className="stack-xs">
+            <p className="eyebrow">Truthful v1 intake</p>
+            <h2>ZIP, benchmark, and review-bundle evidence</h2>
+            <p className="muted">Operator-entered session records that bridge local ODM runs and the later browser upload lane without claiming the upload stack already exists.</p>
+          </div>
+          <div className="stack-xs">
+            {ingestSessions.length > 0 ? ingestSessions.map(({ session, posture }) => (
+              <article key={session.id} className="ops-list-card stack-xs">
+                <div className="ops-list-card-header">
+                  <strong>{session.session_label}</strong>
+                  <span className={getIngestStatusPillClassName(posture.contractCleared, session.review_bundle_ready)}>
+                    {posture.stageLabel}
+                  </span>
+                </div>
+                <p className="muted">
+                  {session.source_type} · updated {formatDateTime(session.updated_at)} · {session.image_count ?? "?"} image(s) · {formatFileSize(session.file_size_bytes)}
+                </p>
+                <dl className="kv-grid">
+                  <div className="kv-row">
+                    <dt>ZIP evidence</dt>
+                    <dd>{session.source_filename ?? session.source_zip_path ?? "Not recorded"}</dd>
+                  </div>
+                  <div className="kv-row">
+                    <dt>Benchmark summary</dt>
+                    <dd>{session.benchmark_summary_path ?? "Not recorded"}</dd>
+                  </div>
+                  <div className="kv-row">
+                    <dt>Review bundle ZIP</dt>
+                    <dd>{session.review_bundle_zip_path ?? "Not recorded"}</dd>
+                  </div>
+                  <div className="kv-row">
+                    <dt>Truthful result</dt>
+                    <dd>
+                      {session.truthful_pass === true
+                        ? "Pass"
+                        : session.truthful_pass === false
+                          ? "Fail"
+                          : "Pending"}
+                    </dd>
+                  </div>
+                </dl>
+                <ul className="action-list mission-blocker-list">
+                  {posture.blockers.length > 0
+                    ? posture.blockers.slice(0, 4).map((item) => <li key={item}>{item}</li>)
+                    : <li>Full truthful v1 evidence chain recorded for this session.</li>}
+                </ul>
+                <p className="muted">Next step: {posture.nextStep}</p>
+                {session.notes ? <p className="muted"><strong>Notes:</strong> {session.notes}</p> : null}
+              </article>
+            )) : <p className="muted">No intake sessions recorded yet. Use the form above to capture ZIP, benchmark, and review-bundle evidence for this mission.</p>}
+          </div>
+        </article>
+
         <article id="mission-datasets" className="surface stack-sm info-card">
           <div className="stack-xs">
             <p className="eyebrow">Datasets</p>

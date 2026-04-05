@@ -7,6 +7,7 @@ type SiteRow = Database["public"]["Tables"]["drone_sites"]["Row"];
 type MissionRow = Database["public"]["Tables"]["drone_missions"]["Row"];
 type MissionVersionRow = Database["public"]["Tables"]["drone_mission_versions"]["Row"];
 type DatasetRow = Database["public"]["Tables"]["drone_datasets"]["Row"];
+type IngestSessionRow = Database["public"]["Tables"]["drone_ingest_sessions"]["Row"];
 type JobRow = Database["public"]["Tables"]["drone_processing_jobs"]["Row"];
 type OutputRow = Database["public"]["Tables"]["drone_processing_outputs"]["Row"];
 type JobEventRow = Database["public"]["Tables"]["drone_processing_job_events"]["Row"];
@@ -19,6 +20,7 @@ export type MissionDetail = {
   site: SiteRow | null;
   versions: MissionVersionRow[];
   datasets: DatasetRow[];
+  ingestSessions: IngestSessionRow[];
   jobs: JobRow[];
   outputs: OutputRow[];
   events: JobEventRow[];
@@ -111,7 +113,7 @@ export async function getMissionDetail(
 
   const missionRow = mission as MissionRow;
 
-  const [projectResult, siteResult, versionsResult, datasetsResult, jobsResult] = await Promise.all([
+  const [projectResult, siteResult, versionsResult, datasetsResult, ingestSessionsResult, jobsResult] = await Promise.all([
     supabase
       .from("drone_projects")
       .select("id, org_id, name, slug, status, description, created_by, created_at, updated_at, archived_at")
@@ -133,6 +135,12 @@ export async function getMissionDetail(
     supabase
       .from("drone_datasets")
       .select("id, org_id, project_id, site_id, mission_id, name, slug, kind, status, captured_at, spatial_footprint, metadata, created_by, created_at, updated_at, archived_at")
+      .eq("org_id", orgId)
+      .eq("mission_id", missionRow.id)
+      .order("updated_at", { ascending: false }),
+    supabase
+      .from("drone_ingest_sessions")
+      .select("id, org_id, mission_id, dataset_id, session_label, source_type, status, source_filename, source_zip_path, extracted_dataset_path, benchmark_summary_path, run_log_path, review_bundle_zip_path, image_count, file_size_bytes, review_bundle_ready, truthful_pass, metadata, notes, created_by, created_at, updated_at")
       .eq("org_id", orgId)
       .eq("mission_id", missionRow.id)
       .order("updated_at", { ascending: false }),
@@ -170,6 +178,7 @@ export async function getMissionDetail(
     site: (siteResult.data as SiteRow | null) ?? null,
     versions: (versionsResult.data ?? []) as MissionVersionRow[],
     datasets: (datasetsResult.data ?? []) as DatasetRow[],
+    ingestSessions: (ingestSessionsResult.data ?? []) as IngestSessionRow[],
     jobs,
     outputs: (outputsResult.data ?? []) as OutputRow[],
     events: (eventsResult.data ?? []) as JobEventRow[],

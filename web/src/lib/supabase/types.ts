@@ -155,6 +155,39 @@ export type Database = {
           archived_at: string | null;
         };
       };
+      drone_ingest_sessions: {
+        Row: {
+          id: string;
+          org_id: string;
+          mission_id: string;
+          dataset_id: string | null;
+          session_label: string;
+          source_type: "browser_zip" | "local_zip" | "external_zip";
+          status:
+            | "recorded"
+            | "zip_received"
+            | "extracted"
+            | "benchmark_complete"
+            | "review_bundle_ready"
+            | "blocked"
+            | "archived";
+          source_filename: string | null;
+          source_zip_path: string | null;
+          extracted_dataset_path: string | null;
+          benchmark_summary_path: string | null;
+          run_log_path: string | null;
+          review_bundle_zip_path: string | null;
+          image_count: number | null;
+          file_size_bytes: number | null;
+          review_bundle_ready: boolean;
+          truthful_pass: boolean | null;
+          metadata: Json;
+          notes: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+      };
       drone_processing_jobs: {
         Row: {
           id: string;

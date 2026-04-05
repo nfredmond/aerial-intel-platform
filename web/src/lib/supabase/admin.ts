@@ -104,6 +104,28 @@ export type DatasetInsert = {
   created_by?: string | null;
 };
 
+export type IngestSessionInsert = {
+  org_id: string;
+  mission_id: string;
+  dataset_id?: string | null;
+  session_label: string;
+  source_type?: string;
+  status?: string;
+  source_filename?: string | null;
+  source_zip_path?: string | null;
+  extracted_dataset_path?: string | null;
+  benchmark_summary_path?: string | null;
+  run_log_path?: string | null;
+  review_bundle_zip_path?: string | null;
+  image_count?: number | null;
+  file_size_bytes?: number | null;
+  review_bundle_ready?: boolean;
+  truthful_pass?: boolean | null;
+  metadata?: Json;
+  notes?: string | null;
+  created_by?: string | null;
+};
+
 export type ProcessingJobInsert = {
   org_id: string;
   project_id: string;
@@ -245,6 +267,18 @@ export async function insertMissionVersion(input: MissionVersionInsert) {
 export async function insertDataset(input: DatasetInsert) {
   const rows = await adminRestRequest<Array<{ id: string }>>(
     "drone_datasets?select=id",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+
+  return rows[0] ?? null;
+}
+
+export async function insertIngestSession(input: IngestSessionInsert) {
+  const rows = await adminRestRequest<Array<{ id: string }>>(
+    "drone_ingest_sessions?select=id",
     {
       method: "POST",
       body: JSON.stringify(input),

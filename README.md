@@ -23,6 +23,7 @@ See the charter and docs folder for current scope and architecture. The repo is 
 - Local ZIP -> extract -> single-host Docker ODM run -> review bundle -> optional Supabase import
 - Imported benchmark-backed jobs/artifacts can render in `/jobs/[jobId]` and `/artifacts/[artifactId]`
 - Artifact review/share/export audit surfaces exist in the web app
+- Mission detail can record honest v1 intake sessions for ZIP evidence, benchmark paths, and review-bundle readiness while browser upload is still pending
 
 ### Not real yet
 - Browser-native ZIP upload and resumable ingest

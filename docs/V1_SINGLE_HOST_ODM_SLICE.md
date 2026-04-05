@@ -18,6 +18,7 @@ The slice is:
 - Review bundle generation from actual emitted files via `scripts/build_v1_review_bundle.mjs`
 - Optional import of the same run into Supabase via `scripts/import_odm_benchmark_run.mjs`
 - Web app surfaces for imported jobs and artifacts (`/jobs/[jobId]`, `/artifacts/[artifactId]`)
+- Mission-level intake session records that can capture ZIP evidence, benchmark paths, review-bundle ZIP paths, and truthful pass/fail posture while browser upload remains unbuilt
 
 ### Not real today
 - Browser-native ZIP upload/resumable ingest
@@ -73,7 +74,7 @@ The bundle intentionally carries evidence, not just outputs:
 ## Recommended next implementation order
 
 1. **Browser upload parity**
-   - add storage-backed ZIP upload / ingest session records
+   - add storage-backed ZIP upload on top of the now-present ingest session records
    - keep the same review-bundle contract
 2. **Real job orchestration**
    - replace manual/proving job progression with actual NodeODM state transitions
