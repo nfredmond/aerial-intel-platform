@@ -13,6 +13,7 @@ import {
 import {
   getBenchmarkSummaryView,
 } from "@/lib/benchmark-summary";
+import { buildRetryJobInputSummary, buildRetryJobOutputSummary, buildRetryOutputSeeds } from "@/lib/job-retries";
 import { getJobDetail, getString } from "@/lib/missions/detail-data";
 import {
   advanceManualProvingJob,
@@ -21,6 +22,7 @@ import {
 import {
   insertJobEvent,
   insertProcessingJob,
+  insertProcessingOutputs,
   updateProcessingJob,
 } from "@/lib/supabase/admin";
 
@@ -230,12 +232,6 @@ export default async function JobDetailPage({
     }
 
     try {
-      const clonedInputSummary = {
-        ...refreshedDetail.inputSummary,
-        name: `${getString(refreshedDetail.inputSummary.name, `${refreshedDetail.job.engine.toUpperCase()} job`)} retry`,
-        retryOfJobId: refreshedDetail.job.id,
-      };
-
       const insertedJob = await insertProcessingJob({
         org_id: refreshedAccess.org.id,
         project_id: refreshedDetail.job.project_id,
@@ -248,12 +244,15 @@ export default async function JobDetailPage({
         stage: "queued",
         progress: 0,
         queue_position: 1,
-        input_summary: clonedInputSummary,
-        output_summary: {
-          eta: "Pending queue pickup",
-          notes: `Retry requested from job ${refreshedDetail.job.id}.`,
-          runLogPath: refreshedDetail.outputSummary.runLogPath,
-        },
+        input_summary: buildRetryJobInputSummary({
+          inputSummary: refreshedDetail.inputSummary,
+          engine: refreshedDetail.job.engine,
+          previousJobId: refreshedDetail.job.id,
+        }),
+        output_summary: buildRetryJobOutputSummary({
+          outputSummary: refreshedDetail.outputSummary,
+          previousJobId: refreshedDetail.job.id,
+        }),
         external_job_reference: null,
         created_by: refreshedAccess.user.id,
       });
@@ -262,13 +261,24 @@ export default async function JobDetailPage({
         redirect(`/jobs/${jobId}?action=error`);
       }
 
+      const retryOutputs = buildRetryOutputSeeds({
+        outputs: refreshedDetail.outputs,
+        orgId: refreshedAccess.org.id,
+        nextJobId: insertedJob.id,
+        previousJobId: refreshedDetail.job.id,
+      });
+
+      if (retryOutputs.length > 0) {
+        await insertProcessingOutputs(retryOutputs);
+      }
+
       await insertJobEvent({
         org_id: refreshedAccess.org.id,
         job_id: insertedJob.id,
         event_type: "job.retried",
         payload: {
           title: "Retry job queued",
-          detail: `Retry requested from job ${refreshedDetail.job.id}.`,
+          detail: `Retry requested from job ${refreshedDetail.job.id}. ${retryOutputs.length > 0 ? `Restaged ${retryOutputs.length} output placeholder(s) for the new run.` : "No prior outputs existed to restage."}`,
         },
       });
 
