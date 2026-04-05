@@ -76,11 +76,16 @@ if [[ -z "$(find "$DATASET_ROOT/images" -type f | head -n 1)" ]]; then
 fi
 
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
-RUN_DIR="benchmark/$TIMESTAMP"
+RUN_DIR="${BENCHMARK_RUN_DIR:-benchmark/$TIMESTAMP}"
 RUN_LOG="$RUN_DIR/run.log"
 SUMMARY_JSON="$RUN_DIR/summary.json"
 START_EPOCH="$(date +%s)"
 START_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+if [[ -e "$RUN_DIR" ]]; then
+  echo "Error: benchmark run directory already exists: $RUN_DIR" >&2
+  exit 1
+fi
 
 mkdir -p "$RUN_DIR"
 

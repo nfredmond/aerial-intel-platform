@@ -9,13 +9,68 @@ See the charter and docs folder for current scope and architecture. The repo is 
 ## Current Implementation Tracks
 
 - ODM benchmark harness (`scripts/run_odm_benchmark.sh`)
+- Truthful local v1 slice orchestrator (`scripts/e2e_v1_slice.sh`)
+- Download-first review bundle builder (`scripts/build_v1_review_bundle.mjs`)
 - Auth delivery readiness plan (`docs/AUTH_DELIVERY_READINESS_2026-03-03.md`)
 - Aerial Operations OS execution plan (`docs/AERIAL_OPERATIONS_OS_EXECUTION_PLAN_2026-03-15.md`)
 - Supabase auth/entitlement schema scaffold (`supabase/migrations/202603040001_droneops_auth_foundation.sql`)
 - Core aerial-ops domain schema scaffold (`supabase/migrations/202603150001_aerial_ops_core_foundation.sql`)
 - Mission-control web shell with protected dashboard + `/missions` workspace (`web/`)
 
-## Quickstart (Benchmark Script)
+## Truthful status snapshot
+
+### Real now
+- Local ZIP -> extract -> single-host Docker ODM run -> review bundle -> optional Supabase import
+- Imported benchmark-backed jobs/artifacts can render in `/jobs/[jobId]` and `/artifacts/[artifactId]`
+- Artifact review/share/export audit surfaces exist in the web app
+
+### Not real yet
+- Browser-native ZIP upload and resumable ingest
+- Real NodeODM/ClusterODM orchestration initiated from the app
+- Signed-download delivery, TiTiler-backed raster viewing, and compute-worker automation for actual ODM jobs
+- Install bundles derived from real mission-planner/controller exports rather than placeholder handoff records
+
+See `docs/V1_SINGLE_HOST_ODM_SLICE.md` for the current v1 slice definition and acceptance bar.
+
+## Quickstart (single-host v1 slice)
+
+Run the first truthful local slice against a mission ZIP that contains imagery:
+
+```bash
+./scripts/e2e_v1_slice.sh <images_zip_file> <project_slug> --mission-name "<mission label>"
+```
+
+Example:
+
+```bash
+./scripts/e2e_v1_slice.sh ./sample-datasets/gv-downtown.zip gv-downtown \
+  --mission-name "Grass Valley downtown curb inventory"
+```
+
+This produces:
+
+- `.data/v1_slice_<project_slug>_<timestamp>/dataset/images/*`
+- `benchmark/<timestamp>_<project_slug>/run.log`
+- `benchmark/<timestamp>_<project_slug>/summary.json`
+- `.data/v1_slice_<project_slug>_<timestamp>/export_bundle/REVIEW.md`
+- `.data/v1_slice_<project_slug>_<timestamp>/export_bundle/EXPORT_MANIFEST.json`
+- `.data/v1_slice_<project_slug>_<timestamp>/export_bundle_<project_slug>.zip`
+
+The script exits non-zero if the ODM run fails to clear the truthful v1 bar, but it still preserves the review bundle so the run can be inspected honestly.
+
+### Optional: import the same run into Supabase
+
+```bash
+SUPABASE_URL=https://<project-ref>.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
+./scripts/e2e_v1_slice.sh ./sample-datasets/gv-downtown.zip gv-downtown \
+  --mission-name "Grass Valley downtown curb inventory" \
+  --import-to-db \
+  --org-slug acme-drone-co \
+  --mission-id <mission-uuid>
+```
+
+## Quickstart (benchmark script only)
 
 Run ODM against a dataset folder that contains an `images/` directory:
 
@@ -33,6 +88,8 @@ Artifacts are written to:
 
 - `benchmark/<timestamp>/run.log`
 - `benchmark/<timestamp>/summary.json`
+
+You can override the run folder for orchestration scripts by setting `BENCHMARK_RUN_DIR`.
 
 `summary.json` now includes output presence checks in `outputs` for:
 
