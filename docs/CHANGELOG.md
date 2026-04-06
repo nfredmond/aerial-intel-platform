@@ -1,5 +1,7 @@
 # Changelog
 
+- Wired browser ZIP intake to a truthful direct-to-storage path: mission detail now requests a signed Supabase Storage upload URL, uploads the ZIP from the browser into the protected `drone-ops` bucket, then records an ingest session with durable storage evidence while explicitly keeping extraction, benchmarking, and ODM orchestration pending.
+
 ## Unreleased
 - Added honest mission-level ingest session tracking for the truthful ODM v1 lane: a new `drone_ingest_sessions` table plus mission-detail form/list now records ZIP evidence, extracted dataset paths, benchmark/run-log paths, review-bundle ZIP paths, truthful pass/fail posture, and operator notes without pretending browser upload already exists.
 - Added a truthful local v1 ODM slice centered on `scripts/e2e_v1_slice.sh`: ZIP ingest now fans into a deterministic benchmark run folder, builds a download-first review bundle from only real emitted outputs, writes a machine-readable export manifest plus human review note, optionally imports the same summary into Supabase with explicit org/mission targeting, and exits non-zero when required outputs are missing instead of falsely claiming success.

@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-button";
+import { BrowserZipIntakeForm } from "@/components/browser-zip-intake-form";
 import { GeometryJsonField } from "@/components/geometry-json-field";
 import { GeometryPreviewCard } from "@/components/geometry-preview-card";
 import { MissionStatusDashboard } from "@/components/mission-status-dashboard";
@@ -16,6 +17,7 @@ import {
 } from "@/lib/artifact-handoff";
 import {
   buildBrowserZipIntakeDraft,
+  buildBrowserZipStoragePath,
   isZipFilename,
 } from "@/lib/browser-zip-intake";
 import {
@@ -68,6 +70,7 @@ import {
   updateMission,
   updateMissionVersion,
 } from "@/lib/supabase/admin";
+import { createDroneOpsSignedUploadTicket } from "@/lib/supabase/admin-storage";
 import type { Json } from "@/lib/supabase/types";
 
 function formatDateTime(value: string | null) {
@@ -237,6 +240,8 @@ function getCalloutMessage(options: {
       ? "Truthful v1 intake session recorded. Use it to track ZIP evidence, benchmark paths, and review-bundle readiness without pretending browser upload already exists."
       : options.ingest === "browser-recorded"
         ? "Browser ZIP evidence recorded. The mission now has a new ingest session with the selected ZIP filename and size, but durable upload/storage, extraction, and ODM orchestration still have not run."
+        : options.ingest === "browser-uploaded"
+          ? "Browser ZIP uploaded into protected intake storage and recorded on this mission. Durable upload now exists; extraction, benchmarking, and ODM orchestration still remain pending until a worker picks up the batch."
       : options.ingest === "missing-label"
         ? "An intake label is required before the session can be recorded."
         : options.ingest === "browser-missing-file"
@@ -574,39 +579,134 @@ export default async function MissionDetailPage({
     redirect(`/missions/${missionId}?ingest=1`);
   }
 
-  async function recordBrowserZipSelection(formData: FormData) {
+  async function prepareBrowserZipUpload(formData: FormData) {
     "use server";
 
     const refreshedAccess = await getDroneOpsAccess();
     if (!refreshedAccess.user) {
-      redirect("/sign-in");
+      return { ok: false as const, error: "Please sign in again before uploading a mission ZIP." };
     }
 
-    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
-      redirect("/dashboard");
+    if (!refreshedAccess.org?.id || !refreshedAccess.org.slug || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      return { ok: false as const, error: "The current organization context is missing or inactive." };
     }
 
     if (refreshedAccess.role === "viewer") {
-      redirect(`/missions/${missionId}?ingest=denied`);
+      return { ok: false as const, error: "Viewer access cannot upload mission ZIPs." };
     }
 
     const refreshedDetail = await getMissionDetail(refreshedAccess, missionId);
     if (!refreshedDetail) {
-      redirect("/missions");
+      return { ok: false as const, error: "This mission could not be refreshed before upload." };
     }
 
-    const browserZipFile = formData.get("browserZipFile");
-    if (!(browserZipFile instanceof File) || browserZipFile.size <= 0 || browserZipFile.name.trim().length === 0) {
-      redirect(`/missions/${missionId}?ingest=browser-missing-file`);
+    const filenameValue = formData.get("browserZipFilename");
+    const filename = typeof filenameValue === "string" ? filenameValue.trim() : "";
+    if (!filename) {
+      return { ok: false as const, error: "Choose a ZIP file before uploading browser intake evidence." };
     }
 
-    if (!isZipFilename(browserZipFile.name)) {
-      redirect(`/missions/${missionId}?ingest=browser-invalid-file`);
+    if (!isZipFilename(filename)) {
+      return { ok: false as const, error: "Choose a .zip file. Folder ingest and non-ZIP uploads still are not supported in this lane." };
+    }
+
+    const fileSizeBytesValue = Number(formData.get("browserZipFileSizeBytes"));
+    const fileSizeBytes = Number.isFinite(fileSizeBytesValue) && fileSizeBytesValue > 0 ? fileSizeBytesValue : 0;
+    if (!fileSizeBytes) {
+      return { ok: false as const, error: "The ZIP size was not available from the browser upload request." };
+    }
+
+    const linkedDatasetIdValue = formData.get("browserLinkedDatasetId");
+    const linkedDatasetId = typeof linkedDatasetIdValue === "string" && linkedDatasetIdValue.trim().length > 0
+      ? linkedDatasetIdValue.trim()
+      : null;
+
+    const sessionLabelValue = formData.get("browserSessionLabel");
+    const sessionLabel = typeof sessionLabelValue === "string" && sessionLabelValue.trim().length > 0
+      ? sessionLabelValue.trim()
+      : null;
+
+    const notesValue = formData.get("browserSessionNotes");
+    const notes = typeof notesValue === "string" && notesValue.trim().length > 0
+      ? notesValue.trim()
+      : null;
+
+    try {
+      const path = buildBrowserZipStoragePath({
+        orgSlug: refreshedAccess.org.slug,
+        missionId: refreshedDetail.mission.id,
+        filename,
+      });
+      const ticket = await createDroneOpsSignedUploadTicket(path);
+
+      return {
+        ok: true as const,
+        bucket: ticket.bucket,
+        path: ticket.path,
+        token: ticket.token,
+        filename,
+        fileSizeBytes,
+        linkedDatasetId,
+        sessionLabel,
+        notes,
+      };
+    } catch (error) {
+      const message = error instanceof Error && error.message.trim().length > 0
+        ? error.message
+        : "A signed upload URL could not be created for this mission ZIP.";
+      return { ok: false as const, error: message };
+    }
+  }
+
+  async function finalizeBrowserZipUpload(formData: FormData) {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      return { ok: false as const, error: "Please sign in again before finalizing the ingest session." };
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      return { ok: false as const, error: "The current organization context is missing or inactive." };
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      return { ok: false as const, error: "Viewer access cannot finalize browser ZIP ingest sessions." };
+    }
+
+    const refreshedDetail = await getMissionDetail(refreshedAccess, missionId);
+    if (!refreshedDetail) {
+      return { ok: false as const, error: "This mission could not be refreshed after the upload completed." };
+    }
+
+    const filenameValue = formData.get("browserZipFilename");
+    const filename = typeof filenameValue === "string" ? filenameValue.trim() : "";
+    if (!filename || !isZipFilename(filename)) {
+      return { ok: false as const, error: "The uploaded file reference is missing or not a ZIP." };
+    }
+
+    const fileSizeBytesValue = Number(formData.get("browserZipFileSizeBytes"));
+    const fileSizeBytes = Number.isFinite(fileSizeBytesValue) && fileSizeBytesValue > 0 ? fileSizeBytesValue : null;
+
+    const storageBucketValue = formData.get("browserStorageBucket");
+    const storageBucket = typeof storageBucketValue === "string" && storageBucketValue.trim().length > 0
+      ? storageBucketValue.trim()
+      : null;
+
+    const storagePathValue = formData.get("browserStoragePath");
+    const storagePath = typeof storagePathValue === "string" && storagePathValue.trim().length > 0
+      ? storagePathValue.trim()
+      : null;
+
+    if (!storageBucket || !storagePath) {
+      return { ok: false as const, error: "The uploaded ZIP storage location was not available for ingest finalization." };
     }
 
     const draft = buildBrowserZipIntakeDraft({
       missionName: refreshedDetail.mission.name,
-      filename: browserZipFile.name,
+      filename,
+      uploadPersisted: true,
+      storagePath,
     });
 
     const linkedDatasetIdValue = formData.get("browserLinkedDatasetId");
@@ -635,25 +735,30 @@ export default async function MissionDetailPage({
         session_label: sessionLabel,
         source_type: draft.sourceType,
         status: draft.status,
-        source_filename: browserZipFile.name,
-        file_size_bytes: browserZipFile.size,
+        source_filename: filename,
+        source_zip_path: `${storageBucket}/${storagePath}`,
+        file_size_bytes: fileSizeBytes,
         review_bundle_ready: draft.reviewBundleReady,
         truthful_pass: draft.truthfulPass,
         metadata: {
           ...draft.metadata,
-          sourceFilename: browserZipFile.name,
-          fileSizeBytes: browserZipFile.size,
-          browserMimeType: browserZipFile.type || null,
+          sourceFilename: filename,
+          fileSizeBytes,
+          storageBucket,
+          storagePath,
           linkedDatasetId,
         },
         notes,
         created_by: refreshedAccess.user.id,
       });
-    } catch {
-      redirect(`/missions/${missionId}?ingest=error`);
+    } catch (error) {
+      const message = error instanceof Error && error.message.trim().length > 0
+        ? error.message
+        : "The ingest session could not be finalized after the ZIP upload.";
+      return { ok: false as const, error: message };
     }
 
-    redirect(`/missions/${missionId}?ingest=browser-recorded`);
+    return { ok: true as const, redirectTo: `/missions/${missionId}?ingest=browser-uploaded` };
   }
 
   async function queueMissionProcessing() {
@@ -1759,57 +1864,13 @@ export default async function MissionDetailPage({
             </div>
           </dl>
 
-          <form action={recordBrowserZipSelection} className="stack-sm surface-form-shell">
-            <div className="stack-xs">
-              <h3>Record browser ZIP evidence</h3>
-              <p className="muted">
-                Select a mission ZIP from the browser and create a truthful ingest-session record automatically. This captures filename + size evidence only; it does not persist the file, extract imagery, or start ODM yet.
-              </p>
-            </div>
-            <label className="stack-xs">
-              <span>Mission ZIP</span>
-              <input
-                name="browserZipFile"
-                type="file"
-                accept=".zip,application/zip,application/x-zip-compressed"
-                required
-              />
-            </label>
-            <div className="form-grid-2">
-              <label className="stack-xs">
-                <span>Session label override (optional)</span>
-                <input
-                  name="browserSessionLabel"
-                  type="text"
-                  placeholder={`${detail.mission.name} browser ZIP intake · mission-batch.zip`}
-                />
-              </label>
-              <label className="stack-xs">
-                <span>Linked dataset</span>
-                <select name="browserLinkedDatasetId" defaultValue="">
-                  <option value="">No linked dataset yet</option>
-                  {detail.datasets.map((dataset) => (
-                    <option key={`browser-intake-${dataset.id}`} value={dataset.id}>{dataset.name}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <label className="stack-xs">
-              <span>Operator notes (optional)</span>
-              <textarea
-                name="browserSessionNotes"
-                rows={3}
-                placeholder="Capture who selected the ZIP, what it should contain, or what should happen next."
-              />
-            </label>
-            <button
-              type="submit"
-              className="button button-primary"
-              disabled={access.role === "viewer"}
-            >
-              Record browser ZIP evidence
-            </button>
-          </form>
+          <BrowserZipIntakeForm
+            missionName={detail.mission.name}
+            datasets={detail.datasets.map((dataset) => ({ id: dataset.id, name: dataset.name }))}
+            disabled={access.role === "viewer"}
+            prepareUpload={prepareBrowserZipUpload}
+            finalizeUpload={finalizeBrowserZipUpload}
+          />
 
           <form action={recordIngestSession} className="stack-sm surface-form-shell">
             <div className="stack-xs">

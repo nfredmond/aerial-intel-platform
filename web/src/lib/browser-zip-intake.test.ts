@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildBrowserZipIntakeDraft,
+  buildBrowserZipStoragePath,
   isZipFilename,
 } from "./browser-zip-intake";
 
@@ -36,6 +37,27 @@ describe("buildBrowserZipIntakeDraft", () => {
       uploadPersisted: false,
       extractionStarted: false,
       orchestrationStarted: false,
+      storagePath: null,
+    });
+  });
+
+  it("records storage-backed browser uploads honestly without implying processing ran", () => {
+    const draft = buildBrowserZipIntakeDraft({
+      missionName: "Grass Valley downtown curb inventory",
+      filename: "gv-downtown.zip",
+      uploadPersisted: true,
+      storagePath: "org/mission-intake/mission-123/20260406165000-gv-downtown.zip",
+    });
+
+    expect(draft.status).toBe("zip_uploaded");
+    expect(draft.notes).toContain("managed intake storage");
+    expect(draft.notes).toContain("Extraction, benchmarking, and ODM orchestration have not run yet");
+    expect(draft.metadata).toEqual({
+      intakeMode: "browser_file_picker",
+      uploadPersisted: true,
+      extractionStarted: false,
+      orchestrationStarted: false,
+      storagePath: "org/mission-intake/mission-123/20260406165000-gv-downtown.zip",
     });
   });
 
@@ -46,5 +68,16 @@ describe("buildBrowserZipIntakeDraft", () => {
     });
 
     expect(draft.sessionLabel).toBe("Colgate slope baseline browser ZIP intake · colgate-phase-1.zip");
+  });
+});
+
+describe("buildBrowserZipStoragePath", () => {
+  it("creates a stable storage path for managed mission intake uploads", () => {
+    expect(buildBrowserZipStoragePath({
+      orgSlug: "Nat Ford Planning",
+      missionId: "Mission 123",
+      filename: "GV Downtown Final Batch.ZIP",
+      uploadedAt: "2026-04-06T16:50:00.000Z",
+    })).toBe("nat-ford-planning/mission-intake/mission-123/20260406165000-gv-downtown-final-batch.zip");
   });
 });

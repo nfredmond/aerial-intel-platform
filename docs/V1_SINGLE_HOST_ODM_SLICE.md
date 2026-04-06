@@ -18,7 +18,7 @@ The slice is:
 - Review bundle generation from actual emitted files via `scripts/build_v1_review_bundle.mjs`
 - Optional import of the same run into Supabase via `scripts/import_odm_benchmark_run.mjs`
 - Web app surfaces for imported jobs and artifacts (`/jobs/[jobId]`, `/artifacts/[artifactId]`)
-- Mission-level intake session records that can capture ZIP evidence, benchmark paths, review-bundle ZIP paths, and truthful pass/fail posture while browser upload remains unbuilt
+- Mission-level intake session records that can capture ZIP evidence, protected browser-upload storage paths, benchmark paths, review-bundle ZIP paths, and truthful pass/fail posture without implying extraction or ODM orchestration already ran
 
 ### Not real today
 - Browser-native ZIP upload/resumable ingest
