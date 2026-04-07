@@ -126,6 +126,12 @@ describe("managed-processing", () => {
         responseStatus: 202,
         externalRunReference: "run-42",
         lastAttemptAt: "2026-04-06T18:00:00.000Z",
+        callbackStatus: "running",
+        callbackId: "cb-1",
+        lastCallbackAt: "2026-04-06T18:05:00.000Z",
+        workerStage: "nodeodm:orthophoto",
+        lastMessage: "NodeODM is building orthophoto tiles.",
+        reportedProgress: 62,
       },
     });
 
@@ -133,6 +139,10 @@ describe("managed-processing", () => {
     expect(adapter.adapterLabel).toBe("NodeODM webhook");
     expect(adapter.responseStatus).toBe(202);
     expect(adapter.externalRunReference).toBe("run-42");
+    expect(adapter.callbackStatus).toBe("running");
+    expect(adapter.callbackId).toBe("cb-1");
+    expect(adapter.workerStage).toBe("nodeodm:orthophoto");
+    expect(adapter.reportedProgress).toBe(62);
   });
 
   it("blocks QA start until outputs are attached", () => {

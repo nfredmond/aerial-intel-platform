@@ -1135,10 +1135,27 @@ Operator note: ${operatorNotes}`
                   <dt>HTTP status</dt>
                   <dd>{dispatchAdapter?.responseStatus ?? "None"}</dd>
                 </div>
+                <div className="kv-row">
+                  <dt>Callback status</dt>
+                  <dd>{dispatchAdapter?.callbackStatus ?? "Not received"}</dd>
+                </div>
+                <div className="kv-row">
+                  <dt>Last callback</dt>
+                  <dd>{formatDateTime(dispatchAdapter?.lastCallbackAt ?? null)}</dd>
+                </div>
+                <div className="kv-row">
+                  <dt>Worker stage</dt>
+                  <dd>{dispatchAdapter?.workerStage ?? "Not reported"}</dd>
+                </div>
+                <div className="kv-row">
+                  <dt>Reported progress</dt>
+                  <dd>{dispatchAdapter?.reportedProgress ?? "Not reported"}</dd>
+                </div>
               </dl>
               {dispatchAdapter?.externalRunReference ? (
                 <p className="muted">Adapter external run reference: {dispatchAdapter.externalRunReference}</p>
               ) : null}
+              {dispatchAdapter?.lastMessage ? <p className="muted">Last worker message: {dispatchAdapter.lastMessage}</p> : null}
               {dispatchAdapter?.lastError ? <p className="muted">Last adapter error: {dispatchAdapter.lastError}</p> : null}
             </div>
           ) : null}

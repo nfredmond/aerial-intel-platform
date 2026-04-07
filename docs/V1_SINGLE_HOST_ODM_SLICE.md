@@ -23,6 +23,7 @@ The slice is:
 - Managed job detail now includes a browser-based operator import lane that can upload benchmark evidence, review bundle ZIPs, and real output files into protected storage, then attach them to the managed job without shell access
 - Managed job detail now includes a browser-recorded dispatch handoff that captures assigned host, optional worker, external run reference, dispatch note, and event history before the request is marked as truly handed to processing infrastructure
 - Managed job detail can now hit a real `aerial-dispatch-adapter.v1` webhook contract when configured, so the app can attempt a true launch, persist accepted external run metadata, and record failed/unconfigured launch attempts without falsely advancing the job
+- The app now has a first `aerial-dispatch-adapter-callback.v1` return leg: authenticated worker/adapter callbacks can sync accepted/running/failed/canceled state and an honest `awaiting_output_import` checkpoint back into the managed job without pretending QA or delivery already happened
 
 ### Not real today
 - Browser-native ZIP upload/resumable ingest beyond the current signed-upload path
@@ -82,7 +83,7 @@ The bundle intentionally carries evidence, not just outputs:
 2. **Managed-job import closure**
    - continue the new attach-to-existing-job import lane until operators can close the whole managed-processing loop without sidecar DB edits or shell uploads
 3. **App-to-worker dispatch automation**
-   - expand the new webhook-based dispatch adapter contract into broader worker coverage, callback/status sync, and retry-safe orchestration instead of a single launch-attempt adapter
+   - expand the now-landed webhook launch + first callback/status return leg into broader worker coverage, richer retry-safe orchestration, and fleet-wide synchronization instead of a single launch/callback pair
 4. **Storage-backed delivery expansion**
    - extend the now-landed signed-download path for storage-published imported outputs/review bundles into a broader default delivery contract
 5. **Raster review upgrade**

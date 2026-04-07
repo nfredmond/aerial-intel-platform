@@ -31,11 +31,12 @@ See the charter and docs folder for current scope and architecture. The repo is 
 - Managed job detail can now import real benchmark evidence, optional review bundle/run log, and uploaded output artifacts directly from the browser into protected storage, then attach them onto the managed job without relying on the shell-only import script
 - Managed job detail now includes an honest dispatch handoff form: operators can record the assigned processing host, optional worker/slot, external run reference, and dispatch notes before the app advances the request into processing, and the job timeline/UI reflects that real handoff metadata
 - Managed job detail can now call a first real dispatch adapter contract when `AERIAL_DISPATCH_ADAPTER_URL` is configured: the app posts a deterministic `aerial-dispatch-adapter.v1` launch payload to a webhook, records accepted external run metadata on success, and records failed/unconfigured launch attempts honestly without claiming compute started
+- The first truthful dispatch return leg now exists: `/api/dispatch/adapter/callback` can accept authenticated `aerial-dispatch-adapter-callback.v1` worker/adapter status callbacks, sync job progress/timeline metadata back into the app, and stop at `awaiting_output_import` instead of falsely claiming QA or delivery completion
 
 ### Not real yet
 - Resumable/browser-recoverable ingest beyond the current signed-upload path
 - Real NodeODM/ClusterODM orchestration initiated from the app
-- Generalized worker-side execution beyond the first webhook adapter contract (today the app can launch against one configured adapter contract, but broader worker automation, retries, and status callbacks are still pending)
+- Generalized worker-side execution beyond the first webhook adapter contract (today the app can launch against one configured adapter contract, and it now has a first honest status callback return leg, but broader worker automation, retries, and richer fleet-wide synchronization are still pending)
 - Broad signed-download delivery beyond storage-published imported artifacts, TiTiler-backed raster viewing, and compute-worker automation for app-initiated ODM jobs
 - Install bundles derived from real mission-planner/controller exports rather than placeholder handoff records
 
@@ -195,28 +196,80 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
 AERIAL_DISPATCH_ADAPTER_URL=https://dispatch.example.com/launch
 AERIAL_DISPATCH_ADAPTER_LABEL=NodeODM dispatch webhook
 AERIAL_DISPATCH_ADAPTER_TOKEN=<optional-bearer-token>
+AERIAL_DISPATCH_CALLBACK_TOKEN=<optional-dedicated-bearer-token-for-inbound-callbacks>
 ```
 
 ### Optional dispatch adapter webhook contract
 
 When `AERIAL_DISPATCH_ADAPTER_URL` is configured, `/jobs/[jobId]` can attempt a real managed launch from the app during intake review.
 
-Request contract:
+Launch request contract:
 
 - `contractVersion = "aerial-dispatch-adapter.v1"`
 - deterministic `requestId`
 - org/job/project/mission/dataset identifiers and names
 - requested host / optional worker / dispatch notes
 
-Successful responses must return an external run reference via JSON or header:
+Successful launch responses must return an external run reference via JSON or header:
 
 - JSON keys accepted: `externalRunReference`, `external_run_reference`, `runId`, `run_id`
 - or response header: `x-external-run-reference`
 
+Status callback return-leg contract:
+
+- callback route: `POST /api/dispatch/adapter/callback`
+- auth: `Authorization: Bearer <AERIAL_DISPATCH_CALLBACK_TOKEN>` (falls back to `AERIAL_DISPATCH_ADAPTER_TOKEN` if no dedicated callback token is set)
+- `contractVersion = "aerial-dispatch-adapter-callback.v1"`
+- required fields:
+  - `callbackId`
+  - `requestId`
+  - `callbackAt`
+  - `orgId`
+  - `job.id`
+  - `status` = `accepted | running | awaiting_output_import | failed | canceled`
+- optional fields:
+  - `externalRunReference`
+  - `progress`
+  - `workerStage`
+  - `message`
+  - `dispatch.hostLabel`
+  - `dispatch.workerLabel`
+  - `metrics.queuePosition`
+  - `metrics.startedAt`
+  - `metrics.finishedAt`
+
+Example callback payload:
+
+```json
+{
+  "contractVersion": "aerial-dispatch-adapter-callback.v1",
+  "callbackId": "cb-20260406-0007",
+  "requestId": "dispatch-job-123-single-host-odm-01-default",
+  "callbackAt": "2026-04-06T18:30:00.000Z",
+  "orgId": "org-1",
+  "job": { "id": "job-123" },
+  "externalRunReference": "odm-20260406-gv-downtown",
+  "status": "awaiting_output_import",
+  "progress": 90,
+  "workerStage": "nodeodm:complete",
+  "message": "Compute finished; upload/import the real outputs before QA.",
+  "dispatch": {
+    "hostLabel": "single-host-odm-01",
+    "workerLabel": "docker-worker-2"
+  },
+  "metrics": {
+    "startedAt": "2026-04-06T18:05:00.000Z",
+    "finishedAt": "2026-04-06T18:29:30.000Z"
+  }
+}
+```
+
 Truth boundary:
 
-- accepted response -> app records real dispatch handoff + adapter metadata
-- failure/unconfigured -> app records the failed/prepared attempt and keeps the job in intake review
+- accepted/running callbacks -> app syncs worker status, progress, and timeline honestly
+- `awaiting_output_import` -> app records worker-side compute completion **without** claiming QA or delivery-ready state
+- failure/canceled callbacks -> app records the worker-side terminal state honestly
+- outputs still need a real import/attach step before QA/delivery can close
 - this is still an early single-adapter contract, not yet a full worker orchestration/control plane
 
 ## Import a real ODM benchmark run

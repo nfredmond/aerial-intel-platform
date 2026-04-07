@@ -37,6 +37,12 @@ export type ManagedDispatchAdapterState = {
   lastError: string | null;
   lastAttemptAt: string | null;
   acceptedAt: string | null;
+  callbackStatus: string | null;
+  callbackId: string | null;
+  lastCallbackAt: string | null;
+  workerStage: string | null;
+  lastMessage: string | null;
+  reportedProgress: number | null;
 };
 
 export type ManagedProcessingActionSource = "job-detail" | "mission-detail" | "workspace";
@@ -119,11 +125,18 @@ export function getManagedDispatchAdapterState(summary: unknown): ManagedDispatc
       lastError: null,
       lastAttemptAt: null,
       acceptedAt: null,
+      callbackStatus: null,
+      callbackId: null,
+      lastCallbackAt: null,
+      workerStage: null,
+      lastMessage: null,
+      reportedProgress: null,
     };
   }
 
   const adapter = rawAdapter as JsonRecord;
   const responseStatusValue = adapter.responseStatus;
+  const reportedProgressValue = adapter.reportedProgress;
 
   return {
     mode: normalizeOptionalString(adapter.mode as string | null | undefined),
@@ -138,6 +151,14 @@ export function getManagedDispatchAdapterState(summary: unknown): ManagedDispatc
     lastError: normalizeOptionalString(adapter.lastError as string | null | undefined),
     lastAttemptAt: normalizeOptionalString(adapter.lastAttemptAt as string | null | undefined),
     acceptedAt: normalizeOptionalString(adapter.acceptedAt as string | null | undefined),
+    callbackStatus: normalizeOptionalString(adapter.callbackStatus as string | null | undefined),
+    callbackId: normalizeOptionalString(adapter.callbackId as string | null | undefined),
+    lastCallbackAt: normalizeOptionalString(adapter.lastCallbackAt as string | null | undefined),
+    workerStage: normalizeOptionalString(adapter.workerStage as string | null | undefined),
+    lastMessage: normalizeOptionalString(adapter.lastMessage as string | null | undefined),
+    reportedProgress: typeof reportedProgressValue === "number" && Number.isFinite(reportedProgressValue)
+      ? reportedProgressValue
+      : null,
   };
 }
 

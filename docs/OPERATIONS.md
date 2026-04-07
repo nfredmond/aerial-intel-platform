@@ -41,4 +41,40 @@ Current contract:
 - deterministic request id derived from job + host + worker
 - expected success return: external run reference in JSON (`externalRunReference`, `external_run_reference`, `runId`, `run_id`) or `x-external-run-reference` header
 
-Truth boundary: this is the first real app/API dispatch adapter slice, not yet a full worker-control plane. Broader worker retries, callbacks, and status synchronization still remain to be built.
+Truth boundary: this is the first real app/API dispatch adapter slice, not yet a full worker-control plane.
+
+## Dispatch adapter callback/status return leg (new truthful precursor)
+
+Use this when the worker or adapter needs to send status back into the app after launch acceptance.
+
+1. POST to `/api/dispatch/adapter/callback`.
+2. Authenticate with `Authorization: Bearer <AERIAL_DISPATCH_CALLBACK_TOKEN>`.
+   - If no dedicated callback token is configured, the route falls back to `AERIAL_DISPATCH_ADAPTER_TOKEN`.
+3. Send `contractVersion = "aerial-dispatch-adapter-callback.v1"` with:
+   - `callbackId`
+   - `requestId`
+   - `callbackAt`
+   - `orgId`
+   - `job.id`
+   - `status` (`accepted`, `running`, `awaiting_output_import`, `failed`, or `canceled`)
+4. Include optional worker context when available:
+   - `externalRunReference`
+   - `progress`
+   - `workerStage`
+   - `message`
+   - `dispatch.hostLabel`
+   - `dispatch.workerLabel`
+   - `metrics.queuePosition`
+   - `metrics.startedAt`
+   - `metrics.finishedAt`
+5. Confirm the truthful outcome in `/jobs/[jobId]`:
+   - dispatch adapter card shows callback status / last callback / worker stage / reported progress
+   - timeline records a `job.dispatch.callback.*` event
+   - job status/stage update only as far as the callback truly supports
+
+Truth boundary:
+
+- `accepted` / `running` mean worker-side processing is underway.
+- `awaiting_output_import` means compute may be complete, but the app still needs a real import/attach step before QA or delivery-ready status can be claimed.
+- `failed` / `canceled` record worker-side terminal state honestly.
+- This is the first honest return leg, but broader retry logic and richer fleet-wide synchronization are still future work.
