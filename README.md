@@ -30,11 +30,12 @@ See the charter and docs folder for current scope and architecture. The repo is 
 - Mission detail can now create a truthful managed-processing request that tracks operator intake review, host dispatch, QA start, and delivery-ready completion without staging fake artifacts before a real run is attached/imported
 - Managed job detail can now import real benchmark evidence, optional review bundle/run log, and uploaded output artifacts directly from the browser into protected storage, then attach them onto the managed job without relying on the shell-only import script
 - Managed job detail now includes an honest dispatch handoff form: operators can record the assigned processing host, optional worker/slot, external run reference, and dispatch notes before the app advances the request into processing, and the job timeline/UI reflects that real handoff metadata
+- Managed job detail can now call a first real dispatch adapter contract when `AERIAL_DISPATCH_ADAPTER_URL` is configured: the app posts a deterministic `aerial-dispatch-adapter.v1` launch payload to a webhook, records accepted external run metadata on success, and records failed/unconfigured launch attempts honestly without claiming compute started
 
 ### Not real yet
 - Resumable/browser-recoverable ingest beyond the current signed-upload path
 - Real NodeODM/ClusterODM orchestration initiated from the app
-- Automatic dispatch creation from the app into a real worker/NodeODM API (the app now records truthful dispatch handoff metadata, but an operator still performs the actual compute-side launch)
+- Generalized worker-side execution beyond the first webhook adapter contract (today the app can launch against one configured adapter contract, but broader worker automation, retries, and status callbacks are still pending)
 - Broad signed-download delivery beyond storage-published imported artifacts, TiTiler-backed raster viewing, and compute-worker automation for app-initiated ODM jobs
 - Install bundles derived from real mission-planner/controller exports rather than placeholder handoff records
 
@@ -191,7 +192,32 @@ Copy `web/.env.example` to `web/.env.local` and set:
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+AERIAL_DISPATCH_ADAPTER_URL=https://dispatch.example.com/launch
+AERIAL_DISPATCH_ADAPTER_LABEL=NodeODM dispatch webhook
+AERIAL_DISPATCH_ADAPTER_TOKEN=<optional-bearer-token>
 ```
+
+### Optional dispatch adapter webhook contract
+
+When `AERIAL_DISPATCH_ADAPTER_URL` is configured, `/jobs/[jobId]` can attempt a real managed launch from the app during intake review.
+
+Request contract:
+
+- `contractVersion = "aerial-dispatch-adapter.v1"`
+- deterministic `requestId`
+- org/job/project/mission/dataset identifiers and names
+- requested host / optional worker / dispatch notes
+
+Successful responses must return an external run reference via JSON or header:
+
+- JSON keys accepted: `externalRunReference`, `external_run_reference`, `runId`, `run_id`
+- or response header: `x-external-run-reference`
+
+Truth boundary:
+
+- accepted response -> app records real dispatch handoff + adapter metadata
+- failure/unconfigured -> app records the failed/prepared attempt and keeps the job in intake review
+- this is still an early single-adapter contract, not yet a full worker orchestration/control plane
 
 ## Import a real ODM benchmark run
 

@@ -26,10 +26,26 @@ export type ManagedDispatchHandoff = {
   dispatchSource: string | null;
 };
 
+export type ManagedDispatchAdapterState = {
+  mode: string | null;
+  adapterLabel: string | null;
+  endpoint: string | null;
+  requestId: string | null;
+  status: string | null;
+  responseStatus: number | null;
+  externalRunReference: string | null;
+  lastError: string | null;
+  lastAttemptAt: string | null;
+  acceptedAt: string | null;
+};
+
 export type ManagedProcessingActionSource = "job-detail" | "mission-detail" | "workspace";
 export type ManagedProcessingAdvanceResult =
   | "intake-started"
   | "dispatch-recorded"
+  | "awaiting-dispatch-handoff"
+  | "dispatch-launch-failed"
+  | "dispatch-launch-unconfigured"
   | "qa-started"
   | "managed-completed"
   | "awaiting-outputs"
@@ -84,6 +100,44 @@ export function getManagedDispatchHandoff(summary: unknown, externalJobReference
     dispatchedAt: normalizeOptionalString(dispatch?.dispatchedAt as string | null | undefined),
     dispatchedByEmail: normalizeOptionalString(dispatch?.dispatchedByEmail as string | null | undefined),
     dispatchSource: normalizeOptionalString(dispatch?.dispatchSource as string | null | undefined),
+  };
+}
+
+export function getManagedDispatchAdapterState(summary: unknown): ManagedDispatchAdapterState {
+  const record = asRecord(summary);
+  const rawAdapter = record.dispatchAdapter;
+
+  if (!rawAdapter || typeof rawAdapter !== "object" || Array.isArray(rawAdapter)) {
+    return {
+      mode: null,
+      adapterLabel: null,
+      endpoint: null,
+      requestId: null,
+      status: null,
+      responseStatus: null,
+      externalRunReference: null,
+      lastError: null,
+      lastAttemptAt: null,
+      acceptedAt: null,
+    };
+  }
+
+  const adapter = rawAdapter as JsonRecord;
+  const responseStatusValue = adapter.responseStatus;
+
+  return {
+    mode: normalizeOptionalString(adapter.mode as string | null | undefined),
+    adapterLabel: normalizeOptionalString(adapter.adapterLabel as string | null | undefined),
+    endpoint: normalizeOptionalString(adapter.endpoint as string | null | undefined),
+    requestId: normalizeOptionalString(adapter.requestId as string | null | undefined),
+    status: normalizeOptionalString(adapter.status as string | null | undefined),
+    responseStatus: typeof responseStatusValue === "number" && Number.isFinite(responseStatusValue)
+      ? responseStatusValue
+      : null,
+    externalRunReference: normalizeOptionalString(adapter.externalRunReference as string | null | undefined),
+    lastError: normalizeOptionalString(adapter.lastError as string | null | undefined),
+    lastAttemptAt: normalizeOptionalString(adapter.lastAttemptAt as string | null | undefined),
+    acceptedAt: normalizeOptionalString(adapter.acceptedAt as string | null | undefined),
   };
 }
 
@@ -247,6 +301,7 @@ async function recordManagedDispatch(options: {
   detail: JobDetailResult;
   source: ManagedProcessingActionSource;
   handoff: ManagedDispatchHandoffInput;
+  adapterState?: JsonRecord | null;
 }) {
   const sourceLabel = getSourceLabel(options.source);
   const now = new Date().toISOString();
@@ -268,6 +323,7 @@ async function recordManagedDispatch(options: {
       notes: `Operator dispatch recorded from ${sourceLabel}. Assigned host ${options.handoff.hostLabel} with external run reference ${options.handoff.externalRunReference}. This marks the managed handoff to real processing infrastructure, but outputs still need to be imported before QA can begin.`,
       latestCheckpoint: `Managed host dispatch recorded on ${options.handoff.hostLabel}`,
       deliveryPosture: "No client-facing deliverables should be promised until real outputs are imported.",
+      dispatchAdapter: options.adapterState ?? undefined,
       dispatchHandoff: {
         hostLabel: options.handoff.hostLabel,
         workerLabel,
@@ -332,6 +388,124 @@ export async function recordManagedDispatchHandoff(options: {
 
   await recordManagedDispatch(options);
   return "dispatch-recorded" as const;
+}
+
+export async function recordManagedDispatchAdapterOutcome(options: {
+  orgId: string;
+  detail: JobDetailResult;
+  source: ManagedProcessingActionSource;
+  handoff: ManagedDispatchHandoffInput;
+  adapter: {
+    mode: string;
+    adapterLabel: string;
+    endpoint: string;
+    requestId: string;
+    status: "accepted" | "failed" | "unconfigured";
+    responseStatus?: number | null;
+    acceptedAt?: string | null;
+    externalRunReference?: string | null;
+    lastError?: string | null;
+  };
+}) {
+  if (!isManagedProcessingJobDetail(options.detail)) {
+    return "not-managed" as const;
+  }
+
+  if (!(options.detail.job.status === "running" && options.detail.job.stage === "intake_review")) {
+    return "noop" as const;
+  }
+
+  const now = new Date().toISOString();
+  const sourceLabel = getSourceLabel(options.source);
+  const adapterState = {
+    mode: options.adapter.mode,
+    adapterLabel: options.adapter.adapterLabel,
+    endpoint: options.adapter.endpoint,
+    requestId: options.adapter.requestId,
+    status: options.adapter.status,
+    responseStatus: options.adapter.responseStatus ?? null,
+    externalRunReference: options.adapter.externalRunReference ?? options.handoff.externalRunReference,
+    lastError: normalizeOptionalString(options.adapter.lastError),
+    lastAttemptAt: now,
+    acceptedAt: normalizeOptionalString(options.adapter.acceptedAt) ?? (options.adapter.status === "accepted" ? now : null),
+  } satisfies JsonRecord;
+
+  if (options.adapter.status === "accepted") {
+    await recordManagedDispatch({
+      ...options,
+      handoff: {
+        ...options.handoff,
+        externalRunReference: options.adapter.externalRunReference ?? options.handoff.externalRunReference,
+      },
+      adapterState,
+    });
+
+    await insertJobEvent({
+      org_id: options.orgId,
+      job_id: options.detail.job.id,
+      event_type: "job.dispatch.launch.accepted",
+      payload: {
+        title: "Dispatch adapter launch accepted",
+        detail: `${options.adapter.adapterLabel} accepted a managed launch request from ${sourceLabel} for host ${options.handoff.hostLabel}. External run reference ${options.adapter.externalRunReference ?? options.handoff.externalRunReference} is now recorded in-app.`,
+      },
+    });
+
+    return "dispatch-recorded" as const;
+  }
+
+  await updateProcessingJob(options.detail.job.id, {
+    output_summary: {
+      ...options.detail.outputSummary,
+      workflowMode: "managed_processing_v1",
+      serviceModel: "operator_assisted",
+      eta: options.adapter.status === "unconfigured"
+        ? "Dispatch adapter not configured"
+        : "Dispatch adapter launch failed",
+      notes: options.adapter.status === "unconfigured"
+        ? `Dispatch adapter was requested from ${sourceLabel}, but no real adapter endpoint is configured. The job remains in intake review until dispatch is recorded manually or an adapter is configured.`
+        : `Dispatch adapter launch failed from ${sourceLabel}. The job remains in intake review and no host dispatch is claimed until a real handoff succeeds.`,
+      latestCheckpoint: options.adapter.status === "unconfigured"
+        ? "Dispatch adapter unavailable"
+        : `Dispatch adapter launch failed on ${options.handoff.hostLabel}`,
+      deliveryPosture: "Outputs still need a real host run import before QA and delivery can close.",
+      dispatchAdapter: adapterState,
+      stageChecklist: getManagedStageChecklist({
+        intakeReview: "running",
+        hostDispatch: "pending",
+        outputsImported: "pending",
+        qaReview: "pending",
+        deliveryRecorded: "pending",
+      }),
+      logTail: [
+        `Dispatch adapter requested from ${sourceLabel}.`,
+        `Target host: ${options.handoff.hostLabel}.`,
+        options.adapter.status === "unconfigured"
+          ? "No configured adapter endpoint was available, so no external launch was attempted."
+          : `Adapter launch failed${options.adapter.responseStatus ? ` with HTTP ${options.adapter.responseStatus}` : ""}.`,
+        normalizeOptionalString(options.adapter.lastError) ?? "No adapter error detail was returned.",
+      ],
+    },
+  });
+
+  await insertJobEvent({
+    org_id: options.orgId,
+    job_id: options.detail.job.id,
+    event_type: options.adapter.status === "unconfigured"
+      ? "job.dispatch.launch.unconfigured"
+      : "job.dispatch.launch.failed",
+    payload: {
+      title: options.adapter.status === "unconfigured"
+        ? "Dispatch adapter unavailable"
+        : "Dispatch adapter launch failed",
+      detail: options.adapter.status === "unconfigured"
+        ? `${options.adapter.adapterLabel} is not configured, so the app could only prepare the dispatch contract from ${sourceLabel}. No host dispatch was recorded.`
+        : `${options.adapter.adapterLabel} rejected or failed the launch request from ${sourceLabel} for host ${options.handoff.hostLabel}. No host dispatch was recorded.`,
+    },
+  });
+
+  return options.adapter.status === "unconfigured"
+    ? "dispatch-launch-unconfigured" as const
+    : "dispatch-launch-failed" as const;
 }
 
 async function startManagedQaReview(options: {
@@ -427,17 +601,7 @@ export async function advanceManagedProcessingJob(options: {
   }
 
   if (detail.job.status === "running" && detail.job.stage === "intake_review") {
-    await recordManagedDispatch({
-      ...options,
-      handoff: {
-        hostLabel: "Processing host assigned",
-        externalRunReference: `managed-${detail.job.id}`,
-        workerLabel: null,
-        dispatchNotes: null,
-        dispatchedByEmail: null,
-      },
-    });
-    return "dispatch-recorded";
+    return "awaiting-dispatch-handoff";
   }
 
   if (detail.job.status === "running" && detail.job.stage === "processing") {

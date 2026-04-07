@@ -6,6 +6,10 @@ import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { ManagedOutputImportForm } from "@/components/managed-output-import-form";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import {
+  getDispatchAdapterConfigSummary,
+  launchDispatchViaAdapter,
+} from "@/lib/dispatch-adapter";
+import {
   formatArtifactHandoffAuditLine,
   getArtifactHandoff,
   summarizeArtifactHandoffs,
@@ -17,9 +21,11 @@ import {
 import { buildRetryJobInputSummary, buildRetryJobOutputSummary, buildRetryOutputSeeds } from "@/lib/job-retries";
 import {
   advanceManagedProcessingJob,
+  getManagedDispatchAdapterState,
   getManagedDispatchHandoff,
   getManagedProcessingNextStep,
   isManagedProcessingJobDetail,
+  recordManagedDispatchAdapterOutcome,
   recordManagedDispatchHandoff,
 } from "@/lib/managed-processing";
 import {
@@ -139,6 +145,27 @@ function getCalloutMessage(actionState?: string) {
     return {
       tone: "success",
       text: "Managed host dispatch recorded. The job now truthfully reflects operator handoff to real processing infrastructure.",
+    } as const;
+  }
+
+  if (actionState === "awaiting-dispatch-handoff") {
+    return {
+      tone: "error",
+      text: "This managed request is still waiting for a real dispatch handoff. Record it manually or launch through the configured adapter before claiming processing started.",
+    } as const;
+  }
+
+  if (actionState === "dispatch-launch-failed") {
+    return {
+      tone: "error",
+      text: "The configured dispatch adapter did not accept the launch request. The job remains in intake review and no host dispatch was recorded.",
+    } as const;
+  }
+
+  if (actionState === "dispatch-launch-unconfigured") {
+    return {
+      tone: "error",
+      text: "No dispatch adapter endpoint is configured for this environment yet. The app prepared the contract, but no external launch was attempted or recorded.",
     } as const;
   }
 
@@ -531,6 +558,91 @@ export default async function JobDetailPage({
     }
   }
 
+  async function launchDispatchWithAdapter(formData: FormData) {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/jobs/${jobId}?action=denied`);
+    }
+
+    const refreshedDetail = await getJobDetail(refreshedAccess, jobId);
+    if (!refreshedDetail) {
+      redirect("/missions");
+    }
+
+    const hostLabel = getFormString(formData, "adapterHostLabel");
+    const workerLabel = getFormString(formData, "adapterWorkerLabel");
+    const dispatchNotes = getFormString(formData, "adapterDispatchNotes");
+
+    if (!hostLabel) {
+      redirect(`/jobs/${jobId}?action=error`);
+    }
+
+    try {
+      const launchResult = await launchDispatchViaAdapter({
+        orgId: refreshedAccess.org.id,
+        detail: refreshedDetail,
+        source: "job-detail",
+        handoff: {
+          hostLabel,
+          workerLabel: workerLabel || null,
+          dispatchNotes: dispatchNotes || null,
+        },
+      });
+
+      const outcome = await recordManagedDispatchAdapterOutcome({
+        orgId: refreshedAccess.org.id,
+        detail: refreshedDetail,
+        source: "job-detail",
+        handoff: {
+          hostLabel,
+          workerLabel: workerLabel || null,
+          dispatchNotes: dispatchNotes || null,
+          dispatchedByEmail: refreshedAccess.user.email ?? null,
+          externalRunReference: launchResult.ok
+            ? launchResult.externalRunReference
+            : `adapter-${refreshedDetail.job.id}`,
+        },
+        adapter: launchResult.ok
+          ? {
+              mode: launchResult.mode,
+              adapterLabel: launchResult.adapterLabel,
+              endpoint: launchResult.endpoint,
+              requestId: launchResult.requestId,
+              status: "accepted",
+              responseStatus: launchResult.responseStatus,
+              acceptedAt: launchResult.acceptedAt,
+              externalRunReference: launchResult.externalRunReference,
+              lastError: null,
+            }
+          : {
+              mode: launchResult.mode,
+              adapterLabel: launchResult.adapterLabel,
+              endpoint: launchResult.endpoint ?? "Not configured",
+              requestId: launchResult.requestId,
+              status: launchResult.mode === "unconfigured" ? "unconfigured" : "failed",
+              responseStatus: launchResult.responseStatus,
+              acceptedAt: null,
+              externalRunReference: null,
+              lastError: launchResult.error,
+            },
+      });
+
+      redirect(`/jobs/${jobId}?action=${outcome}`);
+    } catch {
+      redirect(`/jobs/${jobId}?action=error`);
+    }
+  }
+
   async function prepareManagedImportUpload(formData: FormData) {
     "use server";
 
@@ -823,6 +935,10 @@ Operator note: ${operatorNotes}`
   const dispatchHandoff = managedJob
     ? getManagedDispatchHandoff(detail.outputSummary, detail.job.external_job_reference)
     : null;
+  const dispatchAdapter = managedJob
+    ? getManagedDispatchAdapterState(detail.outputSummary)
+    : null;
+  const dispatchAdapterConfig = getDispatchAdapterConfigSummary();
   const outputDownloadUrls = new Map(
     await Promise.all(
       detail.outputs.map(async (output) => [
@@ -987,6 +1103,42 @@ Operator note: ${operatorNotes}`
             </div>
           ) : null}
 
+          {managedJob && (dispatchAdapter?.status || dispatchAdapterConfig.configured) ? (
+            <div className="stack-xs surface-form-shell">
+              <h3>Dispatch adapter</h3>
+              <dl className="kv-grid">
+                <div className="kv-row">
+                  <dt>Adapter</dt>
+                  <dd>{dispatchAdapter?.adapterLabel ?? dispatchAdapterConfig.adapterLabel}</dd>
+                </div>
+                <div className="kv-row">
+                  <dt>Status</dt>
+                  <dd>{dispatchAdapter?.status ?? (dispatchAdapterConfig.configured ? "ready" : "not configured")}</dd>
+                </div>
+                <div className="kv-row">
+                  <dt>Endpoint</dt>
+                  <dd>{dispatchAdapter?.endpoint ?? dispatchAdapterConfig.endpoint ?? "Not configured"}</dd>
+                </div>
+                <div className="kv-row">
+                  <dt>Request ID</dt>
+                  <dd>{dispatchAdapter?.requestId ?? "Not sent yet"}</dd>
+                </div>
+                <div className="kv-row">
+                  <dt>Last attempt</dt>
+                  <dd>{formatDateTime(dispatchAdapter?.lastAttemptAt ?? null)}</dd>
+                </div>
+                <div className="kv-row">
+                  <dt>HTTP status</dt>
+                  <dd>{dispatchAdapter?.responseStatus ?? "None"}</dd>
+                </div>
+              </dl>
+              {dispatchAdapter?.externalRunReference ? (
+                <p className="muted">Adapter external run reference: {dispatchAdapter.externalRunReference}</p>
+              ) : null}
+              {dispatchAdapter?.lastError ? <p className="muted">Last adapter error: {dispatchAdapter.lastError}</p> : null}
+            </div>
+          ) : null}
+
           <div className="stack-xs surface-form-shell">
             <h3>Job controls</h3>
             <form action={retryJob}>
@@ -1042,53 +1194,98 @@ Operator note: ${operatorNotes}`
                 This job is an operator-assisted managed processing request. Advance it only when the corresponding real-world handoff has actually happened.
               </p>
               {detail.job.status === "running" && detail.job.stage === "intake_review" ? (
-                <form action={recordDispatchHandoff} className="stack-sm">
-                  <label className="stack-xs">
-                    Assigned host
-                    <input
-                      name="hostLabel"
-                      type="text"
-                      defaultValue={dispatchHandoff?.hostLabel ?? ""}
-                      placeholder="single-host-odm-01"
-                      required
-                    />
-                  </label>
-                  <label className="stack-xs">
-                    Worker / queue slot (optional)
-                    <input
-                      name="workerLabel"
-                      type="text"
-                      defaultValue={dispatchHandoff?.workerLabel ?? ""}
-                      placeholder="nodeodm-a / docker-worker-2"
-                    />
-                  </label>
-                  <label className="stack-xs">
-                    External run reference
-                    <input
-                      name="externalRunReference"
-                      type="text"
-                      defaultValue={dispatchHandoff?.externalRunReference ?? ""}
-                      placeholder="odm-20260406-gv-downtown"
-                      required
-                    />
-                  </label>
-                  <label className="stack-xs">
-                    Dispatch notes (optional)
-                    <textarea
-                      name="dispatchNotes"
-                      rows={3}
-                      defaultValue={dispatchHandoff?.dispatchNotes ?? ""}
-                      placeholder="Exact host lane, operator notes, queue context, or special processing flags."
-                    />
-                  </label>
-                  <button
-                    type="submit"
-                    className="button button-primary"
-                    disabled={access.role === "viewer"}
-                  >
-                    Record dispatch handoff
-                  </button>
-                </form>
+                <div className="stack-sm">
+                  <form action={launchDispatchWithAdapter} className="stack-sm">
+                    <h4>Launch through configured adapter</h4>
+                    <label className="stack-xs">
+                      Assigned host
+                      <input
+                        name="adapterHostLabel"
+                        type="text"
+                        defaultValue={dispatchHandoff?.hostLabel ?? ""}
+                        placeholder="single-host-odm-01"
+                        required
+                      />
+                    </label>
+                    <label className="stack-xs">
+                      Worker / queue slot (optional)
+                      <input
+                        name="adapterWorkerLabel"
+                        type="text"
+                        defaultValue={dispatchHandoff?.workerLabel ?? ""}
+                        placeholder="nodeodm-a / docker-worker-2"
+                      />
+                    </label>
+                    <label className="stack-xs">
+                      Dispatch notes (optional)
+                      <textarea
+                        name="adapterDispatchNotes"
+                        rows={3}
+                        defaultValue={dispatchHandoff?.dispatchNotes ?? ""}
+                        placeholder="Exact host lane, operator notes, queue context, or special processing flags."
+                      />
+                    </label>
+                    <button
+                      type="submit"
+                      className="button button-primary"
+                      disabled={access.role === "viewer"}
+                    >
+                      Launch via dispatch adapter
+                    </button>
+                    <p className="muted">
+                      Uses the configured server-side adapter contract when available. On failure or missing config, the job stays in intake review and the attempt is recorded honestly.
+                    </p>
+                  </form>
+
+                  <form action={recordDispatchHandoff} className="stack-sm">
+                    <h4>Manual fallback handoff</h4>
+                    <label className="stack-xs">
+                      Assigned host
+                      <input
+                        name="hostLabel"
+                        type="text"
+                        defaultValue={dispatchHandoff?.hostLabel ?? ""}
+                        placeholder="single-host-odm-01"
+                        required
+                      />
+                    </label>
+                    <label className="stack-xs">
+                      Worker / queue slot (optional)
+                      <input
+                        name="workerLabel"
+                        type="text"
+                        defaultValue={dispatchHandoff?.workerLabel ?? ""}
+                        placeholder="nodeodm-a / docker-worker-2"
+                      />
+                    </label>
+                    <label className="stack-xs">
+                      External run reference
+                      <input
+                        name="externalRunReference"
+                        type="text"
+                        defaultValue={dispatchHandoff?.externalRunReference ?? dispatchAdapter?.externalRunReference ?? ""}
+                        placeholder="odm-20260406-gv-downtown"
+                        required
+                      />
+                    </label>
+                    <label className="stack-xs">
+                      Dispatch notes (optional)
+                      <textarea
+                        name="dispatchNotes"
+                        rows={3}
+                        defaultValue={dispatchHandoff?.dispatchNotes ?? ""}
+                        placeholder="Exact host lane, operator notes, queue context, or special processing flags."
+                      />
+                    </label>
+                    <button
+                      type="submit"
+                      className="button button-secondary"
+                      disabled={access.role === "viewer"}
+                    >
+                      Record manual dispatch handoff
+                    </button>
+                  </form>
+                </div>
               ) : (
                 <form action={advanceManagedJob}>
                   <button

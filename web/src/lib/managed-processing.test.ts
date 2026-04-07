@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildManagedProcessingRequestSummary,
+  getManagedDispatchAdapterState,
   getManagedDispatchHandoff,
   getManagedProcessingNextStep,
   isManagedProcessingJobRecord,
@@ -112,6 +113,26 @@ describe("managed-processing", () => {
     const dispatch = getManagedDispatchHandoff({}, "external-123");
     expect(dispatch.externalRunReference).toBe("external-123");
     expect(dispatch.hostLabel).toBeNull();
+  });
+
+  it("parses dispatch adapter state from job summary metadata", () => {
+    const adapter = getManagedDispatchAdapterState({
+      dispatchAdapter: {
+        mode: "webhook",
+        adapterLabel: "NodeODM webhook",
+        endpoint: "https://dispatch.example.com/launch",
+        requestId: "dispatch-job-1-odm-host-01-default",
+        status: "accepted",
+        responseStatus: 202,
+        externalRunReference: "run-42",
+        lastAttemptAt: "2026-04-06T18:00:00.000Z",
+      },
+    });
+
+    expect(adapter.mode).toBe("webhook");
+    expect(adapter.adapterLabel).toBe("NodeODM webhook");
+    expect(adapter.responseStatus).toBe(202);
+    expect(adapter.externalRunReference).toBe("run-42");
   });
 
   it("blocks QA start until outputs are attached", () => {
