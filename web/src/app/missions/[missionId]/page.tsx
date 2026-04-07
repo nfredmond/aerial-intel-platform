@@ -59,6 +59,7 @@ import {
   isProvingJobRecord,
 } from "@/lib/proving-runs";
 import { normalizeSlug } from "@/lib/slug";
+import { tryCreateSignedDownloadUrl } from "@/lib/storage-delivery";
 import { formatJobStatus, formatOutputArtifactStatus } from "@/lib/missions/workspace";
 import {
   formatFileSize,
@@ -1608,6 +1609,26 @@ export default async function MissionDetailPage({
       tone: bestCoverage !== null && bestCoverage >= 90 ? "success" as const : bestCoverage !== null && bestCoverage >= 70 ? "info" as const : "warning" as const,
     },
   ];
+  const ingestDownloadUrls = new Map(
+    await Promise.all(
+      ingestSessions.map(async ({ session }) => [
+        session.id,
+        await tryCreateSignedDownloadUrl({ path: session.review_bundle_zip_path, download: `${session.session_label}.zip` }),
+      ] as const),
+    ),
+  );
+  const outputDownloadUrls = new Map(
+    await Promise.all(
+      detail.outputs.map(async (output) => [
+        output.id,
+        await tryCreateSignedDownloadUrl({
+          bucket: output.storage_bucket,
+          path: output.storage_path,
+          download: `${output.kind.replaceAll("_", " ")}`,
+        }),
+      ] as const),
+    ),
+  );
   const calloutState =
     resolvedSearchParams.created
     ?? resolvedSearchParams.attached
@@ -2144,6 +2165,11 @@ export default async function MissionDetailPage({
                     : <li>Full truthful v1 evidence chain recorded for this session.</li>}
                 </ul>
                 <p className="muted">Next step: {posture.nextStep}</p>
+                {ingestDownloadUrls.get(session.id) ? (
+                  <a href={ingestDownloadUrls.get(session.id) ?? undefined} className="button button-secondary" target="_blank" rel="noreferrer">
+                    Download review bundle
+                  </a>
+                ) : null}
                 {session.notes ? <p className="muted"><strong>Notes:</strong> {session.notes}</p> : null}
               </article>
             )) : <p className="muted">No intake sessions recorded yet. Use the form above to capture ZIP, benchmark, and review-bundle evidence for this mission.</p>}
@@ -2579,6 +2605,11 @@ export default async function MissionDetailPage({
                     <Link href={`/artifacts/${output.id}`} className="button button-secondary">
                       Review artifact
                     </Link>
+                    {outputDownloadUrls.get(output.id) ? (
+                      <a href={outputDownloadUrls.get(output.id) ?? undefined} className="button button-primary" target="_blank" rel="noreferrer">
+                        Download
+                      </a>
+                    ) : null}
                   </div>
                 </article>
               );

@@ -1,5 +1,6 @@
 # Changelog
 
+- Extended the benchmark-import + delivery lane into a real managed-job closure slice: `scripts/import_odm_benchmark_run.mjs` can now attach imported ODM outputs onto an existing job (including the truthful `managed-processing-v1` request), optionally publish outputs/evidence/review bundles into protected Supabase Storage, and write delivery-package metadata back onto the job; mission, job, and artifact pages now surface signed download buttons only when those files actually exist in protected storage.
 - Wired browser ZIP intake to a truthful direct-to-storage path: mission detail now requests a signed Supabase Storage upload URL, uploads the ZIP from the browser into the protected `drone-ops` bucket, then records an ingest session with durable storage evidence while explicitly keeping extraction, benchmarking, and ODM orchestration pending.
 
 ## Unreleased

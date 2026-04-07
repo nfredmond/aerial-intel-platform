@@ -24,6 +24,7 @@ import {
   advanceManualProvingJob,
   isManualProvingJobDetail,
 } from "@/lib/proving-runs";
+import { tryCreateSignedDownloadUrl } from "@/lib/storage-delivery";
 import {
   insertJobEvent,
   insertProcessingJob,
@@ -468,6 +469,18 @@ export default async function JobDetailPage({
   const provingJob = isManualProvingJobDetail(detail);
   const managedJob = isManagedProcessingJobDetail(detail);
   const managedNextStep = managedJob ? getManagedProcessingNextStep(detail) : null;
+  const outputDownloadUrls = new Map(
+    await Promise.all(
+      detail.outputs.map(async (output) => [
+        output.id,
+        await tryCreateSignedDownloadUrl({
+          bucket: output.storage_bucket,
+          path: output.storage_path,
+          download: `${output.kind.replaceAll("_", " ")}`,
+        }),
+      ] as const),
+    ),
+  );
   const firstReadyOutput = detail.outputs.find((output) => output.status === "ready") ?? null;
   const callout = getCalloutMessage(resolvedSearchParams.action);
 
@@ -712,6 +725,11 @@ export default async function JobDetailPage({
                     <Link href={`/artifacts/${output.id}`} className="button button-secondary">
                       Review artifact
                     </Link>
+                    {outputDownloadUrls.get(output.id) ? (
+                      <a href={outputDownloadUrls.get(output.id) ?? undefined} className="button button-primary" target="_blank" rel="noreferrer">
+                        Download
+                      </a>
+                    ) : null}
                   </div>
                 </article>
               );

@@ -17,6 +17,7 @@ import {
   getBenchmarkSummaryView,
 } from "@/lib/benchmark-summary";
 import { getArtifactDetail, getString } from "@/lib/missions/detail-data";
+import { tryCreateSignedDownloadUrl } from "@/lib/storage-delivery";
 import { insertJobEvent, updateProcessingOutput } from "@/lib/supabase/admin";
 
 function formatDateTime(value: string | null) {
@@ -298,6 +299,11 @@ export default async function ArtifactDetailPage({
   const latestCheckpoint = getString(detail.outputSummary.latestCheckpoint, "No checkpoint recorded yet.");
   const stageChecklist = getStageChecklist(detail.outputSummary);
   const handoff = getArtifactHandoff(detail.metadata);
+  const artifactDownloadUrl = await tryCreateSignedDownloadUrl({
+    bucket: detail.output.storage_bucket,
+    path: detail.output.storage_path,
+    download: artifactName,
+  });
   const exportPacket = buildArtifactExportPacket({
     artifactName,
     artifactKind: detail.output.kind,
@@ -406,7 +412,7 @@ export default async function ArtifactDetailPage({
             <p className="eyebrow">Handoff controls</p>
             <h2>Record review, share, and export</h2>
             <p className="muted">
-              This extends the v1 artifact surface from copy-only summaries into a real handoff audit trail while signed URLs and client portal delivery are still pending.
+              This artifact surface now records a real handoff audit trail and issues signed downloads whenever the file has actually been published into protected storage.
             </p>
           </div>
 
@@ -485,6 +491,13 @@ export default async function ArtifactDetailPage({
           </div>
 
           <div className="stack-sm">
+            {artifactDownloadUrl ? (
+              <a href={artifactDownloadUrl} className="button button-primary" target="_blank" rel="noreferrer">
+                Download artifact
+              </a>
+            ) : (
+              <p className="muted">Protected download is not available yet for this artifact. Use the storage path and delivery notes until the file is published.</p>
+            )}
             <SupportContextCopyButton
               text={shareSummary}
               buttonLabel="Copy share summary"

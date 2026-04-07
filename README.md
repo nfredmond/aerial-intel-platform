@@ -23,6 +23,8 @@ See the charter and docs folder for current scope and architecture. The repo is 
 ### Real now
 - Local ZIP -> extract -> single-host Docker ODM run -> review bundle -> optional Supabase import
 - Imported benchmark-backed jobs/artifacts can render in `/jobs/[jobId]` and `/artifacts/[artifactId]`
+- Benchmark imports can now attach real outputs directly onto an existing managed-processing job instead of only creating a standalone benchmark-import record
+- Storage-backed imported outputs now surface as signed downloads in mission, job, and artifact views when the files have actually been published into protected storage
 - Artifact review/share/export audit surfaces exist in the web app
 - Mission detail can now upload a ZIP directly from the browser into protected Supabase Storage and record an honest v1 ingest session with storage evidence, benchmark/run-log placeholders, and review-bundle readiness without pretending extraction or ODM orchestration already ran
 - Mission detail can now create a truthful managed-processing request that tracks operator intake review, host dispatch, QA start, and delivery-ready completion without staging fake artifacts before a real run is attached/imported
@@ -30,7 +32,7 @@ See the charter and docs folder for current scope and architecture. The repo is 
 ### Not real yet
 - Resumable/browser-recoverable ingest beyond the current signed-upload path
 - Real NodeODM/ClusterODM orchestration initiated from the app
-- Signed-download delivery, TiTiler-backed raster viewing, and compute-worker automation for actual ODM jobs
+- Broad signed-download delivery beyond storage-published imported artifacts, TiTiler-backed raster viewing, and compute-worker automation for app-initiated ODM jobs
 - Install bundles derived from real mission-planner/controller exports rather than placeholder handoff records
 
 See `docs/V1_SINGLE_HOST_ODM_SLICE.md` for the current v1 slice definition and acceptance bar.
@@ -71,6 +73,20 @@ SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
   --import-to-db \
   --org-slug acme-drone-co \
   --mission-id <mission-uuid>
+```
+
+### Optional: attach a real run onto an existing managed-processing job and publish protected downloads
+
+```bash
+SUPABASE_URL=https://<project-ref>.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
+node scripts/import_odm_benchmark_run.mjs \
+  --org-slug acme-drone-co \
+  --mission-id <mission-uuid> \
+  --job-id <managed-job-uuid> \
+  --summary benchmark/20260406T001500Z_gv/summary.json \
+  --review-bundle .data/v1_slice_gv_20260406/export_bundle_gv.zip \
+  --publish-to-storage
 ```
 
 ## Quickstart (benchmark script only)

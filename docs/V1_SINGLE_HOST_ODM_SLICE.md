@@ -19,11 +19,12 @@ The slice is:
 - Optional import of the same run into Supabase via `scripts/import_odm_benchmark_run.mjs`
 - Web app surfaces for imported jobs and artifacts (`/jobs/[jobId]`, `/artifacts/[artifactId]`)
 - Mission-level intake session records that can capture ZIP evidence, protected browser-upload storage paths, benchmark paths, review-bundle ZIP paths, and truthful pass/fail posture without implying extraction or ODM orchestration already ran
+- Benchmark import can now attach real outputs onto an existing managed-processing job, and storage-published imported artifacts can issue signed downloads in the app
 
 ### Not real today
-- Browser-native ZIP upload/resumable ingest
-- Automatic NodeODM/ClusterODM job dispatch from the app
-- Signed-download delivery and storage-backed bundle publication
+- Browser-native ZIP upload/resumable ingest beyond the current signed-upload path
+- Automatic app-initiated NodeODM/ClusterODM dispatch
+- Fully generalized signed-download delivery beyond storage-published imported outputs and review bundles
 - TiTiler-backed raster serving
 - Real mission-controller install bundles derived from controller-native exports
 
@@ -73,13 +74,12 @@ The bundle intentionally carries evidence, not just outputs:
 
 ## Recommended next implementation order
 
-1. **Browser upload parity**
-   - add storage-backed ZIP upload on top of the now-present ingest session records
-   - keep the same review-bundle contract
-2. **Real job orchestration**
+1. **Real job orchestration**
    - replace manual/proving job progression with actual NodeODM state transitions
-3. **Storage-backed delivery**
-   - publish the review/export bundle to durable storage with signed downloads
+2. **Managed-job import closure**
+   - continue the new attach-to-existing-job import lane until operators can close the whole managed-processing loop without sidecar DB edits
+3. **Storage-backed delivery expansion**
+   - extend the now-landed signed-download path for storage-published imported outputs/review bundles into a broader default delivery contract
 4. **Raster review upgrade**
    - move orthophoto/DEM review from file-level evidence to actual in-app visualization
 

@@ -47,3 +47,24 @@ export async function createDroneOpsSignedUploadTicket(path: string): Promise<Si
     signedUrl: result.data.signedUrl,
   };
 }
+
+export async function createSignedDownloadUrl(input: {
+  bucket?: string;
+  path: string;
+  expiresInSeconds?: number;
+  download?: string | boolean;
+}) {
+  const bucket = input.bucket?.trim() || DRONE_OPS_STORAGE_BUCKET;
+  const supabase = getSupabaseAdminStorageClient();
+  const result = await supabase.storage
+    .from(bucket)
+    .createSignedUrl(input.path, input.expiresInSeconds ?? 60 * 60, {
+      download: input.download,
+    });
+
+  if (result.error || !result.data?.signedUrl) {
+    throw new Error(result.error?.message ?? "Could not create a signed download URL.");
+  }
+
+  return result.data.signedUrl;
+}

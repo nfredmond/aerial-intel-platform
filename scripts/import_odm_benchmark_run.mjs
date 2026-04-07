@@ -38,8 +38,13 @@ Required environment variables:
 Optional:
   --dataset-id <uuid>       Attach import to an existing dataset
   --dataset-name <name>     Create dataset with this name if dataset-id omitted and none exists
+  --job-id <uuid>           Attach imported outputs/evidence to an existing job instead of creating a new one
   --job-name <name>         Override job display name
   --external-ref <value>    Override external job reference
+  --publish-to-storage      Upload real outputs/evidence into protected Supabase Storage for signed delivery
+  --storage-bucket <name>   Storage bucket to publish into (default: drone-ops)
+  --publish-prefix <path>   Override storage prefix used for published evidence
+  --review-bundle <path>    Optional export/review bundle ZIP to publish and record on the job
 `);
 }
 
@@ -123,7 +128,17 @@ function createClient({ supabaseUrl, serviceRoleKey }) {
     });
   }
 
-  return { selectOne, selectMany, insertOne, insertMany };
+  async function updateMany(table, query, patch) {
+    return request(`/rest/v1/${table}?${query}&select=*`, {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=representation",
+      },
+      body: patch,
+    });
+  }
+
+  return { selectOne, selectMany, insertOne, insertMany, updateMany };
 }
 
 function normalizeSlug(input) {
@@ -218,6 +233,125 @@ async function loadRunLogExcerpt(summaryPath, summary) {
   return { runLogPath: runLog, logTail: [] };
 }
 
+async function uploadFileToStorage({ supabaseUrl, serviceRoleKey, bucket, objectPath, filePath, contentType }) {
+  const fileBuffer = await fs.readFile(filePath);
+  const response = await fetch(`${supabaseUrl}/storage/v1/object/${bucket}/${objectPath}`, {
+    method: "POST",
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      "x-upsert": "true",
+      "content-type": contentType || "application/octet-stream",
+    },
+    body: fileBuffer,
+  });
+
+  if (!response.ok) {
+    const payload = await safeJson(response);
+    const message =
+      typeof payload === "object" && payload && "message" in payload
+        ? String(payload.message)
+        : `Storage upload failed (${response.status})`;
+    const error = new Error(message);
+    error.status = response.status;
+    error.payload = payload;
+    throw error;
+  }
+
+  return {
+    bucket,
+    path: objectPath,
+  };
+}
+
+function inferContentType(filePath) {
+  const extension = path.extname(filePath).toLowerCase();
+  switch (extension) {
+    case ".zip":
+      return "application/zip";
+    case ".json":
+      return "application/json";
+    case ".log":
+    case ".txt":
+      return "text/plain; charset=utf-8";
+    case ".tif":
+    case ".tiff":
+      return "image/tiff";
+    case ".laz":
+      return "application/octet-stream";
+    case ".ply":
+      return "application/octet-stream";
+    case ".obj":
+      return "text/plain; charset=utf-8";
+    case ".pdf":
+      return "application/pdf";
+    default:
+      return "application/octet-stream";
+  }
+}
+
+async function fileExists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function resolveCandidatePath(basePath, candidate) {
+  if (!candidate || typeof candidate !== "string") {
+    return null;
+  }
+
+  if (path.isAbsolute(candidate)) {
+    return candidate;
+  }
+
+  return path.resolve(path.dirname(basePath), candidate);
+}
+
+async function discoverReviewBundlePath(summaryPath, explicitPath) {
+  const explicitCandidate = resolveCandidatePath(summaryPath, explicitPath);
+  if (explicitCandidate && await fileExists(explicitCandidate)) {
+    return explicitCandidate;
+  }
+
+  const basename = path.basename(summaryPath);
+  if (basename !== "summary.json") {
+    return null;
+  }
+
+  const benchmarkDir = path.dirname(summaryPath);
+  const repoRoot = process.cwd();
+  const relativeBenchmarkDir = path.relative(path.join(repoRoot, "benchmark"), benchmarkDir);
+  if (relativeBenchmarkDir.startsWith("..") || relativeBenchmarkDir === "") {
+    return null;
+  }
+
+  const dataDir = path.join(repoRoot, ".data");
+  let entries;
+  try {
+    entries = await fs.readdir(dataDir, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+
+  const candidateName = `export_bundle_${relativeBenchmarkDir.split("_").slice(1).join("_")}.zip`;
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !entry.name.startsWith("v1_slice_")) {
+      continue;
+    }
+
+    const candidate = path.join(dataDir, entry.name, candidateName);
+    if (await fileExists(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help === "true") {
@@ -243,6 +377,10 @@ async function main() {
   const rawSummary = await fs.readFile(summaryPath, "utf8");
   const summary = JSON.parse(rawSummary);
   const { runLogPath, logTail } = await loadRunLogExcerpt(summaryPath, summary);
+  const requestedJobId = args["job-id"]?.trim() || null;
+  const publishToStorage = args["publish-to-storage"] === "true";
+  const storageBucket = args["storage-bucket"]?.trim() || "drone-ops";
+  const resolvedReviewBundlePath = await discoverReviewBundlePath(summaryPath, args["review-bundle"]?.trim() || null);
 
   const client = createClient({ supabaseUrl, serviceRoleKey });
   const org = await client.selectOne("drone_orgs", `slug=eq.${encodeURIComponent(orgSlug)}&select=id,name,slug`);
@@ -295,85 +433,282 @@ async function main() {
     });
   }
 
+  let existingJob = null;
+  if (requestedJobId) {
+    existingJob = await client.selectOne(
+      "drone_processing_jobs",
+      `org_id=eq.${org.id}&id=eq.${requestedJobId}&select=id,org_id,project_id,site_id,mission_id,dataset_id,engine,preset_id,status,stage,progress,queue_position,input_summary,output_summary,external_job_reference,created_by,created_at,updated_at,started_at,completed_at`,
+    );
+
+    if (!existingJob?.id) {
+      throw new Error(`Job not found for id: ${requestedJobId}`);
+    }
+
+    if (existingJob.mission_id !== mission.id) {
+      throw new Error(`Job ${requestedJobId} does not belong to mission ${mission.id}`);
+    }
+
+    if (existingJob.dataset_id && dataset.id !== existingJob.dataset_id) {
+      const matchedDataset = await client.selectOne(
+        "drone_datasets",
+        `org_id=eq.${org.id}&id=eq.${existingJob.dataset_id}&select=id,org_id,project_id,site_id,mission_id,name,slug,status`,
+      );
+      if (matchedDataset?.id) {
+        dataset = matchedDataset;
+      }
+    }
+  }
+
   const externalRef = args["external-ref"]?.trim()
     || `benchmark-${mission.id}-${String(summary.timestamp_utc || "import").replace(/[^0-9]/g, "")}`;
 
-  const job = await client.insertOne("drone_processing_jobs", {
-    org_id: org.id,
-    project_id: mission.project_id,
-    site_id: mission.site_id,
-    mission_id: mission.id,
-    dataset_id: dataset.id,
-    engine: "odm",
-    preset_id: "benchmark-import",
-    status: mapJobStatus(summary),
-    stage: mapJobStage(summary),
-    progress: 100,
-    queue_position: null,
-    input_summary: {
-      name: args["job-name"]?.trim() || `${mission.name} benchmark import`,
-      source: "benchmark-import-script",
-      importedSummaryPath: summaryPath,
-      importedAt: new Date().toISOString(),
-    },
-    output_summary: {
-      eta: "Complete",
-      notes: "Imported from ODM benchmark summary.",
-      benchmarkSummary: summary,
-      runLogPath,
-      logTail,
-    },
-    external_job_reference: externalRef,
-    started_at: summary.timestamp_utc ?? null,
-    completed_at: summary.end_timestamp_utc ?? summary.timestamp_utc ?? null,
-  });
+  const now = new Date().toISOString();
+  const existingOutputSummary = existingJob?.output_summary && typeof existingJob.output_summary === "object" && !Array.isArray(existingJob.output_summary)
+    ? existingJob.output_summary
+    : {};
+  const existingInputSummary = existingJob?.input_summary && typeof existingJob.input_summary === "object" && !Array.isArray(existingJob.input_summary)
+    ? existingJob.input_summary
+    : {};
 
-  const outputRows = Object.entries(summary.outputs ?? {})
-    .map(([summaryKey, output]) => {
+  let job;
+  if (existingJob) {
+    const updatedJobs = await client.updateMany(
+      "drone_processing_jobs",
+      `org_id=eq.${org.id}&id=eq.${existingJob.id}`,
+      {
+        dataset_id: existingJob.dataset_id ?? dataset.id,
+        engine: existingJob.engine ?? "odm",
+        status: mapJobStatus(summary),
+        stage: mapJobStage(summary),
+        progress: 100,
+        queue_position: null,
+        external_job_reference: existingJob.external_job_reference ?? externalRef,
+        started_at: existingJob.started_at ?? summary.timestamp_utc ?? now,
+        completed_at: summary.end_timestamp_utc ?? summary.timestamp_utc ?? now,
+        input_summary: {
+          ...existingInputSummary,
+          attachedBenchmarkImport: {
+            summaryPath,
+            importedAt: now,
+          },
+        },
+        output_summary: {
+          ...existingOutputSummary,
+          eta: "Complete",
+          notes: existingJob.preset_id === "managed-processing-v1"
+            ? "Real outputs imported from ODM benchmark evidence and attached to the managed processing request."
+            : "Imported from ODM benchmark summary.",
+          benchmarkSummary: summary,
+          runLogPath,
+          logTail,
+          latestCheckpoint: existingJob.preset_id === "managed-processing-v1"
+            ? "Real benchmark outputs attached/imported"
+            : "Benchmark summary imported",
+        },
+      },
+    );
+
+    if (!Array.isArray(updatedJobs) || !updatedJobs[0]) {
+      throw new Error(`Could not update job ${existingJob.id}`);
+    }
+
+    job = updatedJobs[0];
+  } else {
+    job = await client.insertOne("drone_processing_jobs", {
+      org_id: org.id,
+      project_id: mission.project_id,
+      site_id: mission.site_id,
+      mission_id: mission.id,
+      dataset_id: dataset.id,
+      engine: "odm",
+      preset_id: "benchmark-import",
+      status: mapJobStatus(summary),
+      stage: mapJobStage(summary),
+      progress: 100,
+      queue_position: null,
+      input_summary: {
+        name: args["job-name"]?.trim() || `${mission.name} benchmark import`,
+        source: "benchmark-import-script",
+        importedSummaryPath: summaryPath,
+        importedAt: now,
+      },
+      output_summary: {
+        eta: "Complete",
+        notes: "Imported from ODM benchmark summary.",
+        benchmarkSummary: summary,
+        runLogPath,
+        logTail,
+        latestCheckpoint: "Benchmark summary imported",
+      },
+      external_job_reference: externalRef,
+      started_at: summary.timestamp_utc ?? null,
+      completed_at: summary.end_timestamp_utc ?? summary.timestamp_utc ?? null,
+    });
+  }
+
+  const publishPrefix = args["publish-prefix"]?.trim()
+    || `${org.slug}/missions/${mission.id}/jobs/${job.id}`;
+
+  const publishedEvidence = {};
+  if (publishToStorage) {
+    const summaryObject = await uploadFileToStorage({
+      supabaseUrl,
+      serviceRoleKey,
+      bucket: storageBucket,
+      objectPath: `${publishPrefix}/evidence/${path.basename(summaryPath)}`,
+      filePath: summaryPath,
+      contentType: inferContentType(summaryPath),
+    });
+    publishedEvidence.benchmarkSummary = {
+      bucket: summaryObject.bucket,
+      path: summaryObject.path,
+      sourcePath: summaryPath,
+    };
+
+    if (runLogPath && await fileExists(runLogPath)) {
+      const runLogObject = await uploadFileToStorage({
+        supabaseUrl,
+        serviceRoleKey,
+        bucket: storageBucket,
+        objectPath: `${publishPrefix}/evidence/${path.basename(runLogPath)}`,
+        filePath: runLogPath,
+        contentType: inferContentType(runLogPath),
+      });
+      publishedEvidence.runLog = {
+        bucket: runLogObject.bucket,
+        path: runLogObject.path,
+        sourcePath: runLogPath,
+      };
+    }
+
+    if (resolvedReviewBundlePath && await fileExists(resolvedReviewBundlePath)) {
+      const reviewBundleObject = await uploadFileToStorage({
+        supabaseUrl,
+        serviceRoleKey,
+        bucket: storageBucket,
+        objectPath: `${publishPrefix}/delivery/${path.basename(resolvedReviewBundlePath)}`,
+        filePath: resolvedReviewBundlePath,
+        contentType: inferContentType(resolvedReviewBundlePath),
+      });
+      publishedEvidence.reviewBundle = {
+        bucket: reviewBundleObject.bucket,
+        path: reviewBundleObject.path,
+        sourcePath: resolvedReviewBundlePath,
+      };
+    }
+
+    const updatedJobs = await client.updateMany(
+      "drone_processing_jobs",
+      `org_id=eq.${org.id}&id=eq.${job.id}`,
+      {
+        output_summary: {
+          ...((job.output_summary && typeof job.output_summary === "object" && !Array.isArray(job.output_summary)) ? job.output_summary : {}),
+          deliveryPackage: {
+            publishedToStorage: true,
+            bucket: storageBucket,
+            ...publishedEvidence,
+          },
+        },
+      },
+    );
+    if (Array.isArray(updatedJobs) && updatedJobs[0]) {
+      job = updatedJobs[0];
+    }
+  }
+
+  const existingOutputs = await client.selectMany(
+    "drone_processing_outputs",
+    `org_id=eq.${org.id}&job_id=eq.${job.id}&select=id,kind,storage_bucket,storage_path,metadata`,
+  );
+
+  const outputRows = (await Promise.all(
+    Object.entries(summary.outputs ?? {}).map(([summaryKey, output]) => {
       const kind = mapOutputKind(summaryKey);
       if (!kind || !output || typeof output !== "object" || Array.isArray(output)) {
-        return null;
+        return Promise.resolve(null);
       }
 
       const exists = output.exists === true;
       const nonZeroSize = output.non_zero_size === true;
       const filePath = typeof output.path === "string" ? output.path : null;
+      const publishPromise = publishToStorage && exists && nonZeroSize && filePath
+        ? uploadFileToStorage({
+            supabaseUrl,
+            serviceRoleKey,
+            bucket: storageBucket,
+            objectPath: `${publishPrefix}/outputs/${path.basename(filePath)}`,
+            filePath,
+            contentType: inferContentType(filePath),
+          })
+        : Promise.resolve(null);
 
-      return {
-        org_id: org.id,
-        job_id: job.id,
-        mission_id: mission.id,
-        dataset_id: dataset.id,
+      return publishPromise.then((publishedObject) => ({
         kind,
-        status: exists && nonZeroSize ? "ready" : "failed",
-        storage_bucket: "benchmark-import",
-        storage_path: filePath,
-        metadata: {
-          name: `${mission.name} ${kind.replaceAll("_", " ")}`,
-          format: inferOutputFormat(summaryKey, filePath ?? ""),
-          delivery: "Imported benchmark evidence",
-          benchmark: {
-            key: summaryKey,
-            exists,
-            nonZeroSize,
-            sizeBytes: typeof output.size_bytes === "number" ? output.size_bytes : 0,
-            sourcePath: filePath,
+        exists,
+        nonZeroSize,
+        filePath,
+        row: {
+          org_id: org.id,
+          job_id: job.id,
+          mission_id: mission.id,
+          dataset_id: dataset.id,
+          kind,
+          status: exists && nonZeroSize ? "ready" : "failed",
+          storage_bucket: publishedObject?.bucket ?? (publishToStorage ? storageBucket : "benchmark-import"),
+          storage_path: publishedObject?.path ?? filePath,
+          metadata: {
+            name: `${mission.name} ${kind.replaceAll("_", " ")}`,
+            format: inferOutputFormat(summaryKey, filePath ?? ""),
+            delivery: publishedObject ? "Protected download ready" : "Imported benchmark evidence",
+            benchmark: {
+              key: summaryKey,
+              exists,
+              nonZeroSize,
+              sizeBytes: typeof output.size_bytes === "number" ? output.size_bytes : 0,
+              sourcePath: filePath,
+            },
+            storagePublication: publishedObject
+              ? {
+                  published: true,
+                  bucket: publishedObject.bucket,
+                  path: publishedObject.path,
+                  publishedAt: now,
+                }
+              : {
+                  published: false,
+                },
           },
         },
-      };
-    })
-    .filter(Boolean);
+      }));
+    }),
+  )).filter(Boolean);
 
-  await client.insertMany("drone_processing_outputs", outputRows);
+  const outputsToInsert = [];
+  for (const outputEntry of outputRows) {
+    const existingOutput = existingOutputs.find((item) => item.kind === outputEntry.kind);
+    if (existingOutput?.id) {
+      await client.updateMany(
+        "drone_processing_outputs",
+        `org_id=eq.${org.id}&id=eq.${existingOutput.id}`,
+        outputEntry.row,
+      );
+    } else {
+      outputsToInsert.push(outputEntry.row);
+    }
+  }
+
+  await client.insertMany("drone_processing_outputs", outputsToInsert);
 
   await client.insertMany("drone_processing_job_events", [
     {
       org_id: org.id,
       job_id: job.id,
-      event_type: "benchmark.imported",
+      event_type: existingJob ? "benchmark.outputs.attached" : "benchmark.imported",
       payload: {
-        title: "Benchmark summary imported",
-        detail: `Imported ODM benchmark summary for ${mission.name}.`,
+        title: existingJob ? "Benchmark outputs attached" : "Benchmark summary imported",
+        detail: existingJob
+          ? `Imported ODM benchmark evidence and attached real outputs to existing job ${job.id} for ${mission.name}.`
+          : `Imported ODM benchmark summary for ${mission.name}.`,
         summaryPath,
       },
     },
@@ -390,6 +725,24 @@ async function main() {
     },
   ]);
 
+  if (publishToStorage) {
+    await client.insertMany("drone_processing_job_events", [
+      {
+        org_id: org.id,
+        job_id: job.id,
+        event_type: "delivery.package.published",
+        payload: {
+          title: "Protected delivery package published",
+          detail: resolvedReviewBundlePath
+            ? "Outputs and available evidence were published into protected storage for signed download delivery."
+            : "Outputs and benchmark evidence were published into protected storage for signed download delivery.",
+          bucket: storageBucket,
+          prefix: publishPrefix,
+        },
+      },
+    ]);
+  }
+
   console.log("\n✅ Imported ODM benchmark summary\n");
   console.log(JSON.stringify({
     org: { id: org.id, slug: org.slug },
@@ -397,6 +750,11 @@ async function main() {
     dataset: { id: dataset.id, name: dataset.name },
     job: { id: job.id, status: job.status, stage: job.stage },
     summaryPath,
+    attachedToExistingJob: Boolean(existingJob),
+    publishedToStorage: publishToStorage,
+    storageBucket: publishToStorage ? storageBucket : null,
+    publishPrefix: publishToStorage ? publishPrefix : null,
+    reviewBundlePath: resolvedReviewBundlePath,
   }, null, 2));
 }
 
