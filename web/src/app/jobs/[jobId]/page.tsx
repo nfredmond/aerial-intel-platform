@@ -6,6 +6,7 @@ import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { ManagedOutputImportForm } from "@/components/managed-output-import-form";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import {
+  buildDispatchRequestId,
   getDispatchAdapterConfigSummary,
   launchDispatchViaAdapter,
 } from "@/lib/dispatch-adapter";
@@ -610,7 +611,10 @@ export default async function JobDetailPage({
           dispatchedByEmail: refreshedAccess.user.email ?? null,
           externalRunReference: launchResult.ok
             ? launchResult.externalRunReference
-            : `adapter-${refreshedDetail.job.id}`,
+            : buildDispatchRequestId(refreshedDetail.job.id, {
+                hostLabel,
+                workerLabel: workerLabel || null,
+              }),
         },
         adapter: launchResult.ok
           ? {
@@ -1196,7 +1200,7 @@ Operator note: ${operatorNotes}`
               {detail.job.status === "running" && detail.job.stage === "intake_review" ? (
                 <div className="stack-sm">
                   <form action={launchDispatchWithAdapter} className="stack-sm">
-                    <h4>Launch through configured adapter</h4>
+                    <h4>{dispatchAdapterConfig.configured ? "Launch through configured adapter" : "Prepare dispatch adapter contract"}</h4>
                     <label className="stack-xs">
                       Assigned host
                       <input
@@ -1230,10 +1234,12 @@ Operator note: ${operatorNotes}`
                       className="button button-primary"
                       disabled={access.role === "viewer"}
                     >
-                      Launch via dispatch adapter
+                      {dispatchAdapterConfig.configured ? "Launch via dispatch adapter" : "Prepare adapter launch contract"}
                     </button>
                     <p className="muted">
-                      Uses the configured server-side adapter contract when available. On failure or missing config, the job stays in intake review and the attempt is recorded honestly.
+                      {dispatchAdapterConfig.configured
+                        ? "Uses the configured server-side adapter contract. The job only moves to processing when the adapter accepts and returns an external run reference."
+                        : "No adapter endpoint is configured in this deployment. Submitting here records a truthful prepared/failed adapter attempt and leaves the job in intake review until a real launch succeeds or a manual handoff is entered."}
                     </p>
                   </form>
 
