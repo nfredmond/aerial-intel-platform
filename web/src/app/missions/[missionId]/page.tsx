@@ -52,6 +52,9 @@ import {
   getStringArray,
 } from "@/lib/missions/detail-data";
 import {
+  buildManagedProcessingRequestSummary,
+} from "@/lib/managed-processing";
+import {
   advanceManualProvingJob,
   isProvingJobRecord,
 } from "@/lib/proving-runs";
@@ -255,12 +258,12 @@ function getCalloutMessage(options: {
 
   if (options.queued) {
     return options.queued === "1"
-      ? "Processing job queued. Refreshes should now appear in the live job lane for this mission."
-      : options.queued === "missing-dataset"
-        ? "This mission does not have a dataset yet, so a processing job could not be queued."
+      ? "Managed processing request created. The mission now has a truthful operator-assisted job record, but no ODM dispatch or artifact generation is claimed until real run evidence is attached."
+        : options.queued === "missing-dataset"
+        ? "This mission does not have a dataset yet, so a managed processing request could not be created."
         : options.queued === "denied"
-          ? "Viewer access cannot queue processing jobs."
-          : "The processing job could not be queued. Check server configuration and try again.";
+          ? "Viewer access cannot create managed processing requests."
+          : "The managed processing request could not be created. Check server configuration and try again.";
   }
 
   if (options.seeded) {
@@ -783,7 +786,7 @@ export default async function MissionDetailPage({
     }
 
     const dataset = refreshedDetail.datasets[0];
-    const jobName = `${refreshedDetail.mission.name} processing refresh`;
+    const jobName = `${refreshedDetail.mission.name} managed processing request`;
 
     try {
       const insertedJob = await insertProcessingJob({
@@ -793,7 +796,7 @@ export default async function MissionDetailPage({
         mission_id: refreshedDetail.mission.id,
         dataset_id: dataset.id,
         engine: "odm",
-        preset_id: "standard-refresh",
+        preset_id: "managed-processing-v1",
         status: "queued",
         stage: "queued",
         progress: 0,
@@ -802,12 +805,13 @@ export default async function MissionDetailPage({
           name: jobName,
           requestedByUserId: refreshedAccess.user.id,
           requestedByEmail: refreshedAccess.user.email,
-          source: "mission-detail-action",
+          source: "mission-detail-managed-request",
         },
-        output_summary: {
-          eta: "Pending queue pickup",
-          notes: "Queued from the mission detail page.",
-        },
+        output_summary: buildManagedProcessingRequestSummary({
+          missionName: refreshedDetail.mission.name,
+          datasetName: dataset.name,
+          requestedByEmail: refreshedAccess.user.email,
+        }),
         external_job_reference: null,
         created_by: refreshedAccess.user.id,
       });
@@ -816,86 +820,13 @@ export default async function MissionDetailPage({
         redirect(`/missions/${missionId}?queued=error`);
       }
 
-      await insertProcessingOutputs([
-        {
-          org_id: refreshedAccess.org.id,
-          job_id: insertedJob.id,
-          mission_id: refreshedDetail.mission.id,
-          dataset_id: dataset.id,
-          kind: "orthomosaic",
-          status: "pending",
-          storage_bucket: "drone-ops",
-          storage_path: `${refreshedAccess.org.slug}/jobs/${insertedJob.id}/orthomosaic.tif`,
-          metadata: {
-            name: `${refreshedDetail.mission.name} orthomosaic`,
-            format: "COG",
-            delivery: "Review pending",
-          },
-        },
-        {
-          org_id: refreshedAccess.org.id,
-          job_id: insertedJob.id,
-          mission_id: refreshedDetail.mission.id,
-          dataset_id: dataset.id,
-          kind: "dsm",
-          status: "pending",
-          storage_bucket: "drone-ops",
-          storage_path: `${refreshedAccess.org.slug}/jobs/${insertedJob.id}/dsm.tif`,
-          metadata: {
-            name: `${refreshedDetail.mission.name} surface model`,
-            format: "COG",
-            delivery: "Review pending",
-          },
-        },
-        {
-          org_id: refreshedAccess.org.id,
-          job_id: insertedJob.id,
-          mission_id: refreshedDetail.mission.id,
-          dataset_id: dataset.id,
-          kind: "point_cloud",
-          status: "pending",
-          storage_bucket: "drone-ops",
-          storage_path: `${refreshedAccess.org.slug}/jobs/${insertedJob.id}/cloud.laz`,
-          metadata: {
-            name: `${refreshedDetail.mission.name} point cloud`,
-            format: "LAZ",
-            delivery: "Hold for QA",
-          },
-        },
-        {
-          org_id: refreshedAccess.org.id,
-          job_id: insertedJob.id,
-          mission_id: refreshedDetail.mission.id,
-          dataset_id: dataset.id,
-          kind: "report",
-          status: "pending",
-          storage_bucket: "drone-ops",
-          storage_path: `${refreshedAccess.org.slug}/jobs/${insertedJob.id}/mission-brief.pdf`,
-          metadata: {
-            name: `${refreshedDetail.mission.name} mission brief`,
-            format: "PDF",
-            delivery: "Share/export pending",
-          },
-        },
-      ]);
-
       await insertJobEvent({
         org_id: refreshedAccess.org.id,
         job_id: insertedJob.id,
         event_type: "job.queued",
         payload: {
-          title: "Manual processing job queued",
-          detail: `Queued from mission detail for dataset ${dataset.name}.`,
-        },
-      });
-
-      await insertJobEvent({
-        org_id: refreshedAccess.org.id,
-        job_id: insertedJob.id,
-        event_type: "artifact.generated",
-        payload: {
-          title: "Placeholder outputs staged",
-          detail: "Orthomosaic, DSM, point cloud, and report placeholders were created for downstream review/export flows.",
+          title: "Managed processing request queued",
+          detail: `A managed processing request was created from mission detail for dataset ${dataset.name}. No host dispatch or artifacts are recorded yet.`,
         },
       });
     } catch {
@@ -2069,14 +2000,14 @@ export default async function MissionDetailPage({
               </>
             ) : detail.datasets.length > 0 && detail.jobs.length === 0 ? (
               <>
-                <p className="muted">Dataset exists. Next step is to create a real processing run.</p>
+                <p className="muted">Dataset exists. Next step is to create a managed processing request that truthfully tracks operator intake, dispatch, QA, and delivery readiness.</p>
                 <form action={queueMissionProcessing}>
                   <button
                     type="submit"
                     className="button button-primary"
                     disabled={access.role === "viewer"}
                   >
-                    Queue processing job
+                    Create managed request
                   </button>
                 </form>
               </>
@@ -2119,11 +2050,11 @@ export default async function MissionDetailPage({
               className="button button-primary"
               disabled={detail.datasets.length === 0 || access.role === "viewer"}
             >
-              Queue processing job
+              Create managed request
             </button>
           </form>
           {detail.datasets.length === 0 ? (
-            <p className="muted">A dataset must exist before a job can be queued.</p>
+            <p className="muted">A dataset must exist before a managed processing request can be created.</p>
           ) : null}
 
           <form action={seedProvingRun} className="stack-xs surface-form-shell">

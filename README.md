@@ -11,6 +11,7 @@ See the charter and docs folder for current scope and architecture. The repo is 
 - ODM benchmark harness (`scripts/run_odm_benchmark.sh`)
 - Truthful local v1 slice orchestrator (`scripts/e2e_v1_slice.sh`)
 - Download-first review bundle builder (`scripts/build_v1_review_bundle.mjs`)
+- Managed-processing request lifecycle for truthful operator-assisted orchestration (`web/src/lib/managed-processing.ts`)
 - Auth delivery readiness plan (`docs/AUTH_DELIVERY_READINESS_2026-03-03.md`)
 - Aerial Operations OS execution plan (`docs/AERIAL_OPERATIONS_OS_EXECUTION_PLAN_2026-03-15.md`)
 - Supabase auth/entitlement schema scaffold (`supabase/migrations/202603040001_droneops_auth_foundation.sql`)
@@ -24,10 +25,10 @@ See the charter and docs folder for current scope and architecture. The repo is 
 - Imported benchmark-backed jobs/artifacts can render in `/jobs/[jobId]` and `/artifacts/[artifactId]`
 - Artifact review/share/export audit surfaces exist in the web app
 - Mission detail can now upload a ZIP directly from the browser into protected Supabase Storage and record an honest v1 ingest session with storage evidence, benchmark/run-log placeholders, and review-bundle readiness without pretending extraction or ODM orchestration already ran
-- Mission detail now includes a browser file-picker lane that records ZIP filename/size into a new ingest session without pretending durable upload/storage or orchestration already exists
+- Mission detail can now create a truthful managed-processing request that tracks operator intake review, host dispatch, QA start, and delivery-ready completion without staging fake artifacts before a real run is attached/imported
 
 ### Not real yet
-- Browser-native ZIP upload and resumable ingest
+- Resumable/browser-recoverable ingest beyond the current signed-upload path
 - Real NodeODM/ClusterODM orchestration initiated from the app
 - Signed-download delivery, TiTiler-backed raster viewing, and compute-worker automation for actual ODM jobs
 - Install bundles derived from real mission-planner/controller exports rather than placeholder handoff records

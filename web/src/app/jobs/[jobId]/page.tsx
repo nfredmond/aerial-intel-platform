@@ -14,6 +14,11 @@ import {
   getBenchmarkSummaryView,
 } from "@/lib/benchmark-summary";
 import { buildRetryJobInputSummary, buildRetryJobOutputSummary, buildRetryOutputSeeds } from "@/lib/job-retries";
+import {
+  advanceManagedProcessingJob,
+  getManagedProcessingNextStep,
+  isManagedProcessingJobDetail,
+} from "@/lib/managed-processing";
 import { getJobDetail, getString } from "@/lib/missions/detail-data";
 import {
   advanceManualProvingJob,
@@ -98,6 +103,55 @@ function getCalloutMessage(actionState?: string) {
     return {
       tone: "success",
       text: "Proving job completed. Output artifacts are now ready for real review/share/export work.",
+    } as const;
+  }
+
+  if (actionState === "intake-started") {
+    return {
+      tone: "success",
+      text: "Managed intake review started. This request is now active, but host dispatch is still not recorded.",
+    } as const;
+  }
+
+  if (actionState === "dispatch-recorded") {
+    return {
+      tone: "success",
+      text: "Managed host dispatch recorded. The job now truthfully reflects operator handoff to real processing infrastructure.",
+    } as const;
+  }
+
+  if (actionState === "qa-started") {
+    return {
+      tone: "success",
+      text: "Managed QA review started. Real outputs are attached and the delivery lane can now be reviewed honestly.",
+    } as const;
+  }
+
+  if (actionState === "managed-completed") {
+    return {
+      tone: "success",
+      text: "Managed processing request marked delivery-ready. Ready artifacts can now move through review/share/export with truthful audit trail.",
+    } as const;
+  }
+
+  if (actionState === "awaiting-outputs") {
+    return {
+      tone: "error",
+      text: "This managed request cannot advance into QA yet because no real outputs are attached to the job.",
+    } as const;
+  }
+
+  if (actionState === "awaiting-ready-artifacts") {
+    return {
+      tone: "error",
+      text: "This managed request cannot be marked delivery-ready yet because no attached artifact is marked ready.",
+    } as const;
+  }
+
+  if (actionState === "not-managed") {
+    return {
+      tone: "error",
+      text: "This job is not marked as a managed processing request, so the managed controls are unavailable.",
     } as const;
   }
 
@@ -364,6 +418,40 @@ export default async function JobDetailPage({
     redirect(`/jobs/${jobId}?action=completed`);
   }
 
+  async function advanceManagedJob() {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/jobs/${jobId}?action=denied`);
+    }
+
+    const refreshedDetail = await getJobDetail(refreshedAccess, jobId);
+    if (!refreshedDetail) {
+      redirect("/missions");
+    }
+
+    try {
+      const result = await advanceManagedProcessingJob({
+        orgId: refreshedAccess.org.id,
+        detail: refreshedDetail,
+        source: "job-detail",
+      });
+
+      redirect(`/jobs/${jobId}?action=${result}`);
+    } catch {
+      redirect(`/jobs/${jobId}?action=error`);
+    }
+  }
+
   const benchmarkSummary = getBenchmarkSummaryView(detail.outputSummary.benchmarkSummary ?? detail.outputSummary);
   const latestCheckpoint = getString(detail.outputSummary.latestCheckpoint, "No checkpoint recorded yet.");
   const stageChecklist = getStageChecklist(detail.outputSummary);
@@ -378,6 +466,8 @@ export default async function JobDetailPage({
     ),
   );
   const provingJob = isManualProvingJobDetail(detail);
+  const managedJob = isManagedProcessingJobDetail(detail);
+  const managedNextStep = managedJob ? getManagedProcessingNextStep(detail) : null;
   const firstReadyOutput = detail.outputs.find((output) => output.status === "ready") ?? null;
   const callout = getCalloutMessage(resolvedSearchParams.action);
 
@@ -523,6 +613,25 @@ export default async function JobDetailPage({
                   Complete proving job
                 </button>
               </form>
+            </div>
+          ) : null}
+
+          {managedJob && managedNextStep ? (
+            <div className="stack-xs surface-form-shell">
+              <h3>Managed-processing controls</h3>
+              <p className="muted">
+                This job is an operator-assisted managed processing request. Advance it only when the corresponding real-world handoff has actually happened.
+              </p>
+              <form action={advanceManagedJob}>
+                <button
+                  type="submit"
+                  className="button button-primary"
+                  disabled={access.role === "viewer" || managedNextStep.disabled}
+                >
+                  {managedNextStep.label}
+                </button>
+              </form>
+              <p className="muted">{managedNextStep.helper}</p>
             </div>
           ) : null}
 
