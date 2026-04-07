@@ -29,10 +29,12 @@ See the charter and docs folder for current scope and architecture. The repo is 
 - Mission detail can now upload a ZIP directly from the browser into protected Supabase Storage and record an honest v1 ingest session with storage evidence, benchmark/run-log placeholders, and review-bundle readiness without pretending extraction or ODM orchestration already ran
 - Mission detail can now create a truthful managed-processing request that tracks operator intake review, host dispatch, QA start, and delivery-ready completion without staging fake artifacts before a real run is attached/imported
 - Managed job detail can now import real benchmark evidence, optional review bundle/run log, and uploaded output artifacts directly from the browser into protected storage, then attach them onto the managed job without relying on the shell-only import script
+- Managed job detail now includes an honest dispatch handoff form: operators can record the assigned processing host, optional worker/slot, external run reference, and dispatch notes before the app advances the request into processing, and the job timeline/UI reflects that real handoff metadata
 
 ### Not real yet
 - Resumable/browser-recoverable ingest beyond the current signed-upload path
 - Real NodeODM/ClusterODM orchestration initiated from the app
+- Automatic dispatch creation from the app into a real worker/NodeODM API (the app now records truthful dispatch handoff metadata, but an operator still performs the actual compute-side launch)
 - Broad signed-download delivery beyond storage-published imported artifacts, TiTiler-backed raster viewing, and compute-worker automation for app-initiated ODM jobs
 - Install bundles derived from real mission-planner/controller exports rather than placeholder handoff records
 

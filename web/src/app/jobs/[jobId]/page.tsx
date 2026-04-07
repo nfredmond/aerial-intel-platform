@@ -17,8 +17,10 @@ import {
 import { buildRetryJobInputSummary, buildRetryJobOutputSummary, buildRetryOutputSeeds } from "@/lib/job-retries";
 import {
   advanceManagedProcessingJob,
+  getManagedDispatchHandoff,
   getManagedProcessingNextStep,
   isManagedProcessingJobDetail,
+  recordManagedDispatchHandoff,
 } from "@/lib/managed-processing";
 import {
   buildManagedImportStoragePath,
@@ -100,6 +102,11 @@ function getChecklistStatusClass(status: string) {
     default:
       return "status-pill status-pill--warning";
   }
+}
+
+function getFormString(formData: FormData, key: string) {
+  const value = formData.get(key);
+  return typeof value === "string" ? value.trim() : "";
 }
 
 function getCalloutMessage(actionState?: string) {
@@ -474,6 +481,56 @@ export default async function JobDetailPage({
     }
   }
 
+  async function recordDispatchHandoff(formData: FormData) {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/jobs/${jobId}?action=denied`);
+    }
+
+    const refreshedDetail = await getJobDetail(refreshedAccess, jobId);
+    if (!refreshedDetail) {
+      redirect("/missions");
+    }
+
+    const hostLabel = getFormString(formData, "hostLabel");
+    const workerLabel = getFormString(formData, "workerLabel");
+    const externalRunReference = getFormString(formData, "externalRunReference");
+    const dispatchNotes = getFormString(formData, "dispatchNotes");
+
+    if (!hostLabel || !externalRunReference) {
+      redirect(`/jobs/${jobId}?action=error`);
+    }
+
+    try {
+      const result = await recordManagedDispatchHandoff({
+        orgId: refreshedAccess.org.id,
+        detail: refreshedDetail,
+        source: "job-detail",
+        handoff: {
+          hostLabel,
+          workerLabel: workerLabel || null,
+          externalRunReference,
+          dispatchNotes: dispatchNotes || null,
+          dispatchedByEmail: refreshedAccess.user.email ?? null,
+        },
+      });
+
+      redirect(`/jobs/${jobId}?action=${result}`);
+    } catch {
+      redirect(`/jobs/${jobId}?action=error`);
+    }
+  }
+
   async function prepareManagedImportUpload(formData: FormData) {
     "use server";
 
@@ -763,6 +820,9 @@ Operator note: ${operatorNotes}`
   const provingJob = isManualProvingJobDetail(detail);
   const managedJob = isManagedProcessingJobDetail(detail);
   const managedNextStep = managedJob ? getManagedProcessingNextStep(detail) : null;
+  const dispatchHandoff = managedJob
+    ? getManagedDispatchHandoff(detail.outputSummary, detail.job.external_job_reference)
+    : null;
   const outputDownloadUrls = new Map(
     await Promise.all(
       detail.outputs.map(async (output) => [
@@ -880,11 +940,52 @@ Operator note: ${operatorNotes}`
               <dt>External ref</dt>
               <dd>{detail.job.external_job_reference ?? "None"}</dd>
             </div>
+            {dispatchHandoff?.hostLabel ? (
+              <div className="kv-row">
+                <dt>Assigned host</dt>
+                <dd>{dispatchHandoff.hostLabel}</dd>
+              </div>
+            ) : null}
+            {dispatchHandoff?.workerLabel ? (
+              <div className="kv-row">
+                <dt>Assigned worker</dt>
+                <dd>{dispatchHandoff.workerLabel}</dd>
+              </div>
+            ) : null}
             <div className="kv-row">
               <dt>ETA</dt>
               <dd>{getString(detail.outputSummary.eta, "Pending")}</dd>
             </div>
           </dl>
+
+          {dispatchHandoff?.hostLabel || dispatchHandoff?.externalRunReference || dispatchHandoff?.dispatchNotes ? (
+            <div className="stack-xs surface-form-shell">
+              <h3>Dispatch handoff</h3>
+              <dl className="kv-grid">
+                <div className="kv-row">
+                  <dt>Host</dt>
+                  <dd>{dispatchHandoff.hostLabel ?? "Not recorded"}</dd>
+                </div>
+                <div className="kv-row">
+                  <dt>Worker</dt>
+                  <dd>{dispatchHandoff.workerLabel ?? "Not recorded"}</dd>
+                </div>
+                <div className="kv-row">
+                  <dt>External run ref</dt>
+                  <dd>{dispatchHandoff.externalRunReference ?? "Not recorded"}</dd>
+                </div>
+                <div className="kv-row">
+                  <dt>Recorded</dt>
+                  <dd>{formatDateTime(dispatchHandoff.dispatchedAt)}</dd>
+                </div>
+                <div className="kv-row">
+                  <dt>Recorded by</dt>
+                  <dd>{dispatchHandoff.dispatchedByEmail ?? "Not recorded"}</dd>
+                </div>
+              </dl>
+              {dispatchHandoff.dispatchNotes ? <p className="muted">Notes: {dispatchHandoff.dispatchNotes}</p> : null}
+            </div>
+          ) : null}
 
           <div className="stack-xs surface-form-shell">
             <h3>Job controls</h3>
@@ -940,15 +1041,65 @@ Operator note: ${operatorNotes}`
               <p className="muted">
                 This job is an operator-assisted managed processing request. Advance it only when the corresponding real-world handoff has actually happened.
               </p>
-              <form action={advanceManagedJob}>
-                <button
-                  type="submit"
-                  className="button button-primary"
-                  disabled={access.role === "viewer" || managedNextStep.disabled}
-                >
-                  {managedNextStep.label}
-                </button>
-              </form>
+              {detail.job.status === "running" && detail.job.stage === "intake_review" ? (
+                <form action={recordDispatchHandoff} className="stack-sm">
+                  <label className="stack-xs">
+                    Assigned host
+                    <input
+                      name="hostLabel"
+                      type="text"
+                      defaultValue={dispatchHandoff?.hostLabel ?? ""}
+                      placeholder="single-host-odm-01"
+                      required
+                    />
+                  </label>
+                  <label className="stack-xs">
+                    Worker / queue slot (optional)
+                    <input
+                      name="workerLabel"
+                      type="text"
+                      defaultValue={dispatchHandoff?.workerLabel ?? ""}
+                      placeholder="nodeodm-a / docker-worker-2"
+                    />
+                  </label>
+                  <label className="stack-xs">
+                    External run reference
+                    <input
+                      name="externalRunReference"
+                      type="text"
+                      defaultValue={dispatchHandoff?.externalRunReference ?? ""}
+                      placeholder="odm-20260406-gv-downtown"
+                      required
+                    />
+                  </label>
+                  <label className="stack-xs">
+                    Dispatch notes (optional)
+                    <textarea
+                      name="dispatchNotes"
+                      rows={3}
+                      defaultValue={dispatchHandoff?.dispatchNotes ?? ""}
+                      placeholder="Exact host lane, operator notes, queue context, or special processing flags."
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    className="button button-primary"
+                    disabled={access.role === "viewer"}
+                  >
+                    Record dispatch handoff
+                  </button>
+                </form>
+              ) : (
+                <form action={advanceManagedJob}>
+                  <button
+                    type="submit"
+                    className="button button-primary"
+                    disabled={access.role === "viewer" || managedNextStep.disabled}
+                  >
+                    {managedNextStep.label}
+                  </button>
+                </form>
+              )}
               <p className="muted">{managedNextStep.helper}</p>
             </div>
           ) : null}

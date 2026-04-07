@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildManagedProcessingRequestSummary,
+  getManagedDispatchHandoff,
   getManagedProcessingNextStep,
   isManagedProcessingJobRecord,
 } from "./managed-processing";
@@ -88,10 +89,41 @@ describe("managed-processing", () => {
     expect(nextStep?.disabled).toBe(false);
   });
 
+  it("parses a recorded dispatch handoff from job summary metadata", () => {
+    const dispatch = getManagedDispatchHandoff({
+      dispatchHandoff: {
+        hostLabel: "odm-host-01",
+        workerLabel: "nodeodm-worker-a",
+        externalRunReference: "run-42",
+        dispatchNotes: "Single-host Docker lane",
+        dispatchedAt: "2026-04-06T18:00:00.000Z",
+        dispatchedByEmail: "ops@example.com",
+        dispatchSource: "job detail",
+      },
+    });
+
+    expect(dispatch.hostLabel).toBe("odm-host-01");
+    expect(dispatch.workerLabel).toBe("nodeodm-worker-a");
+    expect(dispatch.externalRunReference).toBe("run-42");
+    expect(dispatch.dispatchNotes).toContain("Single-host Docker");
+  });
+
+  it("falls back to the job external reference when dispatch metadata is partial", () => {
+    const dispatch = getManagedDispatchHandoff({}, "external-123");
+    expect(dispatch.externalRunReference).toBe("external-123");
+    expect(dispatch.hostLabel).toBeNull();
+  });
+
   it("blocks QA start until outputs are attached", () => {
     const nextStep = getManagedProcessingNextStep(createDetail({ status: "running", stage: "processing", outputs: [] }));
     expect(nextStep?.label).toBe("Start QA on imported outputs");
     expect(nextStep?.disabled).toBe(true);
+  });
+
+  it("asks for a real dispatch handoff record during intake review", () => {
+    const nextStep = getManagedProcessingNextStep(createDetail({ status: "running", stage: "intake_review" }));
+    expect(nextStep?.label).toBe("Record dispatch handoff");
+    expect(nextStep?.helper).toContain("assigned host");
   });
 
   it("allows delivery completion only when a ready artifact exists", () => {

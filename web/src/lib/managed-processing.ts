@@ -8,6 +8,24 @@ import type { Json } from "@/lib/supabase/types";
 type JsonRecord = Record<string, Json | undefined>;
 type JobDetailResult = NonNullable<Awaited<ReturnType<typeof getJobDetail>>>;
 
+export type ManagedDispatchHandoffInput = {
+  hostLabel: string;
+  workerLabel?: string | null;
+  externalRunReference: string;
+  dispatchNotes?: string | null;
+  dispatchedByEmail?: string | null;
+};
+
+export type ManagedDispatchHandoff = {
+  hostLabel: string | null;
+  workerLabel: string | null;
+  externalRunReference: string | null;
+  dispatchNotes: string | null;
+  dispatchedAt: string | null;
+  dispatchedByEmail: string | null;
+  dispatchSource: string | null;
+};
+
 export type ManagedProcessingActionSource = "job-detail" | "mission-detail" | "workspace";
 export type ManagedProcessingAdvanceResult =
   | "intake-started"
@@ -36,6 +54,56 @@ function getSourceLabel(source: ManagedProcessingActionSource) {
     default:
       return "job detail";
   }
+}
+
+function normalizeOptionalString(value: string | null | undefined) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function getManagedDispatchHandoffRecord(value: unknown) {
+  const record = asRecord(value);
+  const rawDispatch = record.dispatchHandoff;
+
+  if (!rawDispatch || typeof rawDispatch !== "object" || Array.isArray(rawDispatch)) {
+    return null;
+  }
+
+  return rawDispatch as JsonRecord;
+}
+
+export function getManagedDispatchHandoff(summary: unknown, externalJobReference?: string | null): ManagedDispatchHandoff {
+  const dispatch = getManagedDispatchHandoffRecord(summary);
+
+  return {
+    hostLabel: normalizeOptionalString(dispatch?.hostLabel as string | null | undefined),
+    workerLabel: normalizeOptionalString(dispatch?.workerLabel as string | null | undefined),
+    externalRunReference:
+      normalizeOptionalString(dispatch?.externalRunReference as string | null | undefined)
+      ?? normalizeOptionalString(externalJobReference),
+    dispatchNotes: normalizeOptionalString(dispatch?.dispatchNotes as string | null | undefined),
+    dispatchedAt: normalizeOptionalString(dispatch?.dispatchedAt as string | null | undefined),
+    dispatchedByEmail: normalizeOptionalString(dispatch?.dispatchedByEmail as string | null | undefined),
+    dispatchSource: normalizeOptionalString(dispatch?.dispatchSource as string | null | undefined),
+  };
+}
+
+function buildManagedDispatchLogLines(input: {
+  sourceLabel: string;
+  hostLabel: string;
+  workerLabel?: string | null;
+  externalRunReference: string;
+}) {
+  const workerLine = input.workerLabel && input.workerLabel.trim().length > 0
+    ? `Assigned worker: ${input.workerLabel.trim()}.`
+    : "Assigned worker: not recorded in-app.";
+
+  return [
+    `Managed host dispatch recorded from ${input.sourceLabel}.`,
+    `Assigned host: ${input.hostLabel}.`,
+    workerLine,
+    `External run reference: ${input.externalRunReference}.`,
+    "Awaiting real output import before QA review.",
+  ];
 }
 
 function getManagedStageChecklist(input: {
@@ -178,22 +246,37 @@ async function recordManagedDispatch(options: {
   orgId: string;
   detail: JobDetailResult;
   source: ManagedProcessingActionSource;
+  handoff: ManagedDispatchHandoffInput;
 }) {
   const sourceLabel = getSourceLabel(options.source);
+  const now = new Date().toISOString();
+  const workerLabel = normalizeOptionalString(options.handoff.workerLabel);
+  const dispatchNotes = normalizeOptionalString(options.handoff.dispatchNotes);
+  const dispatchedByEmail = normalizeOptionalString(options.handoff.dispatchedByEmail);
 
   await updateProcessingJob(options.detail.job.id, {
     status: "running",
     stage: "processing",
     progress: 45,
     queue_position: null,
+    external_job_reference: options.handoff.externalRunReference,
     output_summary: {
       ...options.detail.outputSummary,
       workflowMode: "managed_processing_v1",
       serviceModel: "operator_assisted",
       eta: "Awaiting output import",
-      notes: `Operator dispatch recorded from ${sourceLabel}. This marks the managed handoff to real processing infrastructure, but outputs still need to be imported before QA can begin.`,
-      latestCheckpoint: "Managed host dispatch recorded",
+      notes: `Operator dispatch recorded from ${sourceLabel}. Assigned host ${options.handoff.hostLabel} with external run reference ${options.handoff.externalRunReference}. This marks the managed handoff to real processing infrastructure, but outputs still need to be imported before QA can begin.`,
+      latestCheckpoint: `Managed host dispatch recorded on ${options.handoff.hostLabel}`,
       deliveryPosture: "No client-facing deliverables should be promised until real outputs are imported.",
+      dispatchHandoff: {
+        hostLabel: options.handoff.hostLabel,
+        workerLabel,
+        externalRunReference: options.handoff.externalRunReference,
+        dispatchNotes,
+        dispatchedAt: now,
+        dispatchedByEmail,
+        dispatchSource: sourceLabel,
+      },
       stageChecklist: getManagedStageChecklist({
         intakeReview: "complete",
         hostDispatch: "complete",
@@ -201,11 +284,12 @@ async function recordManagedDispatch(options: {
         qaReview: "pending",
         deliveryRecorded: "pending",
       }),
-      logTail: [
-        `Managed host dispatch recorded from ${sourceLabel}.`,
-        "Processing host handoff acknowledged.",
-        "Awaiting real output import before QA review.",
-      ],
+      logTail: buildManagedDispatchLogLines({
+        sourceLabel,
+        hostLabel: options.handoff.hostLabel,
+        workerLabel,
+        externalRunReference: options.handoff.externalRunReference,
+      }),
     },
   });
 
@@ -215,9 +299,39 @@ async function recordManagedDispatch(options: {
     event_type: "job.stage.changed",
     payload: {
       title: "Managed host dispatch recorded",
-      detail: `Operator dispatch to the processing host was recorded from ${sourceLabel}. Real outputs still need to be imported before QA can start.`,
+      detail: `Operator dispatch to ${options.handoff.hostLabel}${workerLabel ? ` / ${workerLabel}` : ""} was recorded from ${sourceLabel} with external run reference ${options.handoff.externalRunReference}. Real outputs still need to be imported before QA can start.`,
     },
   });
+
+  if (dispatchNotes) {
+    await insertJobEvent({
+      org_id: options.orgId,
+      job_id: options.detail.job.id,
+      event_type: "job.dispatch.note.recorded",
+      payload: {
+        title: "Managed dispatch note recorded",
+        detail: `Dispatch note for host ${options.handoff.hostLabel}: ${dispatchNotes}`,
+      },
+    });
+  }
+}
+
+export async function recordManagedDispatchHandoff(options: {
+  orgId: string;
+  detail: JobDetailResult;
+  source: ManagedProcessingActionSource;
+  handoff: ManagedDispatchHandoffInput;
+}) {
+  if (!isManagedProcessingJobDetail(options.detail)) {
+    return "not-managed" as const;
+  }
+
+  if (!(options.detail.job.status === "running" && options.detail.job.stage === "intake_review")) {
+    return "noop" as const;
+  }
+
+  await recordManagedDispatch(options);
+  return "dispatch-recorded" as const;
 }
 
 async function startManagedQaReview(options: {
@@ -313,7 +427,16 @@ export async function advanceManagedProcessingJob(options: {
   }
 
   if (detail.job.status === "running" && detail.job.stage === "intake_review") {
-    await recordManagedDispatch(options);
+    await recordManagedDispatch({
+      ...options,
+      handoff: {
+        hostLabel: "Processing host assigned",
+        externalRunReference: `managed-${detail.job.id}`,
+        workerLabel: null,
+        dispatchNotes: null,
+        dispatchedByEmail: null,
+      },
+    });
     return "dispatch-recorded";
   }
 
@@ -356,8 +479,8 @@ export function getManagedProcessingNextStep(detail: JobDetailResult) {
 
   if (detail.job.status === "running" && detail.job.stage === "intake_review") {
     return {
-      label: "Record host dispatch",
-      helper: "Record that this managed request has been handed to real processing infrastructure.",
+      label: "Record dispatch handoff",
+      helper: "Record the assigned host and external run reference before claiming this request was handed to real processing infrastructure.",
       disabled: false,
     };
   }

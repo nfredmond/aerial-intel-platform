@@ -193,6 +193,7 @@ export type ProcessingJobPatch = {
   queue_position?: number | null;
   input_summary?: Json;
   output_summary?: Json;
+  external_job_reference?: string | null;
   started_at?: string | null;
   completed_at?: string | null;
 };

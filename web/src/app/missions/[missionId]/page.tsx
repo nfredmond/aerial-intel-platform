@@ -53,6 +53,7 @@ import {
 } from "@/lib/missions/detail-data";
 import {
   buildManagedProcessingRequestSummary,
+  getManagedDispatchHandoff,
 } from "@/lib/managed-processing";
 import {
   advanceManualProvingJob,
@@ -2528,6 +2529,7 @@ export default async function MissionDetailPage({
               const outputSummary = job.output_summary && typeof job.output_summary === "object" && !Array.isArray(job.output_summary)
                 ? (job.output_summary as Record<string, unknown>)
                 : {};
+              const dispatchHandoff = getManagedDispatchHandoff(outputSummary, job.external_job_reference);
               const latestCheckpoint = getString(outputSummary.latestCheckpoint as string | undefined, "");
               const stageChecklist = getStageChecklist(outputSummary);
 
@@ -2549,6 +2551,12 @@ export default async function MissionDetailPage({
                     <strong>{job.progress}%</strong>
                   </div>
                   {latestCheckpoint ? <p className="muted">Checkpoint: {latestCheckpoint}</p> : null}
+                  {dispatchHandoff.hostLabel || dispatchHandoff.externalRunReference ? (
+                    <p className="muted">
+                      Dispatch: {dispatchHandoff.hostLabel ?? "Host pending"}
+                      {dispatchHandoff.externalRunReference ? ` · Run ref ${dispatchHandoff.externalRunReference}` : ""}
+                    </p>
+                  ) : null}
                   {stageChecklist.length > 0 ? (
                     <div className="header-actions">
                       {stageChecklist.map((item) => (

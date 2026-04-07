@@ -21,6 +21,7 @@ The slice is:
 - Mission-level intake session records that can capture ZIP evidence, protected browser-upload storage paths, benchmark paths, review-bundle ZIP paths, and truthful pass/fail posture without implying extraction or ODM orchestration already ran
 - Benchmark import can now attach real outputs onto an existing managed-processing job, and storage-published imported artifacts can issue signed downloads in the app
 - Managed job detail now includes a browser-based operator import lane that can upload benchmark evidence, review bundle ZIPs, and real output files into protected storage, then attach them to the managed job without shell access
+- Managed job detail now includes a browser-recorded dispatch handoff that captures assigned host, optional worker, external run reference, dispatch note, and event history before the request is marked as truly handed to processing infrastructure
 
 ### Not real today
 - Browser-native ZIP upload/resumable ingest beyond the current signed-upload path
@@ -79,9 +80,11 @@ The bundle intentionally carries evidence, not just outputs:
    - replace manual/proving job progression with actual NodeODM state transitions
 2. **Managed-job import closure**
    - continue the new attach-to-existing-job import lane until operators can close the whole managed-processing loop without sidecar DB edits or shell uploads
-3. **Storage-backed delivery expansion**
+3. **App-to-worker dispatch automation**
+   - convert the new truthful dispatch handoff record into a real compute-side launch contract so host assignment and external run reference can be created automatically instead of manually entered by the operator
+4. **Storage-backed delivery expansion**
    - extend the now-landed signed-download path for storage-published imported outputs/review bundles into a broader default delivery contract
-4. **Raster review upgrade**
+5. **Raster review upgrade**
    - move orthophoto/DEM review from file-level evidence to actual in-app visualization
 
 ## Operating note
