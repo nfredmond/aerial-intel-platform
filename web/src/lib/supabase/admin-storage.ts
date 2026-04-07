@@ -68,3 +68,20 @@ export async function createSignedDownloadUrl(input: {
 
   return result.data.signedUrl;
 }
+
+export async function downloadStorageText(input: {
+  bucket?: string;
+  path: string;
+}) {
+  const bucket = input.bucket?.trim() || DRONE_OPS_STORAGE_BUCKET;
+  const supabase = getSupabaseAdminStorageClient();
+  const result = await supabase.storage
+    .from(bucket)
+    .download(input.path);
+
+  if (result.error || !result.data) {
+    throw new Error(result.error?.message ?? "Could not download the storage object.");
+  }
+
+  return result.data.text();
+}

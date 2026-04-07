@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
+import { ManagedOutputImportForm } from "@/components/managed-output-import-form";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import {
   formatArtifactHandoffAuditLine,
@@ -19,6 +20,13 @@ import {
   getManagedProcessingNextStep,
   isManagedProcessingJobDetail,
 } from "@/lib/managed-processing";
+import {
+  buildManagedImportStoragePath,
+  inferManagedImportFormat,
+  mapBenchmarkOutputKeyToArtifactKind,
+  parseManagedBenchmarkSummaryText,
+  type ManagedImportUploadKind,
+} from "@/lib/managed-processing-import";
 import { getJobDetail, getString } from "@/lib/missions/detail-data";
 import {
   advanceManualProvingJob,
@@ -26,11 +34,17 @@ import {
 } from "@/lib/proving-runs";
 import { tryCreateSignedDownloadUrl } from "@/lib/storage-delivery";
 import {
+  adminSelect,
   insertJobEvent,
   insertProcessingJob,
   insertProcessingOutputs,
   updateProcessingJob,
+  updateProcessingOutput,
 } from "@/lib/supabase/admin";
+import {
+  createDroneOpsSignedUploadTicket,
+  downloadStorageText,
+} from "@/lib/supabase/admin-storage";
 
 function formatDateTime(value: string | null) {
   if (!value) return "TBD";
@@ -132,6 +146,13 @@ function getCalloutMessage(actionState?: string) {
     return {
       tone: "success",
       text: "Managed processing request marked delivery-ready. Ready artifacts can now move through review/share/export with truthful audit trail.",
+    } as const;
+  }
+
+  if (actionState === "imported") {
+    return {
+      tone: "success",
+      text: "Real benchmark evidence and any uploaded outputs were attached to this managed job from the browser. Advance QA/delivery only when the real-world handoff matches the new artifacts.",
     } as const;
   }
 
@@ -453,6 +474,279 @@ export default async function JobDetailPage({
     }
   }
 
+  async function prepareManagedImportUpload(formData: FormData) {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      return { ok: false as const, error: "Please sign in again before uploading import evidence." };
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.org.slug || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      return { ok: false as const, error: "The current organization context is missing or inactive." };
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      return { ok: false as const, error: "Viewer access cannot upload managed import evidence." };
+    }
+
+    const refreshedDetail = await getJobDetail(refreshedAccess, jobId);
+    if (!refreshedDetail || !isManagedProcessingJobDetail(refreshedDetail)) {
+      return { ok: false as const, error: "This job is not eligible for browser-based managed import." };
+    }
+
+    const uploadKindValue = formData.get("uploadKind");
+    const uploadKind = typeof uploadKindValue === "string" ? uploadKindValue.trim() as ManagedImportUploadKind : null;
+    const uploadFilenameValue = formData.get("uploadFilename");
+    const uploadFilename = typeof uploadFilenameValue === "string" ? uploadFilenameValue.trim() : "";
+
+    if (!uploadKind || !uploadFilename) {
+      return { ok: false as const, error: "Upload kind and filename are required before requesting a signed upload URL." };
+    }
+
+    if (uploadKind === "benchmark_summary" && !uploadFilename.toLowerCase().endsWith(".json")) {
+      return { ok: false as const, error: "The benchmark summary upload must be a JSON file." };
+    }
+
+    if (uploadKind === "review_bundle" && !uploadFilename.toLowerCase().endsWith(".zip")) {
+      return { ok: false as const, error: "The review bundle upload must be a ZIP file." };
+    }
+
+    try {
+      const path = buildManagedImportStoragePath({
+        orgSlug: refreshedAccess.org.slug,
+        jobId: refreshedDetail.job.id,
+        kind: uploadKind,
+        filename: uploadFilename,
+      });
+      const ticket = await createDroneOpsSignedUploadTicket(path);
+
+      return {
+        ok: true as const,
+        bucket: ticket.bucket,
+        path: ticket.path,
+        token: ticket.token,
+        kind: uploadKind,
+        filename: uploadFilename,
+      };
+    } catch (error) {
+      const message = error instanceof Error && error.message.trim().length > 0
+        ? error.message
+        : "A signed upload URL could not be created for this managed import file.";
+      return { ok: false as const, error: message };
+    }
+  }
+
+  async function finalizeManagedImport(formData: FormData) {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      return { ok: false as const, error: "Please sign in again before finalizing the managed import." };
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      return { ok: false as const, error: "The current organization context is missing or inactive." };
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      return { ok: false as const, error: "Viewer access cannot finalize managed imports." };
+    }
+
+    const refreshedDetail = await getJobDetail(refreshedAccess, jobId);
+    if (!refreshedDetail || !isManagedProcessingJobDetail(refreshedDetail)) {
+      return { ok: false as const, error: "This job is not eligible for browser-based managed import." };
+    }
+
+    const summaryBucketValue = formData.get("benchmark_summaryBucket");
+    const summaryBucket = typeof summaryBucketValue === "string" && summaryBucketValue.trim().length > 0
+      ? summaryBucketValue.trim()
+      : null;
+    const summaryPathValue = formData.get("benchmark_summaryPath");
+    const summaryPath = typeof summaryPathValue === "string" && summaryPathValue.trim().length > 0
+      ? summaryPathValue.trim()
+      : null;
+
+    if (!summaryBucket || !summaryPath) {
+      return { ok: false as const, error: "Upload a benchmark summary JSON before finalizing this managed import." };
+    }
+
+    let summaryText: string;
+    try {
+      summaryText = await downloadStorageText({ bucket: summaryBucket, path: summaryPath });
+    } catch (error) {
+      return {
+        ok: false as const,
+        error: error instanceof Error && error.message.trim().length > 0
+          ? error.message
+          : "The uploaded benchmark summary could not be downloaded for parsing.",
+      };
+    }
+
+    let parsedSummary;
+    try {
+      parsedSummary = parseManagedBenchmarkSummaryText(summaryText);
+    } catch (error) {
+      return {
+        ok: false as const,
+        error: error instanceof Error && error.message.trim().length > 0
+          ? error.message
+          : "The uploaded benchmark summary could not be parsed.",
+      };
+    }
+
+    const runLogBucket = typeof formData.get("run_logBucket") === "string" ? String(formData.get("run_logBucket")).trim() : "";
+    const runLogPath = typeof formData.get("run_logPath") === "string" ? String(formData.get("run_logPath")).trim() : "";
+    const reviewBundleBucket = typeof formData.get("review_bundleBucket") === "string" ? String(formData.get("review_bundleBucket")).trim() : "";
+    const reviewBundlePath = typeof formData.get("review_bundlePath") === "string" ? String(formData.get("review_bundlePath")).trim() : "";
+    const operatorNotesValue = formData.get("operatorNotes");
+    const operatorNotes = typeof operatorNotesValue === "string" && operatorNotesValue.trim().length > 0
+      ? operatorNotesValue.trim()
+      : null;
+
+    const existingOutputs = await adminSelect<Array<{ id: string; kind: string }>>(
+      `drone_processing_outputs?org_id=eq.${encodeURIComponent(refreshedAccess.org.id)}&job_id=eq.${encodeURIComponent(refreshedDetail.job.id)}&select=id,kind`,
+    );
+
+    const outputsToInsert: Array<{
+      org_id: string;
+      job_id: string;
+      mission_id?: string | null;
+      dataset_id?: string | null;
+      kind: string;
+      status?: string;
+      storage_bucket?: string | null;
+      storage_path?: string | null;
+      metadata?: Parameters<typeof insertProcessingOutputs>[0][number]["metadata"];
+    }> = [];
+
+    for (const output of parsedSummary.outputs) {
+      if (!output.exists || !output.nonZeroSize) {
+        continue;
+      }
+
+      const artifactKind = mapBenchmarkOutputKeyToArtifactKind(output.key);
+      if (!artifactKind) {
+        continue;
+      }
+
+      const uploadedBucketValue = formData.get(`${output.key}Bucket`);
+      const uploadedBucket = typeof uploadedBucketValue === "string" && uploadedBucketValue.trim().length > 0
+        ? uploadedBucketValue.trim()
+        : null;
+      const uploadedPathValue = formData.get(`${output.key}Path`);
+      const uploadedPath = typeof uploadedPathValue === "string" && uploadedPathValue.trim().length > 0
+        ? uploadedPathValue.trim()
+        : null;
+      const existingOutput = existingOutputs.find((item) => item.kind === artifactKind) ?? null;
+      const patch = {
+        status: "ready",
+        storage_bucket: uploadedBucket,
+        storage_path: uploadedPath ?? output.path,
+        metadata: {
+          name: `${refreshedDetail.mission?.name ?? "Mission"} ${artifactKind.replaceAll("_", " ")}`,
+          format: inferManagedImportFormat(output.key, uploadedPath ?? output.path),
+          delivery: uploadedBucket && uploadedPath ? "Protected download ready" : "Imported benchmark evidence",
+          benchmark: {
+            key: output.key,
+            exists: output.exists,
+            nonZeroSize: output.nonZeroSize,
+            sizeBytes: output.sizeBytes,
+            sourcePath: output.path,
+          },
+          storagePublication: uploadedBucket && uploadedPath
+            ? {
+                published: true,
+                bucket: uploadedBucket,
+                path: uploadedPath,
+                publishedAt: new Date().toISOString(),
+              }
+            : {
+                published: false,
+              },
+        },
+      };
+
+      if (existingOutput?.id) {
+        await updateProcessingOutput(existingOutput.id, patch);
+      } else {
+        outputsToInsert.push({
+          org_id: refreshedAccess.org.id,
+          job_id: refreshedDetail.job.id,
+          mission_id: refreshedDetail.job.mission_id,
+          dataset_id: refreshedDetail.job.dataset_id,
+          kind: artifactKind,
+          ...patch,
+        });
+      }
+    }
+
+    if (outputsToInsert.length > 0) {
+      await insertProcessingOutputs(outputsToInsert);
+    }
+
+    const nextLogTail = Array.isArray(refreshedDetail.outputSummary.logTail)
+      ? refreshedDetail.outputSummary.logTail.filter((line): line is string => typeof line === "string")
+      : [];
+
+    await updateProcessingJob(refreshedDetail.job.id, {
+      output_summary: {
+        ...refreshedDetail.outputSummary,
+        benchmarkSummary: parsedSummary.raw,
+        runLogPath: runLogBucket && runLogPath ? `${runLogBucket}/${runLogPath}` : refreshedDetail.outputSummary.runLogPath,
+        logTail: nextLogTail.length > 0 ? nextLogTail : [
+          "Browser-managed import attached benchmark evidence.",
+          parsedSummary.minimumPass
+            ? "Benchmark summary cleared minimum pass."
+            : `Benchmark summary still needs review: ${parsedSummary.missingRequiredOutputs.join(", ") || "see summary"}.`,
+          reviewBundleBucket && reviewBundlePath
+            ? "Protected review bundle uploaded for delivery review."
+            : "No review bundle ZIP uploaded in this import pass.",
+        ],
+        latestCheckpoint: "Browser-managed import attached real outputs/evidence",
+        notes: operatorNotes
+          ? `${getString(refreshedDetail.outputSummary.notes, "Managed import updated from job detail.")}
+
+Operator note: ${operatorNotes}`
+          : refreshedDetail.outputSummary.notes ?? "Managed import updated from job detail.",
+        deliveryPackage: {
+          publishedToStorage: true,
+          benchmarkSummary: {
+            bucket: summaryBucket,
+            path: summaryPath,
+          },
+          runLog: runLogBucket && runLogPath ? { bucket: runLogBucket, path: runLogPath } : null,
+          reviewBundle: reviewBundleBucket && reviewBundlePath ? { bucket: reviewBundleBucket, path: reviewBundlePath } : null,
+        },
+      },
+    });
+
+    await insertJobEvent({
+      org_id: refreshedAccess.org.id,
+      job_id: refreshedDetail.job.id,
+      event_type: "benchmark.outputs.attached",
+      payload: {
+        title: "Browser-managed import attached",
+        detail: `Real benchmark evidence${outputsToInsert.length > 0 ? ` and ${outputsToInsert.length} new output record(s)` : ""} were attached from the browser-managed import lane.`,
+        summaryPath: `${summaryBucket}/${summaryPath}`,
+      },
+    });
+
+    await insertJobEvent({
+      org_id: refreshedAccess.org.id,
+      job_id: refreshedDetail.job.id,
+      event_type: "delivery.package.published",
+      payload: {
+        title: reviewBundleBucket && reviewBundlePath ? "Protected review bundle published" : "Managed evidence updated",
+        detail: reviewBundleBucket && reviewBundlePath
+          ? "A protected review bundle ZIP was uploaded and linked to this managed job for delivery review."
+          : "Benchmark evidence was attached from the browser, but no review bundle ZIP was uploaded in this pass.",
+      },
+    });
+
+    return { ok: true as const, redirectTo: `/jobs/${jobId}?action=imported` };
+  }
+
   const benchmarkSummary = getBenchmarkSummaryView(detail.outputSummary.benchmarkSummary ?? detail.outputSummary);
   const latestCheckpoint = getString(detail.outputSummary.latestCheckpoint, "No checkpoint recorded yet.");
   const stageChecklist = getStageChecklist(detail.outputSummary);
@@ -481,6 +775,17 @@ export default async function JobDetailPage({
       ] as const),
     ),
   );
+  const deliveryPackage = detail.outputSummary.deliveryPackage && typeof detail.outputSummary.deliveryPackage === "object" && !Array.isArray(detail.outputSummary.deliveryPackage)
+    ? (detail.outputSummary.deliveryPackage as Record<string, unknown>)
+    : {};
+  const deliveryReviewBundle = deliveryPackage.reviewBundle && typeof deliveryPackage.reviewBundle === "object" && !Array.isArray(deliveryPackage.reviewBundle)
+    ? (deliveryPackage.reviewBundle as Record<string, unknown>)
+    : null;
+  const reviewBundleDownloadUrl = await tryCreateSignedDownloadUrl({
+    bucket: typeof deliveryReviewBundle?.bucket === "string" ? deliveryReviewBundle.bucket : undefined,
+    path: typeof deliveryReviewBundle?.path === "string" ? deliveryReviewBundle.path : undefined,
+    download: "review-bundle.zip",
+  });
   const firstReadyOutput = detail.outputs.find((output) => output.status === "ready") ?? null;
   const callout = getCalloutMessage(resolvedSearchParams.action);
 
@@ -648,6 +953,14 @@ export default async function JobDetailPage({
             </div>
           ) : null}
 
+          {managedJob ? (
+            <ManagedOutputImportForm
+              disabled={access.role === "viewer"}
+              prepareUpload={prepareManagedImportUpload}
+              finalizeImport={finalizeManagedImport}
+            />
+          ) : null}
+
           {provingJob ? (
             <div className="stack-xs surface-form-shell">
               <h3>Live proving next step</h3>
@@ -760,6 +1073,11 @@ export default async function JobDetailPage({
               <dd>{handoffCounts.exportedCount}</dd>
             </div>
           </dl>
+          {reviewBundleDownloadUrl ? (
+            <a href={reviewBundleDownloadUrl} className="button button-secondary" target="_blank" rel="noreferrer">
+              Download review bundle ZIP
+            </a>
+          ) : null}
           <p className="muted">{getString(detail.outputSummary.notes, "No job notes recorded yet.")}</p>
         </article>
       </section>

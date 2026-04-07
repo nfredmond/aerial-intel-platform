@@ -20,6 +20,7 @@ The slice is:
 - Web app surfaces for imported jobs and artifacts (`/jobs/[jobId]`, `/artifacts/[artifactId]`)
 - Mission-level intake session records that can capture ZIP evidence, protected browser-upload storage paths, benchmark paths, review-bundle ZIP paths, and truthful pass/fail posture without implying extraction or ODM orchestration already ran
 - Benchmark import can now attach real outputs onto an existing managed-processing job, and storage-published imported artifacts can issue signed downloads in the app
+- Managed job detail now includes a browser-based operator import lane that can upload benchmark evidence, review bundle ZIPs, and real output files into protected storage, then attach them to the managed job without shell access
 
 ### Not real today
 - Browser-native ZIP upload/resumable ingest beyond the current signed-upload path
@@ -77,7 +78,7 @@ The bundle intentionally carries evidence, not just outputs:
 1. **Real job orchestration**
    - replace manual/proving job progression with actual NodeODM state transitions
 2. **Managed-job import closure**
-   - continue the new attach-to-existing-job import lane until operators can close the whole managed-processing loop without sidecar DB edits
+   - continue the new attach-to-existing-job import lane until operators can close the whole managed-processing loop without sidecar DB edits or shell uploads
 3. **Storage-backed delivery expansion**
    - extend the now-landed signed-download path for storage-published imported outputs/review bundles into a broader default delivery contract
 4. **Raster review upgrade**

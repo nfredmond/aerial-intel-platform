@@ -28,6 +28,7 @@ See the charter and docs folder for current scope and architecture. The repo is 
 - Artifact review/share/export audit surfaces exist in the web app
 - Mission detail can now upload a ZIP directly from the browser into protected Supabase Storage and record an honest v1 ingest session with storage evidence, benchmark/run-log placeholders, and review-bundle readiness without pretending extraction or ODM orchestration already ran
 - Mission detail can now create a truthful managed-processing request that tracks operator intake review, host dispatch, QA start, and delivery-ready completion without staging fake artifacts before a real run is attached/imported
+- Managed job detail can now import real benchmark evidence, optional review bundle/run log, and uploaded output artifacts directly from the browser into protected storage, then attach them onto the managed job without relying on the shell-only import script
 
 ### Not real yet
 - Resumable/browser-recoverable ingest beyond the current signed-upload path
