@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "url": "https://mcp.supabase.com/mcp?project_ref=bvrmnesiamadpnysqiqd&features=docs%2Caccount%2Cdatabase%2Cdebugging%2Cdevelopment%2Cfunctions%2Cbranching%2Cstorage"
+    },
+    "vercel": {
+      "url": "https://mcp.vercel.com"
+    },
+    "github": {
+      "command": "/home/narford/.openclaw/workspace/scripts/github_mcp.sh"
+    }
+  }
+}
