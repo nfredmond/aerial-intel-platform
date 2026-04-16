@@ -1,4 +1,10 @@
 import type { DroneMembershipRole } from "@/lib/supabase/types";
+import {
+  DRONE_OPS_SUPPORT_EMAIL,
+  buildBlockedAccessSupportSubject,
+  createSupportGmailComposeUrl,
+  createSupportMailto,
+} from "@/lib/support";
 
 export type BlockedAccessSupportField = {
   label: string;
@@ -6,10 +12,7 @@ export type BlockedAccessSupportField = {
 };
 
 export function formatEntitlementTier(tierId: string | null | undefined) {
-  if (!tierId) {
-    return "Unknown tier";
-  }
-
+  if (!tierId) return "Unknown tier";
   return tierId
     .split(/[_-]/g)
     .filter(Boolean)
@@ -18,10 +21,7 @@ export function formatEntitlementTier(tierId: string | null | undefined) {
 }
 
 function formatMembershipRole(role: DroneMembershipRole | null) {
-  if (!role) {
-    return "Unknown";
-  }
-
+  if (!role) return "Unknown";
   return role[0].toUpperCase() + role.slice(1);
 }
 
@@ -36,14 +36,14 @@ export function getDashboardNextActions(options: {
     return [
       "Confirm team roles so pilots and analysts have the right access level.",
       `Review what is included in your ${tierLabel} entitlement for upcoming deliverables.`,
-      "Share support@natfordplanning.com with your team for urgent access issues.",
+      `Share ${DRONE_OPS_SUPPORT_EMAIL} with your team for urgent access issues.`,
     ];
   }
 
   return [
     "Validate that your organization and role details match your assignment.",
     `Coordinate with your org owner for ${tierLabel} plan changes or seat updates.`,
-    "Report entitlement or data-access blockers to support@natfordplanning.com.",
+    `Report entitlement or data-access blockers to ${DRONE_OPS_SUPPORT_EMAIL}.`,
   ];
 }
 
@@ -96,84 +96,135 @@ export function getBlockedAccessSupportFields(options: {
   tierId: string | null | undefined;
 }): BlockedAccessSupportField[] {
   return [
-    {
-      label: "User ID",
-      value: options.userId ?? "Unknown",
-    },
-    {
-      label: "Signed-in email",
-      value: options.email ?? "Unknown",
-    },
-    {
-      label: "Organization ID",
-      value: options.orgId ?? "Unknown",
-    },
-    {
-      label: "Organization",
-      value: options.orgName ?? "Unknown",
-    },
-    {
-      label: "Organization slug",
-      value: options.orgSlug ?? "Unknown",
-    },
-    {
-      label: "Role",
-      value: formatMembershipRole(options.role),
-    },
-    {
-      label: "Membership linked",
-      value: options.hasMembership ? "Yes" : "No",
-    },
-    {
-      label: "Entitlement active",
-      value: options.hasActiveEntitlement ? "Yes" : "No",
-    },
+    { label: "User ID", value: options.userId ?? "Unknown" },
+    { label: "Signed-in email", value: options.email ?? "Unknown" },
+    { label: "Organization ID", value: options.orgId ?? "Unknown" },
+    { label: "Organization", value: options.orgName ?? "Unknown" },
+    { label: "Organization slug", value: options.orgSlug ?? "Unknown" },
+    { label: "Role", value: formatMembershipRole(options.role) },
+    { label: "Membership linked", value: options.hasMembership ? "Yes" : "No" },
+    { label: "Entitlement active", value: options.hasActiveEntitlement ? "Yes" : "No" },
     {
       label: "Entitlement tier",
-      value: options.hasActiveEntitlement
-        ? formatEntitlementTier(options.tierId)
-        : "Not active",
+      value: options.hasActiveEntitlement ? formatEntitlementTier(options.tierId) : "Not active",
     },
   ];
 }
 
-export function buildBlockedAccessSupportContext(options: {
+export type SupportPacketInput = {
   fields: BlockedAccessSupportField[];
   blockedReason: string | null | undefined;
   generatedAtIso?: string;
-}) {
-  const generatedAtIso = options.generatedAtIso ?? new Date().toISOString();
-  const compactTimestamp = generatedAtIso.replace(/\D/g, "").slice(0, 14);
-  const reference = compactTimestamp.length === 14 ? `AIR-${compactTimestamp}` : "AIR-UNKNOWN";
+};
 
-  return {
-    reference,
-    generatedAtIso,
-    text: [
-      `Support reference: ${reference}`,
-      `Snapshot generated (UTC): ${generatedAtIso}`,
-      ...options.fields.map((field) => `${field.label}: ${field.value}`),
-      `Observed reason: ${options.blockedReason ?? "not provided"}`,
-    ].join("\n"),
-  };
-}
-
-export function buildBlockedAccessSupportContextJson(options: {
+type BaseSupportBlock = {
   reference: string;
   generatedAtIso: string;
-  blockedReason: string | null | undefined;
-  fields: BlockedAccessSupportField[];
-}) {
-  const diagnostics = Object.fromEntries(options.fields.map((field) => [field.label, field.value]));
+  blockedReason: string;
+};
 
-  return JSON.stringify(
+function normalizeBlock(input: SupportPacketInput): BaseSupportBlock {
+  const generatedAtIso = input.generatedAtIso ?? new Date().toISOString();
+  const compactTimestamp = generatedAtIso.replace(/\D/g, "").slice(0, 14);
+  const reference = compactTimestamp.length === 14 ? `AIR-${compactTimestamp}` : "AIR-UNKNOWN";
+  const blockedReason = input.blockedReason ?? "not provided";
+  return { reference, generatedAtIso, blockedReason };
+}
+
+export function buildSupportSummary(input: SupportPacketInput) {
+  const { reference, generatedAtIso, blockedReason } = normalizeBlock(input);
+  const text = [
+    `Support reference: ${reference}`,
+    `Snapshot generated (UTC): ${generatedAtIso}`,
+    ...input.fields.map((field) => `${field.label}: ${field.value}`),
+    `Observed reason: ${blockedReason}`,
+  ].join("\n");
+
+  return { reference, generatedAtIso, text };
+}
+
+export function buildSupportJson(input: SupportPacketInput) {
+  const { reference, generatedAtIso, blockedReason } = normalizeBlock(input);
+  const diagnostics = Object.fromEntries(input.fields.map((f) => [f.label, f.value]));
+  const text = JSON.stringify(
     {
-      supportReference: options.reference,
-      snapshotGeneratedUtc: options.generatedAtIso,
-      observedReason: options.blockedReason ?? "not provided",
+      supportReference: reference,
+      snapshotGeneratedUtc: generatedAtIso,
+      observedReason: blockedReason,
       diagnostics,
     },
     null,
-    2,
+    2
   );
+  return { reference, generatedAtIso, text };
+}
+
+export function buildSupportMarkdown(input: SupportPacketInput) {
+  const { reference, generatedAtIso, blockedReason } = normalizeBlock(input);
+  const text = [
+    `## Support reference ${reference}`,
+    `Snapshot generated (UTC): ${generatedAtIso}`,
+    "",
+    ...input.fields.map((field) => `- **${field.label}:** ${field.value}`),
+    "",
+    `**Observed reason:** ${blockedReason}`,
+  ].join("\n");
+  return { reference, generatedAtIso, text };
+}
+
+export function buildSupportEmailDraft(input: SupportPacketInput) {
+  const summary = buildSupportSummary(input);
+  const subject = buildBlockedAccessSupportSubject(summary.reference);
+  const body = [
+    "Hello support team,",
+    "",
+    "My DroneOps access is currently blocked.",
+    "",
+    summary.text,
+    "",
+    "Please help me restore access.",
+  ].join("\n");
+
+  return {
+    reference: summary.reference,
+    generatedAtIso: summary.generatedAtIso,
+    subject,
+    body,
+    text: `Subject: ${subject}\n\n${body}`,
+    mailtoHref: createSupportMailto({ subject, body }),
+    gmailHref: createSupportGmailComposeUrl({ subject, body }),
+  };
+}
+
+export type SupportDiagnosticsPacket = {
+  reference: string;
+  generatedAtIso: string;
+  supportEmail: string;
+  emailSubject: string;
+  mailtoHref: string;
+  gmailHref: string;
+  summary: string;
+  emailDraft: string;
+  json: string;
+  markdown: string;
+};
+
+export function buildSupportDiagnosticsPacket(input: SupportPacketInput): SupportDiagnosticsPacket {
+  const summary = buildSupportSummary(input);
+  const email = buildSupportEmailDraft(input);
+  const json = buildSupportJson(input);
+  const markdown = buildSupportMarkdown(input);
+
+  return {
+    reference: summary.reference,
+    generatedAtIso: summary.generatedAtIso,
+    supportEmail: DRONE_OPS_SUPPORT_EMAIL,
+    emailSubject: email.subject,
+    mailtoHref: email.mailtoHref,
+    gmailHref: email.gmailHref,
+    summary: summary.text,
+    emailDraft: email.text,
+    json: json.text,
+    markdown: markdown.text,
+  };
 }

@@ -1,5 +1,6 @@
 import { isAuthSessionMissingError, type User } from "@supabase/supabase-js";
 
+import { computeDroneOpsActions, type DroneOpsAction } from "@/lib/auth/actions";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database, DroneMembershipRole } from "@/lib/supabase/types";
 
@@ -13,6 +14,7 @@ export type DroneOpsAccessResult = {
   hasMembership: boolean;
   hasActiveEntitlement: boolean;
   role: DroneMembershipRole | null;
+  actions: DroneOpsAction[];
   org: OrgRow | null;
   entitlement: EntitlementRow | null;
   blockedReason: string | null;
@@ -25,6 +27,7 @@ function buildSignedOutAccess(): DroneOpsAccessResult {
     hasMembership: false,
     hasActiveEntitlement: false,
     role: null,
+    actions: [],
     org: null,
     entitlement: null,
     blockedReason: "You must sign in to access DroneOps.",
@@ -69,6 +72,7 @@ export async function getDroneOpsAccess(): Promise<DroneOpsAccessResult> {
       hasMembership: false,
       hasActiveEntitlement: false,
       role: null,
+      actions: [],
       org: null,
       entitlement: null,
       blockedReason:
@@ -124,6 +128,7 @@ export async function getDroneOpsAccess(): Promise<DroneOpsAccessResult> {
       hasMembership: true,
       hasActiveEntitlement: false,
       role: primaryMembership?.role ?? null,
+      actions: [],
       org: fallbackOrg,
       entitlement: null,
       blockedReason:
@@ -140,6 +145,7 @@ export async function getDroneOpsAccess(): Promise<DroneOpsAccessResult> {
     hasMembership: true,
     hasActiveEntitlement: true,
     role: entitledMembership.role,
+    actions: computeDroneOpsActions(entitledMembership.role),
     org: entitledOrg,
     entitlement,
     blockedReason: null,

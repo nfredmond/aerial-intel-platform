@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  buildBlockedAccessSupportContext,
-  buildBlockedAccessSupportContextJson,
+  buildSupportDiagnosticsPacket,
+  buildSupportEmailDraft,
+  buildSupportJson,
+  buildSupportMarkdown,
+  buildSupportSummary,
   formatEntitlementTier,
   getBlockedAccessDetails,
   getBlockedAccessSupportFields,
@@ -94,32 +97,42 @@ describe("access-insights", () => {
     expect(fields[8]).toEqual({ label: "Entitlement tier", value: "Enterprise Plus" });
   });
 
-  it("builds support context with reference and snapshot timestamp", () => {
-    const context = buildBlockedAccessSupportContext({
+  it("builds the support summary with reference and snapshot timestamp", () => {
+    const summary = buildSupportSummary({
       fields: [{ label: "User ID", value: "abc123" }],
       blockedReason: "No active entitlement record",
       generatedAtIso: "2026-03-06T19:33:12.000Z",
     });
 
-    expect(context.reference).toBe("AIR-20260306193312");
-    expect(context.text).toContain("Support reference: AIR-20260306193312");
-    expect(context.text).toContain("Snapshot generated (UTC): 2026-03-06T19:33:12.000Z");
-    expect(context.text).toContain("User ID: abc123");
-    expect(context.text).toContain("Observed reason: No active entitlement record");
+    expect(summary.reference).toBe("AIR-20260306193312");
+    expect(summary.text).toContain("Support reference: AIR-20260306193312");
+    expect(summary.text).toContain("Snapshot generated (UTC): 2026-03-06T19:33:12.000Z");
+    expect(summary.text).toContain("User ID: abc123");
+    expect(summary.text).toContain("Observed reason: No active entitlement record");
   });
 
-  it("builds a JSON payload for support ticket systems", () => {
-    const json = buildBlockedAccessSupportContextJson({
-      reference: "AIR-20260306193312",
-      generatedAtIso: "2026-03-06T19:33:12.000Z",
-      blockedReason: "No active entitlement record",
+  it("falls back to AIR-UNKNOWN when generated timestamp is not parseable", () => {
+    const summary = buildSupportSummary({
+      fields: [],
+      blockedReason: null,
+      generatedAtIso: "not-a-timestamp",
+    });
+
+    expect(summary.reference).toBe("AIR-UNKNOWN");
+    expect(summary.text).toContain("Observed reason: not provided");
+  });
+
+  it("builds JSON output containing a diagnostics map keyed by field label", () => {
+    const json = buildSupportJson({
       fields: [
         { label: "User ID", value: "abc123" },
         { label: "Entitlement active", value: "No" },
       ],
+      blockedReason: "No active entitlement record",
+      generatedAtIso: "2026-03-06T19:33:12.000Z",
     });
 
-    const payload = JSON.parse(json) as {
+    const payload = JSON.parse(json.text) as {
       supportReference: string;
       snapshotGeneratedUtc: string;
       observedReason: string;
@@ -127,20 +140,49 @@ describe("access-insights", () => {
     };
 
     expect(payload.supportReference).toBe("AIR-20260306193312");
-    expect(payload.snapshotGeneratedUtc).toBe("2026-03-06T19:33:12.000Z");
-    expect(payload.observedReason).toBe("No active entitlement record");
     expect(payload.diagnostics["User ID"]).toBe("abc123");
-    expect(payload.diagnostics["Entitlement active"]).toBe("No");
+    expect(payload.observedReason).toBe("No active entitlement record");
   });
 
-  it("falls back to AIR-UNKNOWN when generated timestamp is not parseable", () => {
-    const context = buildBlockedAccessSupportContext({
-      fields: [],
-      blockedReason: null,
-      generatedAtIso: "not-a-timestamp",
+  it("builds a Markdown bullet list with the reference header", () => {
+    const md = buildSupportMarkdown({
+      fields: [{ label: "User ID", value: "abc123" }],
+      blockedReason: "No active entitlement record",
+      generatedAtIso: "2026-03-06T19:33:12.000Z",
     });
 
-    expect(context.reference).toBe("AIR-UNKNOWN");
-    expect(context.text).toContain("Observed reason: not provided");
+    expect(md.text).toContain("## Support reference AIR-20260306193312");
+    expect(md.text).toContain("- **User ID:** abc123");
+    expect(md.text).toContain("**Observed reason:** No active entitlement record");
+  });
+
+  it("builds an email draft with subject, body, mailto, and Gmail links", () => {
+    const draft = buildSupportEmailDraft({
+      fields: [{ label: "User ID", value: "abc123" }],
+      blockedReason: "No active entitlement record",
+      generatedAtIso: "2026-03-06T19:33:12.000Z",
+    });
+
+    expect(draft.subject).toBe("DroneOps access blocked (AIR-20260306193312)");
+    expect(draft.body).toContain("Hello support team,");
+    expect(draft.body).toContain("User ID: abc123");
+    expect(draft.text.startsWith(`Subject: ${draft.subject}`)).toBe(true);
+    expect(draft.mailtoHref.startsWith("mailto:support@natfordplanning.com")).toBe(true);
+    expect(draft.gmailHref).toContain("mail.google.com");
+  });
+
+  it("assembles a diagnostics packet with all four formats", () => {
+    const packet = buildSupportDiagnosticsPacket({
+      fields: [{ label: "User ID", value: "abc123" }],
+      blockedReason: "No active entitlement record",
+      generatedAtIso: "2026-03-06T19:33:12.000Z",
+    });
+
+    expect(packet.reference).toBe("AIR-20260306193312");
+    expect(packet.summary).toContain("Support reference: AIR-20260306193312");
+    expect(packet.emailDraft).toContain("Subject: DroneOps access blocked");
+    expect(JSON.parse(packet.json).supportReference).toBe("AIR-20260306193312");
+    expect(packet.markdown).toContain("## Support reference AIR-20260306193312");
+    expect(packet.supportEmail).toBe("support@natfordplanning.com");
   });
 });

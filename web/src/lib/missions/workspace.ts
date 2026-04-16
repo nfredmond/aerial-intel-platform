@@ -2,6 +2,7 @@ import type { DroneMembershipRole } from "@/lib/supabase/types";
 
 import { formatEntitlementTier } from "@/lib/auth/access-insights";
 import { buildProvingHeartbeatSummary, type ProvingHeartbeatSummary } from "@/lib/proving-heartbeat";
+import * as labels from "@/lib/ui/labels";
 
 export type MissionStage = "capture-planned" | "processing" | "ready-for-qa";
 export type MissionOutputStatus = "ready" | "processing" | "missing";
@@ -759,55 +760,17 @@ export function formatMissionStage(stage: MissionStage) {
 }
 
 export function formatMissionOutputStatus(status: MissionOutputStatus) {
-  switch (status) {
-    case "ready":
-      return "Ready";
-    case "processing":
-      return "Processing";
-    case "missing":
-      return "Missing";
-    default:
-      return status;
-  }
+  return labels.formatMissionOutputStatus(status);
 }
 
 export function formatDatasetStatus(status: DatasetRecord["status"]) {
-  switch (status) {
-    case "ready":
-      return "Ready";
-    case "uploading":
-      return "Uploading";
-    case "flagged":
-      return "Flagged";
-    default:
-      return status;
-  }
+  return labels.formatDatasetStatus(status);
 }
 
 export function formatJobStatus(status: JobRecord["status"]) {
-  switch (status) {
-    case "running":
-      return "Running";
-    case "queued":
-      return "Queued";
-    case "needs_review":
-      return "Needs review";
-    case "completed":
-      return "Completed";
-    default:
-      return status;
-  }
+  return labels.formatJobStatus(status);
 }
 
 export function formatOutputArtifactStatus(status: OutputArtifactRecord["status"]) {
-  switch (status) {
-    case "ready":
-      return "Ready";
-    case "processing":
-      return "Processing";
-    case "draft":
-      return "Draft";
-    default:
-      return status;
-  }
+  return labels.formatOutputArtifactStatus(status);
 }

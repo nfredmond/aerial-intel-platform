@@ -32,6 +32,7 @@ describe("getDroneOpsAccess", () => {
       hasMembership: false,
       hasActiveEntitlement: false,
       role: null,
+      actions: [],
       org: null,
       entitlement: null,
       blockedReason: "You must sign in to access DroneOps.",

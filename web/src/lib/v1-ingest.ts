@@ -17,25 +17,7 @@ function hasText(value: string | null | undefined) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-export function formatFileSize(bytes: number | string | null | undefined) {
-  const parsed = typeof bytes === "string" ? Number(bytes) : bytes;
-  if (!Number.isFinite(parsed) || (parsed ?? 0) <= 0) {
-    return "Not recorded";
-  }
-
-  const value = parsed as number;
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let unitIndex = 0;
-  let size = value;
-
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex += 1;
-  }
-
-  const digits = size >= 100 || unitIndex === 0 ? 0 : size >= 10 ? 1 : 2;
-  return `${size.toFixed(digits)} ${units[unitIndex]}`;
-}
+export { formatBytes as formatFileSize } from "@/lib/ui/bytes";
 
 export function summarizeV1IngestSession(session: V1IngestSessionEvidence) {
   const blockers = [] as string[];
