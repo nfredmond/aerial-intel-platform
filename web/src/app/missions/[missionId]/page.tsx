@@ -2206,7 +2206,11 @@ export default async function MissionDetailPage({
                 <p className="muted">{version.source_format} · created {formatDateTime(version.created_at)}</p>
               </article>
             ))}
+            {detail.versions.length === 0 ? <p className="muted">No versions snapshotted yet.</p> : null}
           </div>
+          <Link href={`/missions/${detail.mission.id}/versions`} className="button button-secondary">
+            Manage versions
+          </Link>
         </article>
       </section>
 
