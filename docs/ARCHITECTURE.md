@@ -38,21 +38,35 @@ The system should be designed with clear plane separation so the app remains cre
 - browser-first export and install guidance
 - optional companion/helper app for mission install, offline sync, controller-aware validation, and fallback workflows where browser-only automation is not credible
 
-## Current implementation reality
+## Current implementation reality (2026-04-16)
 
 ### Implemented now
-- Supabase auth + entitlement gating
+- Supabase auth + entitlement gating with action-matrix RBAC (`web/src/lib/auth/actions.ts`)
 - protected dashboard and mission workspace routes
 - benchmark harness for ODM smoke/evidence runs
 - mission-control UI shell with planning, ingest, processing, and output review lanes represented in-product
+- shared UI primitives + 5-tone system (`web/src/components/ui/`, `web/src/lib/ui/`)
+- MapLibre GL JS planning + coverage maps (`web/src/components/map/`) with OSM fallback style
+- GeoJSON validation / bbox / area helpers (`web/src/lib/geo/`)
+- managed-processing state machine with truthful transition gates
+- `aerial-dispatch-adapter.v1` webhook dispatch contract (operator-routed compute)
+- `aerial-dispatch-adapter-callback.v1` webhook callback contract
+- NodeODM-direct dispatch adapter (`web/src/lib/dispatch-adapter-nodeodm.ts`) with typed client + three ODM presets
+- cron-backed NodeODM status poller (`/api/internal/nodeodm-poll`)
+- install-bundle export (`GET /api/missions/[missionId]/install-bundle` — README + manifest + geojson, fflate-zipped)
+- structured JSON logging (`web/src/lib/logging.ts`) wired into all webhook + cron + install-bundle routes
+- public showcase page at `/`
+- truthful ingest-session tracking + benchmark import scripts
 
 ### Not yet implemented
-- live mission geometry editing
-- resumable upload service
-- real NodeODM/ClusterODM orchestration
+- resumable imagery upload service (browser-direct ZIP upload to protected storage is implemented; chunked multi-part is not)
+- mission-version diff / promotion UI (the `drone_mission_versions` table is live; the UI surface is deferred)
 - TiTiler raster publishing
-- real-time collaboration/presence
-- install helper automation beyond planning and UX scaffolding
+- real-time collaboration / presence
+- signed time-bounded share links for artifacts
+- admin / support console
+- Playwright end-to-end tests
+- Stripe billing, SSO, field companion app, AI QA modules
 
 ## Product positioning
 

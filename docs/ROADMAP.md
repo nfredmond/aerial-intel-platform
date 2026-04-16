@@ -1,10 +1,19 @@
 # Roadmap
 
+**Status as of 2026-04-16 (modernization pass):**
+
+- Phase 0 foundations — **complete**.
+- Phase 1 mission-control shell — **complete**, now decomposed around shared UI primitives.
+- Phase 2 ingest / preflight / processing — **largely complete**; NodeODM-direct dispatch added this pass alongside the existing webhook adapter.
+- Phase 3 viewing / delivery / collaboration — **partial**: MapLibre-backed planning + coverage maps shipped; install-bundle export shipped; TiTiler raster delivery and share-link surface still deferred.
+- Phase 4 AI / domain modules — **not started**.
+- Phase 5 enterprise / ecosystem — **not started**.
+
 ## Phase 0 — Foundations and architecture spikes
 - Auth + entitlement schema scaffold completed
 - ODM benchmark harness completed
 - Legal/ADR posture established: compose around ODM ecosystem, do not fake a rewrite
-- New priority: expand from auth MVP into Aerial Operations OS mission-control shell and durable domain schema
+- Mission-control shell, map-first planning UX, NodeODM direct dispatch, install-bundle export all landed in the 2026-04-16 modernization pass
 
 ## Phase 1 — Mission editor and operations shell MVP
 Goal: ship a planner-first workspace that already feels stronger than a static map + settings panel.

@@ -1,8 +1,91 @@
 # Nat Ford Aerial Intelligence Platform (Aerial Operations OS)
 
-Project slug: `aerial-intel-platform`  
-default branch: `main`  
-Vercel project: `natford/aerial-intel-platform` (linked on 2026-03-16 for direct `main` production shipping; corrected to `web/` root on 2026-03-16)
+Project slug: `aerial-intel-platform`
+Default branch: `main`
+Vercel project: `natford/aerial-intel-platform`
+
+**Aerial Operations OS** — a Next.js 16 + Supabase SaaS layer over OpenDroneMap. Ships mission planning,
+truthful ingest, managed-processing, map-first planning UX, NodeODM-direct + webhook dispatch, install-bundle
+export, and action-matrix RBAC. Built for small cities, counties, tribes, RTPAs, consultancies, and drone
+service operators. See `AGENTS.md` (repo root) for agent handoff guidance.
+
+## Status-at-a-glance (2026-04-16 modernization pass)
+
+**Shipped**
+- Mission / dataset / job / artifact spine with PostGIS geometry (Supabase).
+- Evidence-gated managed-processing state machine.
+- Mission-control UI shell decomposed around shared UI primitives (`web/src/components/ui/`, `web/src/lib/ui/`).
+- MapLibre GL planning + coverage visualization (`web/src/components/map/`).
+- NodeODM-direct dispatch (optional) + webhook dispatch adapter v1 (default).
+- Cron-backed NodeODM status poller.
+- Install-bundle export (`GET /api/missions/[missionId]/install-bundle`).
+- Action-matrix RBAC (`web/src/lib/auth/actions.ts`).
+- Structured JSON logging across webhook + cron + install-bundle routes.
+- Public showcase at `/`.
+
+**Deferred (explicit non-goals)**
+- Mission-version diff / promotion UI.
+- TiTiler raster delivery backend.
+- Signed-share artifact links.
+- Playwright E2E scaffold.
+- Admin / support console.
+- Stripe billing, SSO, field companion, AI QA.
+
+## Quickstart
+
+```bash
+cd web
+npm install
+cp ../.env.example .env.local
+npm run dev                       # http://localhost:3000
+npm run lint && npm run test && npm run build
+```
+
+**Optional NodeODM direct dispatch:**
+
+```bash
+docker run -p 3000:3000 opendronemap/nodeodm
+export AERIAL_NODEODM_URL=http://localhost:3000
+```
+
+**Supabase migrations:**
+
+```bash
+cd supabase && supabase db push
+```
+
+## Architecture (planes)
+
+```
++--------------+    +----------+    +-------------+    +-----------------+    +------------+
+| App plane    |--> | Data     |--> | Compute     |--> | Raster delivery |--> | Field      |
+| Next.js 16   |    | Supabase |    | NodeODM or  |    | TiTiler (later) |    | companion  |
+| SSR + SA     |    | PostGIS  |    | webhook op  |    |                 |    | (later)    |
++--------------+    +----------+    +-------------+    +-----------------+    +------------+
+```
+
+- App plane: Next.js 16 App Router + React 19 (`web/`).
+- Data plane: Supabase Postgres/PostGIS, service-role writes through `web/src/lib/supabase/admin.ts`.
+- Compute plane: `aerial-dispatch-adapter.v1` webhook (operator-run) OR NodeODM direct (this pass).
+- Raster delivery plane: deferred.
+- Field companion plane: deferred.
+
+See `docs/ARCHITECTURE.md` for the detailed breakdown.
+
+## Docs index
+
+- `AGENTS.md` — agent handoff guidance (covenant, code boundaries, don't-do list).
+- `docs/ROADMAP.md` — phased plan with live status.
+- `docs/ARCHITECTURE.md` — plane separation + implemented-vs-deferred lists.
+- `docs/OPERATIONS.md` — runbook.
+- `docs/ODM_PLUS_COMPARISON_MATRIX.md` — OSS vs. Aerial Operations OS.
+- `docs/SHOWCASE_PAGE_SPEC.md` — public showcase source of truth.
+- `docs/CHANGELOG.md` — changelog (modernization pass at top).
+
+---
+
+_Historical detail below reflects the pre-modernization implementation log. New work should flow into
+`docs/CHANGELOG.md`._
 
 See the charter and docs folder for current scope and architecture. The repo is now evolving from a narrow DroneOps auth MVP into a broader **Aerial Operations OS** covering mission planning, ingest, processing, delivery, and repeat capture workflows.
 
