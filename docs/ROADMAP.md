@@ -5,7 +5,7 @@
 - Phase 0 foundations — **complete**.
 - Phase 1 mission-control shell — **complete**, now decomposed around shared UI primitives.
 - Phase 2 ingest / preflight / processing — **largely complete**; NodeODM-direct dispatch added this pass alongside the existing webhook adapter.
-- Phase 3 viewing / delivery / collaboration — **partial**: MapLibre-backed planning + coverage maps shipped; install-bundle export shipped; TiTiler raster delivery and share-link surface still deferred.
+- Phase 3 viewing / delivery / collaboration — **partial**: MapLibre-backed planning + coverage maps shipped; install-bundle export shipped; mission-version snapshot + promote shipped; signed-share artifact links shipped (`/s/[token]`); read-only admin console shipped (`/admin`); Playwright public-showcase smoke shipped. Side-by-side version diff, TiTiler raster delivery, and admin write actions still deferred.
 - Phase 4 AI / domain modules — **not started**.
 - Phase 5 enterprise / ecosystem — **not started**.
 
@@ -47,11 +47,14 @@ Goal: turn the shell into a real operational pipeline.
 Goal: provide WebODM-grade output review with stronger delivery UX.
 
 ### In scope
-- TiTiler-backed COG raster delivery
-- orthomosaic/DSM viewing
-- share pages and export bundles
-- comments, approvals, and activity feed depth
-- client-safe packaging and report surfaces
+- TiTiler-backed COG raster delivery (deferred)
+- orthomosaic/DSM viewing (deferred)
+- share pages and export bundles (share pages shipped at `/s/[token]`; export bundles shipped via install-bundle route)
+- comments, approvals, and activity feed depth (activity feed shipped; comments/approvals deferred)
+- client-safe packaging and report surfaces (install-bundle shipped)
+- read-only admin / support console (shipped at `/admin`)
+- mission-version snapshot + promote UI (shipped at `/missions/[missionId]/versions`; side-by-side diff deferred)
+- Playwright E2E scaffold (shipped with public-showcase smoke; auth-gated flow deferred)
 
 ## Phase 4 — AI and domain modules
 Goal: add high-leverage assistance, not gimmicks.

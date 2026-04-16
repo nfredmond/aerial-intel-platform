@@ -91,6 +91,47 @@ is tested by the unit suite — the unit suite mocks `fetch`.
   manifest, planning.geojson, site.geojson.
 - Schema version: `aerial-intel.install-bundle.v1`. Bump when changing layout.
 
+## Mission versioning
+
+- Table: `drone_mission_versions` (version_number, source_format, plan_payload, validation_summary,
+  export_summary, status). `status` check constraint: `draft | validated | approved | installed | archived`.
+- UI: `/missions/[missionId]/versions` — snapshot from current planning geometry + summary, inline
+  `<details>` payload viewer, promote non-installed versions back onto the current mission.
+- Promote action writes `plan_payload` back into mission `summary` + `planning_geometry`, marks the target
+  version `installed`. **Do NOT** insert into `drone_processing_job_events` — `mission_id` is not a valid
+  `job_id` FK. Audit trail is the version row's own `status` + `updated_at`.
+- Side-by-side diff view is deferred.
+
+## Signed-share artifact links
+
+- Table: `drone_artifact_share_links` with tenant-safe composite FK `(org_id, artifact_id)` to
+  `drone_processing_outputs (org_id, id)`. Unique token column.
+- Lib: `web/src/lib/sharing.ts` — token gen (≥16 random bytes, base64url), `validateShareLink` with
+  precedence `revoked > expired > exhausted`, parser guardrails for user input.
+- Public route: `/s/[token]` landing page (status-specific fallbacks) + `/s/[token]/download` (issues a
+  5-minute signed URL, increments `use_count`, 302 redirects).
+- Page views don't count — only downloads. Create/revoke is gated behind non-viewer roles + artifact
+  `ready` status on the artifact detail page.
+
+## Admin / support console
+
+- Route: `/admin`, gated by the `admin.support` action (owner + admin).
+- **Read-only in v1.** Shows summary cards + memberships / entitlements / recent jobs / recent events
+  tables. Recent jobs link into `/jobs/[id]`.
+- Helpers: `selectMembershipsForOrg`, `selectEntitlementsForOrg`, `selectRecentJobsForOrg`,
+  `selectRecentEventsForOrg` in `web/src/lib/supabase/admin.ts`.
+- Write actions (invite / pause / resume) are deferred. Don't wire placeholder write buttons.
+
+## Playwright E2E
+
+- Config: `web/playwright.config.ts` — single chromium project, autostarts `npm run dev` unless
+  `AERIAL_E2E_SKIP_SERVER=1`.
+- Specs: `web/tests/e2e/` — today only the public-showcase smoke. Auth-gated flow (sign-in → mission →
+  dispatch → import → artifact) is deferred pending a dedicated test Supabase project — see
+  `tests/e2e/README.md`.
+- Run locally: `npx playwright install --with-deps chromium` (first time), then `npm run test:e2e`.
+- CI posture: run on non-PR `main` pushes only; PR CI stays lint + vitest + build.
+
 ## Logging
 
 - Use `createLogger(namespace, baseFields)` from `@/lib/logging`. Emits JSON lines with `namespace`,

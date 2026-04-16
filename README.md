@@ -19,16 +19,19 @@ service operators. See `AGENTS.md` (repo root) for agent handoff guidance.
 - NodeODM-direct dispatch (optional) + webhook dispatch adapter v1 (default).
 - Cron-backed NodeODM status poller.
 - Install-bundle export (`GET /api/missions/[missionId]/install-bundle`).
+- Mission-version snapshot + inline payload viewer + promote-to-current (`/missions/[missionId]/versions`).
+- Signed-share artifact links with revoke + usage caps (`/s/[token]`).
+- Read-only admin / support console (`/admin`, gated by `admin.support`).
 - Action-matrix RBAC (`web/src/lib/auth/actions.ts`).
-- Structured JSON logging across webhook + cron + install-bundle routes.
+- Structured JSON logging across webhook + cron + install-bundle + share-link routes.
 - Public showcase at `/`.
+- Playwright E2E scaffold with public-showcase smoke (`web/tests/e2e/`).
 
 **Deferred (explicit non-goals)**
-- Mission-version diff / promotion UI.
+- Side-by-side mission-version diff view (inline snapshot viewer ships today).
 - TiTiler raster delivery backend.
-- Signed-share artifact links.
-- Playwright E2E scaffold.
-- Admin / support console.
+- Admin write actions (invite / pause / resume — read-only console ships today).
+- Auth-gated E2E flow (needs a dedicated test Supabase project).
 - Stripe billing, SSO, field companion, AI QA.
 
 ## Quickstart

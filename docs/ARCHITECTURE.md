@@ -54,18 +54,21 @@ The system should be designed with clear plane separation so the app remains cre
 - NodeODM-direct dispatch adapter (`web/src/lib/dispatch-adapter-nodeodm.ts`) with typed client + three ODM presets
 - cron-backed NodeODM status poller (`/api/internal/nodeodm-poll`)
 - install-bundle export (`GET /api/missions/[missionId]/install-bundle` — README + manifest + geojson, fflate-zipped)
-- structured JSON logging (`web/src/lib/logging.ts`) wired into all webhook + cron + install-bundle routes
+- structured JSON logging (`web/src/lib/logging.ts`) wired into all webhook + cron + install-bundle + share-link routes
 - public showcase page at `/`
 - truthful ingest-session tracking + benchmark import scripts
+- mission-version snapshot + inline payload viewer + promote-to-current (`/missions/[missionId]/versions`) — side-by-side diff still deferred
+- signed time-bounded share links for artifacts with revoke + usage caps (`drone_artifact_share_links`, `/s/[token]`, `/s/[token]/download`)
+- read-only admin / support console (`/admin`, gated by `admin.support`)
+- Playwright E2E scaffold with public-showcase smoke (`web/tests/e2e/`, auth-gated flow deferred)
 
 ### Not yet implemented
 - resumable imagery upload service (browser-direct ZIP upload to protected storage is implemented; chunked multi-part is not)
-- mission-version diff / promotion UI (the `drone_mission_versions` table is live; the UI surface is deferred)
+- side-by-side mission-version diff view (snapshot + promote ships today; the visual diff is still deferred)
 - TiTiler raster publishing
 - real-time collaboration / presence
-- signed time-bounded share links for artifacts
-- admin / support console
-- Playwright end-to-end tests
+- admin write actions (invite / pause / resume — the console is read-only for v1)
+- auth-gated Playwright E2E (needs a dedicated test Supabase project)
 - Stripe billing, SSO, field companion app, AI QA modules
 
 ## Product positioning

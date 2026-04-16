@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-04-16 — Post-modernization follow-up (Phase 3.4 + 4.1 / 4.2 / 4.4)
+
+Four commits landed after the modernization pass to close deferred Phase 3.4 + Phase 4 slices without re-opening the primitives:
+
+- **Phase 3.4 — Mission versioning (promote + inline snapshot).** Added `/missions/[missionId]/versions` with a version list, inline `<details>` payload viewer per row, and a **Promote v{N} to current** server action that copies `plan_payload` back into the mission summary + planning geometry and marks the promoted version `installed`. No job-events written — audit trail is the version row's own `status` + `updated_at`. Side-by-side diff remains deferred.
+- **Phase 4.1 — Playwright E2E scaffold.** Added `@playwright/test`, `web/playwright.config.ts` (single chromium project, autostarts `npm run dev` unless `AERIAL_E2E_SKIP_SERVER=1`), and `web/tests/e2e/showcase.spec.ts` covering the public `/` hero + pricing + truth disclosure and the sign-in link routing to `/sign-in`. Auth-gated specs are deferred until a dedicated test Supabase project is wired — see `tests/e2e/README.md`.
+- **Phase 4.2 — Signed-share artifact links.** Added `drone_artifact_share_links` (tenant-safe composite FK to `(org_id, id)` on `drone_processing_outputs`), `web/src/lib/sharing.ts` (token generation, validate with revoked > expired > exhausted precedence, parser guardrails), a public `/s/[token]` landing page with status-specific fallbacks, and `/s/[token]/download` that issues a 5-minute signed URL and increments `use_count`. Artifact detail grew a create-link form + revoke action gated behind non-viewer roles and `ready` status.
+- **Phase 4.4 — Read-only admin / support console.** Added `/admin` gated by the `admin.support` action (owner + admin). Shows summary cards (members, active entitlements, recent jobs, in-flight jobs) and tables for memberships, entitlements, recent jobs (linked to `/jobs/[id]`), and recent events. Write actions (invite / pause / resume) deferred. Dashboard overview grew an "Admin console" link visible only to eligible roles.
+
 ## 2026-04-16 — Modernization pass (Phases 1–5)
 
 **Scope:** decompose monolithic pages, add map-first UX, add NodeODM-direct dispatch, add install-bundle export, add structured logging, add public showcase, refresh agent handoff docs.
@@ -10,7 +19,7 @@
 - **Phase 4 — Delivery + observability.** Added `web/src/lib/logging.ts` structured JSON logger (`createLogger(namespace, baseFields)` + `extractRequestId`); wired into dispatch callback, proving heartbeat, nodeodm poll, and install-bundle routes. Added public showcase at `/` (hero, how-it-works, capabilities matrix, pricing tiers, truthful status disclosure, footer CTA).
 - **Phase 5 — Handoff.** Added repo-root `AGENTS.md` with covenant, plane separation, code boundaries, UI system, map + NodeODM + logging conventions, and "don't do" list. Refreshed `README.md`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`.
 
-**Deferred (explicit non-goals this pass):** mission-versioning UI (Phase 3.4 in plan), Playwright E2E (Phase 4.1), signed-share links (Phase 4.2), admin console (Phase 4.4). The primitives and contracts are in place to add these without further refactor.
+**Deferred (explicit non-goals this pass):** mission-versioning UI (Phase 3.4 in plan), Playwright E2E (Phase 4.1), signed-share links (Phase 4.2), admin console (Phase 4.4). The primitives and contracts are in place to add these without further refactor. _(All four were picked up in the same-day follow-up above.)_
 
 - Extended the benchmark-import + delivery lane into a real managed-job closure slice: `scripts/import_odm_benchmark_run.mjs` can now attach imported ODM outputs onto an existing job (including the truthful `managed-processing-v1` request), optionally publish outputs/evidence/review bundles into protected Supabase Storage, and write delivery-package metadata back onto the job; mission, job, and artifact pages now surface signed download buttons only when those files actually exist in protected storage.
 - Wired browser ZIP intake to a truthful direct-to-storage path: mission detail now requests a signed Supabase Storage upload URL, uploads the ZIP from the browser into the protected `drone-ops` bucket, then records an ingest session with durable storage evidence while explicitly keeping extraction, benchmarking, and ODM orchestration pending.
