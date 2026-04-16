@@ -369,3 +369,101 @@ export async function updateProcessingOutput(id: string, patch: ProcessingOutput
 
   return rows[0] ?? null;
 }
+
+export type ArtifactShareLinkInsert = {
+  org_id: string;
+  artifact_id: string;
+  token: string;
+  note?: string | null;
+  max_uses?: number | null;
+  expires_at?: string | null;
+  created_by?: string | null;
+};
+
+export type ArtifactShareLinkPatch = {
+  note?: string | null;
+  max_uses?: number | null;
+  expires_at?: string | null;
+  revoked_at?: string | null;
+  use_count?: number;
+  last_used_at?: string | null;
+};
+
+export type ArtifactShareLinkRow = {
+  id: string;
+  org_id: string;
+  artifact_id: string;
+  token: string;
+  note: string | null;
+  max_uses: number | null;
+  use_count: number;
+  expires_at: string | null;
+  revoked_at: string | null;
+  last_used_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function insertArtifactShareLink(input: ArtifactShareLinkInsert) {
+  const rows = await adminRestRequest<ArtifactShareLinkRow[]>(
+    "drone_artifact_share_links?select=*",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return rows[0] ?? null;
+}
+
+export async function updateArtifactShareLink(id: string, patch: ArtifactShareLinkPatch) {
+  const rows = await adminRestRequest<ArtifactShareLinkRow[]>(
+    `drone_artifact_share_links?id=eq.${encodeURIComponent(id)}&select=*`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    },
+  );
+  return rows[0] ?? null;
+}
+
+export async function selectArtifactShareLinksByArtifact(artifactId: string) {
+  const query = `drone_artifact_share_links?artifact_id=eq.${encodeURIComponent(
+    artifactId,
+  )}&select=*&order=created_at.desc`;
+  return adminRestRequest<ArtifactShareLinkRow[]>(query, { method: "GET" });
+}
+
+export async function selectArtifactShareLinkByToken(
+  token: string,
+): Promise<ArtifactShareLinkRow | null> {
+  const rows = await adminRestRequest<ArtifactShareLinkRow[]>(
+    `drone_artifact_share_links?token=eq.${encodeURIComponent(token)}&select=*`,
+    { method: "GET" },
+  );
+  return rows[0] ?? null;
+}
+
+export type ProcessingOutputPublicRow = {
+  id: string;
+  org_id: string;
+  kind: string;
+  status: string;
+  storage_bucket: string | null;
+  storage_path: string | null;
+  metadata: Json;
+  mission_id: string | null;
+  created_at: string;
+};
+
+export async function selectProcessingOutputById(
+  id: string,
+): Promise<ProcessingOutputPublicRow | null> {
+  const rows = await adminRestRequest<ProcessingOutputPublicRow[]>(
+    `drone_processing_outputs?id=eq.${encodeURIComponent(
+      id,
+    )}&select=id,org_id,kind,status,storage_bucket,storage_path,metadata,mission_id,created_at`,
+    { method: "GET" },
+  );
+  return rows[0] ?? null;
+}

@@ -18,7 +18,20 @@ import {
 } from "@/lib/benchmark-summary";
 import { getArtifactDetail, getString } from "@/lib/missions/detail-data";
 import { tryCreateSignedDownloadUrl } from "@/lib/storage-delivery";
-import { insertJobEvent, updateProcessingOutput } from "@/lib/supabase/admin";
+import {
+  computeExpiresAt,
+  generateShareToken,
+  parseExpiresInHoursInput,
+  parseMaxUsesInput,
+  shareLinkStatus,
+} from "@/lib/sharing";
+import {
+  insertArtifactShareLink,
+  insertJobEvent,
+  selectArtifactShareLinksByArtifact,
+  updateArtifactShareLink,
+  updateProcessingOutput,
+} from "@/lib/supabase/admin";
 import { formatDateTime } from "@/lib/ui/datetime";
 import { statusPillClassName, type Tone } from "@/lib/ui/tones";
 
@@ -98,6 +111,16 @@ function getCalloutMessage(action?: string) {
       return {
         tone: "error",
         text: "Viewer access cannot update artifact handoff state.",
+      } as const;
+    case "share-link-issued":
+      return {
+        tone: "success",
+        text: "Share link issued. Copy the full URL below and send it to the recipient.",
+      } as const;
+    case "share-link-revoked":
+      return {
+        tone: "success",
+        text: "Share link revoked. It will no longer grant access, even with the token.",
       } as const;
     case "error":
       return {
@@ -272,6 +295,123 @@ export default async function ArtifactDetailPage({
     redirect(`/artifacts/${artifactId}?action=note-saved`);
   }
 
+  async function createShareLinkAction(formData: FormData) {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+    if (
+      !refreshedAccess.org?.id ||
+      !refreshedAccess.hasMembership ||
+      !refreshedAccess.hasActiveEntitlement
+    ) {
+      redirect("/dashboard");
+    }
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/artifacts/${artifactId}?action=denied`);
+    }
+
+    const refreshedDetail = await getArtifactDetail(refreshedAccess, artifactId);
+    if (!refreshedDetail) {
+      redirect("/missions");
+    }
+    if (refreshedDetail.output.status !== "ready") {
+      redirect(`/artifacts/${artifactId}?action=not-ready`);
+    }
+
+    const rawNote = formData.get("shareNote");
+    const rawExpires = formData.get("shareExpiresInHours");
+    const rawMaxUses = formData.get("shareMaxUses");
+    const note = typeof rawNote === "string" && rawNote.trim() ? rawNote.trim() : null;
+    const expiresInHours = parseExpiresInHoursInput(typeof rawExpires === "string" ? rawExpires : null);
+    const maxUses = parseMaxUsesInput(typeof rawMaxUses === "string" ? rawMaxUses : null);
+    const expiresAt = computeExpiresAt(expiresInHours);
+    const token = generateShareToken();
+
+    try {
+      const link = await insertArtifactShareLink({
+        org_id: refreshedAccess.org.id,
+        artifact_id: refreshedDetail.output.id,
+        token,
+        note,
+        max_uses: maxUses,
+        expires_at: expiresAt,
+        created_by: refreshedAccess.user.id,
+      });
+
+      if (link) {
+        await insertJobEvent({
+          org_id: refreshedAccess.org.id,
+          job_id: refreshedDetail.output.job_id,
+          event_type: "artifact.share_link.issued",
+          payload: {
+            title: "Artifact share link issued",
+            detail: `Share link issued for ${getString(
+              refreshedDetail.metadata.name,
+              refreshedDetail.output.kind.replaceAll("_", " "),
+            )}${expiresAt ? ` with expiry ${expiresAt}` : ""}${maxUses ? ` (max ${maxUses} uses)` : ""}${note ? `: ${note}` : "."}`,
+            linkId: link.id,
+          },
+        }).catch(() => undefined);
+      }
+    } catch {
+      redirect(`/artifacts/${artifactId}?action=error`);
+    }
+
+    redirect(`/artifacts/${artifactId}?action=share-link-issued`);
+  }
+
+  async function revokeShareLinkAction(formData: FormData) {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+    if (
+      !refreshedAccess.org?.id ||
+      !refreshedAccess.hasMembership ||
+      !refreshedAccess.hasActiveEntitlement
+    ) {
+      redirect("/dashboard");
+    }
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/artifacts/${artifactId}?action=denied`);
+    }
+
+    const rawId = formData.get("linkId");
+    const linkId = typeof rawId === "string" ? rawId.trim() : "";
+    if (!linkId) {
+      redirect(`/artifacts/${artifactId}?action=error`);
+    }
+
+    const refreshedDetail = await getArtifactDetail(refreshedAccess, artifactId);
+    if (!refreshedDetail) {
+      redirect("/missions");
+    }
+
+    try {
+      await updateArtifactShareLink(linkId, { revoked_at: new Date().toISOString() });
+
+      await insertJobEvent({
+        org_id: refreshedAccess.org.id,
+        job_id: refreshedDetail.output.job_id,
+        event_type: "artifact.share_link.revoked",
+        payload: {
+          title: "Artifact share link revoked",
+          detail: `Share link ${linkId} was revoked.`,
+          linkId,
+        },
+      }).catch(() => undefined);
+    } catch {
+      redirect(`/artifacts/${artifactId}?action=error`);
+    }
+
+    redirect(`/artifacts/${artifactId}?action=share-link-revoked`);
+  }
+
   const artifactName = getString(detail.metadata.name, detail.output.kind.replaceAll("_", " "));
   const storagePath = detail.output.storage_path ?? "Storage path pending";
   const benchmarkSummary = getBenchmarkSummaryView(detail.outputSummary.benchmarkSummary ?? detail.outputSummary);
@@ -306,6 +446,7 @@ export default async function ArtifactDetailPage({
     handoffStageLabel: handoff.stageLabel,
     handoffNote: handoff.note,
   });
+  const shareLinks = await selectArtifactShareLinksByArtifact(detail.output.id).catch(() => []);
   const callout = getCalloutMessage(resolvedSearchParams.action);
 
   return (
@@ -640,6 +781,80 @@ export default async function ArtifactDetailPage({
           </div>
         </section>
       ) : null}
+
+      <section className="surface stack-sm">
+        <div className="stack-xs">
+          <p className="eyebrow">External share</p>
+          <h2>Signed share links</h2>
+          <p className="muted">
+            Issue a revocable link that lets an external recipient download this artifact without signing in. The link points at <code>/s/&lt;token&gt;</code>; each download mints a short-lived signed storage URL and counts against the configured limit.
+          </p>
+        </div>
+
+        {shareLinks.length === 0 ? (
+          <p className="muted">No share links issued yet.</p>
+        ) : (
+          <div className="share-links">
+            {shareLinks.map((link) => {
+              const status = shareLinkStatus(link);
+              const tone: Tone =
+                status === "active" ? "success" : status === "revoked" ? "danger" : "warning";
+              const usesLabel =
+                link.max_uses === null || link.max_uses === undefined
+                  ? `${link.use_count} downloads`
+                  : `${link.use_count} / ${link.max_uses} downloads`;
+              const expiresLabel = link.expires_at ? formatDateTime(link.expires_at) : "No expiry";
+              return (
+                <article key={link.id} className="share-links__item">
+                  <div className="share-links__meta">
+                    <div className="share-links__url">{`/s/${link.token}`}</div>
+                    <div className="share-links__stats">
+                      <span className={statusPillClassName(tone)}>{status}</span>{" "}
+                      · {usesLabel} · Expires {expiresLabel} · Created {formatDateTime(link.created_at)}
+                      {link.note ? ` · ${link.note}` : ""}
+                    </div>
+                  </div>
+                  {status === "active" ? (
+                    <form action={revokeShareLinkAction}>
+                      <input type="hidden" name="linkId" value={link.id} />
+                      <button type="submit" className="button button-secondary">
+                        Revoke
+                      </button>
+                    </form>
+                  ) : null}
+                </article>
+              );
+            })}
+          </div>
+        )}
+
+        {detail.output.status === "ready" ? (
+          <form action={createShareLinkAction} className="share-links__form">
+            <label className="stack-xs">
+              <span className="muted">Note (optional)</span>
+              <input
+                type="text"
+                name="shareNote"
+                placeholder="e.g. Client preview — do not redistribute"
+                maxLength={200}
+              />
+            </label>
+            <label className="stack-xs">
+              <span className="muted">Expires in hours (optional)</span>
+              <input type="number" name="shareExpiresInHours" min={1} max={8760} step={1} placeholder="24" />
+            </label>
+            <label className="stack-xs">
+              <span className="muted">Max uses (optional)</span>
+              <input type="number" name="shareMaxUses" min={1} step={1} placeholder="5" />
+            </label>
+            <button type="submit" className="button button-primary">
+              Issue share link
+            </button>
+          </form>
+        ) : (
+          <p className="muted">Share links require a ready artifact. This one is currently {detail.output.status}.</p>
+        )}
+      </section>
 
       <section className="surface stack-sm">
         <div className="stack-xs">
