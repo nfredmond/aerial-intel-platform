@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { createLogger, extractRequestId } from "@/lib/logging";
 import {
   PROVING_HEARTBEAT_CRON_SCHEDULE,
   PROVING_HEARTBEAT_ROUTE_PATH,
@@ -23,7 +24,13 @@ function isAuthorized(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const log = createLogger("api.internal.proving-heartbeat", {
+    requestId: extractRequestId(request),
+  });
+  const startedAtMs = Date.now();
+
   if (!isAuthorized(request)) {
+    log.warn("blocked.unauthorized");
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
@@ -47,6 +54,15 @@ export async function GET(request: NextRequest) {
       targets: result.auditTargets,
     });
 
+    log.info("heartbeat.complete", {
+      scanned: result.scanned,
+      updates: result.updates,
+      started: result.started,
+      completed: result.completed,
+      auditRecorded,
+      durationMs: Date.now() - startedAtMs,
+    });
+
     return NextResponse.json({
       ok: true,
       heartbeat,
@@ -57,6 +73,7 @@ export async function GET(request: NextRequest) {
       completed: result.completed,
     });
   } catch (error) {
+    log.error("heartbeat.failed", { error, durationMs: Date.now() - startedAtMs });
     return NextResponse.json(
       {
         ok: false,
