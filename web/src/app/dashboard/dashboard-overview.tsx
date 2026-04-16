@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import type { DroneOpsAccessResult } from "@/lib/auth/drone-ops-access";
+import { canPerformDroneOpsAction } from "@/lib/auth/actions";
 import {
   formatEntitlementTier,
   getDashboardNextActions,
@@ -54,6 +55,11 @@ export function DashboardOverview({ access }: DashboardOverviewProps) {
           <Link href="/missions" className="button button-secondary">
             Open mission workspace
           </Link>
+          {canPerformDroneOpsAction(access, "admin.support") ? (
+            <Link href="/admin" className="button button-secondary">
+              Admin console
+            </Link>
+          ) : null}
           <SignOutForm label="Sign out" variant="secondary" />
         </div>
       </section>

@@ -467,3 +467,82 @@ export async function selectProcessingOutputById(
   );
   return rows[0] ?? null;
 }
+
+export type MembershipAdminRow = {
+  org_id: string;
+  user_id: string;
+  role: string;
+  created_at: string;
+};
+
+export async function selectMembershipsForOrg(orgId: string) {
+  return adminRestRequest<MembershipAdminRow[]>(
+    `drone_memberships?org_id=eq.${encodeURIComponent(orgId)}&select=*&order=created_at.asc`,
+    { method: "GET" },
+  );
+}
+
+export type EntitlementAdminRow = {
+  id: string;
+  org_id: string;
+  product_id: string;
+  tier_id: string;
+  status: string;
+  source: string;
+  external_reference: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function selectEntitlementsForOrg(orgId: string) {
+  return adminRestRequest<EntitlementAdminRow[]>(
+    `drone_entitlements?org_id=eq.${encodeURIComponent(orgId)}&select=*&order=updated_at.desc`,
+    { method: "GET" },
+  );
+}
+
+export type ProcessingJobAdminRow = {
+  id: string;
+  org_id: string;
+  project_id: string | null;
+  mission_id: string | null;
+  engine: string;
+  status: string;
+  stage: string | null;
+  progress: number | null;
+  preset_id: string | null;
+  external_job_reference: string | null;
+  created_at: string;
+  updated_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+};
+
+export async function selectRecentJobsForOrg(orgId: string, limit = 20) {
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 200);
+  return adminRestRequest<ProcessingJobAdminRow[]>(
+    `drone_processing_jobs?org_id=eq.${encodeURIComponent(
+      orgId,
+    )}&select=id,org_id,project_id,mission_id,engine,status,stage,progress,preset_id,external_job_reference,created_at,updated_at,started_at,completed_at&order=updated_at.desc&limit=${safeLimit}`,
+    { method: "GET" },
+  );
+}
+
+export type ProcessingJobEventAdminRow = {
+  id: string;
+  org_id: string;
+  job_id: string;
+  event_type: string;
+  payload: Json;
+  created_at: string;
+};
+
+export async function selectRecentEventsForOrg(orgId: string, limit = 30) {
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 200);
+  return adminRestRequest<ProcessingJobEventAdminRow[]>(
+    `drone_processing_job_events?org_id=eq.${encodeURIComponent(
+      orgId,
+    )}&select=*&order=created_at.desc&limit=${safeLimit}`,
+    { method: "GET" },
+  );
+}
