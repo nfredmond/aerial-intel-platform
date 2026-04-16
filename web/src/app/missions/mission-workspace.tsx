@@ -9,6 +9,7 @@ import {
 
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-button";
+import { formatDateTime } from "@/lib/ui/datetime";
 
 import { MissionBoardClient } from "./mission-board-client";
 
@@ -26,19 +27,6 @@ type MissionWorkspaceProps = {
     message: string;
   } | null;
 };
-
-function formatDateTime(value: string) {
-  const timestamp = new Date(value);
-
-  if (Number.isNaN(timestamp.getTime())) {
-    return "TBD";
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(timestamp);
-}
 
 function formatWholeNumber(value: number) {
   return new Intl.NumberFormat("en-US", {

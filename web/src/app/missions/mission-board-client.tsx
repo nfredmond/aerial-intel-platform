@@ -8,25 +8,13 @@ import {
   formatMissionOutputStatus,
   formatMissionStage,
 } from "@/lib/missions/workspace";
+import { formatDateTime } from "@/lib/ui/datetime";
 
 type Mission = MissionWorkspaceSnapshot["missions"][number];
 
 type MissionBoardClientProps = {
   missions: MissionWorkspaceSnapshot["missions"];
 };
-
-function formatDateTime(value: string) {
-  const timestamp = new Date(value);
-
-  if (Number.isNaN(timestamp.getTime())) {
-    return "TBD";
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(timestamp);
-}
 
 function formatDate(value: string) {
   const timestamp = new Date(value);

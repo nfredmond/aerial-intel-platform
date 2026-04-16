@@ -7,6 +7,7 @@ import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-b
 import { BrowserZipIntakeForm } from "@/components/browser-zip-intake-form";
 import { GeometryJsonField } from "@/components/geometry-json-field";
 import { GeometryPreviewCard } from "@/components/geometry-preview-card";
+import { GeometryPreviewMap } from "@/components/map/geometry-preview-map";
 import { MissionStatusDashboard } from "@/components/mission-status-dashboard";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import {
@@ -62,10 +63,15 @@ import {
 import { normalizeSlug } from "@/lib/slug";
 import { tryCreateSignedDownloadUrl } from "@/lib/storage-delivery";
 import { formatJobStatus, formatOutputArtifactStatus } from "@/lib/missions/workspace";
+import { formatBytes } from "@/lib/ui/bytes";
+import { formatDateTime } from "@/lib/ui/datetime";
 import {
-  formatFileSize,
-  summarizeV1IngestSession,
-} from "@/lib/v1-ingest";
+  statusPillClassName,
+  artifactStatusTone,
+  jobStatusTone,
+  type Tone,
+} from "@/lib/ui/tones";
+import { summarizeV1IngestSession } from "@/lib/v1-ingest";
 import {
   insertDataset,
   insertIngestSession,
@@ -78,60 +84,23 @@ import {
 import { createDroneOpsSignedUploadTicket } from "@/lib/supabase/admin-storage";
 import type { Json } from "@/lib/supabase/types";
 
-function formatDateTime(value: string | null) {
-  if (!value) return "TBD";
-  const timestamp = new Date(value);
-  if (Number.isNaN(timestamp.getTime())) return "TBD";
-
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(timestamp);
-}
-
 function getJobPillClassName(status: string) {
-  switch (status) {
-    case "running":
-      return "status-pill status-pill--info";
-    case "completed":
-      return "status-pill status-pill--success";
-    default:
-      return "status-pill status-pill--warning";
-  }
+  return statusPillClassName(jobStatusTone(status));
 }
 
 function getOutputPillClassName(status: string) {
-  switch (status) {
-    case "ready":
-      return "status-pill status-pill--success";
-    case "processing":
-      return "status-pill status-pill--info";
-    default:
-      return "status-pill status-pill--warning";
-  }
+  return statusPillClassName(artifactStatusTone(status));
 }
 
 function getChecklistStatusClass(status: string) {
-  switch (status) {
-    case "complete":
-      return "status-pill status-pill--success";
-    case "running":
-      return "status-pill status-pill--info";
-    default:
-      return "status-pill status-pill--warning";
-  }
+  const tone: Tone =
+    status === "complete" ? "success" : status === "running" ? "info" : "warning";
+  return statusPillClassName(tone);
 }
 
 function getIngestStatusPillClassName(contractCleared: boolean, reviewBundleReady: boolean) {
-  if (contractCleared) {
-    return "status-pill status-pill--success";
-  }
-
-  if (reviewBundleReady) {
-    return "status-pill status-pill--info";
-  }
-
-  return "status-pill status-pill--warning";
+  const tone: Tone = contractCleared ? "success" : reviewBundleReady ? "info" : "warning";
+  return statusPillClassName(tone);
 }
 
 function getStageChecklist(summary: unknown) {
@@ -2134,7 +2103,7 @@ export default async function MissionDetailPage({
                   </span>
                 </div>
                 <p className="muted">
-                  {session.source_type} · updated {formatDateTime(session.updated_at)} · {session.image_count ?? "?"} image(s) · {formatFileSize(session.file_size_bytes)}
+                  {session.source_type} · updated {formatDateTime(session.updated_at)} · {session.image_count ?? "?"} image(s) · {formatBytes(session.file_size_bytes)}
                 </p>
                 <dl className="kv-grid">
                   <div className="kv-row">
@@ -2283,9 +2252,32 @@ export default async function MissionDetailPage({
           />
         </article>
 
+        <GeometryPreviewMap
+          title="Mission spatial overview"
+          layers={[
+            {
+              id: "mission-aoi",
+              label: "Mission AOI",
+              tone: "info",
+              geojson: missionGeometry as unknown as import("geojson").GeoJsonObject | null,
+              outlineOnly: true,
+              dashed: true,
+            },
+            {
+              id: "selected-dataset-footprint",
+              label: selectedDataset ? `${selectedDataset.name} footprint` : "Dataset footprint",
+              tone: "success",
+              geojson: selectedDatasetGeometry as unknown as import("geojson").GeoJsonObject | null,
+              opacity: 0.3,
+            },
+          ]}
+          primaryGeometry={missionGeometry as unknown as import("geojson").GeoJsonObject | null}
+          note="Pan, zoom, or tap layers. Areas are approximate (WGS84)."
+        />
+
         <GeometryPreviewCard
           title="Mission AOI and dataset footprint"
-          subtitle={`Quick in-app visual preview of the planned AOI and ${selectedDataset ? `the selected dataset footprint (${selectedDataset.name})` : "the selected dataset footprint"}.`}
+          subtitle={`SVG preview of the planned AOI and ${selectedDataset ? `the selected dataset footprint (${selectedDataset.name})` : "the selected dataset footprint"} for quick toggling.`}
           missionGeometry={missionGeometry}
           datasetGeometry={selectedDatasetGeometry}
         />

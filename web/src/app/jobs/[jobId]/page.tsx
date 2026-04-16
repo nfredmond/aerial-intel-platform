@@ -54,29 +54,17 @@ import {
   createDroneOpsSignedUploadTicket,
   downloadStorageText,
 } from "@/lib/supabase/admin-storage";
-
-function formatDateTime(value: string | null) {
-  if (!value) return "TBD";
-  const timestamp = new Date(value);
-  if (Number.isNaN(timestamp.getTime())) return "TBD";
-
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(timestamp);
-}
+import { formatDateTime } from "@/lib/ui/datetime";
+import { statusPillClassName, type Tone } from "@/lib/ui/tones";
 
 function statusClass(status: string) {
-  switch (status) {
-    case "running":
-    case "pending":
-      return "status-pill status-pill--info";
-    case "succeeded":
-    case "ready":
-      return "status-pill status-pill--success";
-    default:
-      return "status-pill status-pill--warning";
-  }
+  const tone: Tone =
+    status === "running" || status === "pending"
+      ? "info"
+      : status === "succeeded" || status === "ready"
+        ? "success"
+        : "warning";
+  return statusPillClassName(tone);
 }
 
 type StageChecklistItem = {
@@ -101,14 +89,9 @@ function getStageChecklist(summary: Record<string, unknown>) {
 }
 
 function getChecklistStatusClass(status: string) {
-  switch (status) {
-    case "complete":
-      return "status-pill status-pill--success";
-    case "running":
-      return "status-pill status-pill--info";
-    default:
-      return "status-pill status-pill--warning";
-  }
+  const tone: Tone =
+    status === "complete" ? "success" : status === "running" ? "info" : "warning";
+  return statusPillClassName(tone);
 }
 
 function getFormString(formData: FormData, key: string) {

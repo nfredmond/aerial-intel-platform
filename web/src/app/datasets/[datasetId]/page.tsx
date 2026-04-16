@@ -6,6 +6,7 @@ import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-button";
 import { GeometryJsonField } from "@/components/geometry-json-field";
 import { GeometryPreviewCard } from "@/components/geometry-preview-card";
+import { GeometryPreviewMap } from "@/components/map/geometry-preview-map";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import { formatGeoJsonSurface, parseGeoJsonSurface } from "@/lib/geojson";
 import { buildDatasetGisBrief } from "@/lib/gis-briefs";
@@ -14,27 +15,11 @@ import { getDatasetSpatialInsight } from "@/lib/gis-insights";
 import { getDatasetDetail } from "@/lib/missions/detail-data";
 import { updateDataset } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/supabase/types";
-
-function formatDateTime(value: string | null) {
-  if (!value) return "TBD";
-  const timestamp = new Date(value);
-  if (Number.isNaN(timestamp.getTime())) return "TBD";
-
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(timestamp);
-}
+import { formatDateTime } from "@/lib/ui/datetime";
+import { datasetStatusTone, statusPillClassName } from "@/lib/ui/tones";
 
 function getStatusClassName(status: string) {
-  switch (status) {
-    case "ready":
-      return "status-pill status-pill--success";
-    case "preflight_flagged":
-      return "status-pill status-pill--warning";
-    default:
-      return "status-pill status-pill--info";
-  }
+  return statusPillClassName(datasetStatusTone(status));
 }
 
 function getCalloutMessage(input: { reviewed?: string; geometry?: string }) {
@@ -351,9 +336,32 @@ export default async function DatasetDetailPage({
       </section>
 
       <section className="grid-cards">
+        <GeometryPreviewMap
+          title="Spatial overview"
+          layers={[
+            {
+              id: "mission-aoi",
+              label: "Mission AOI",
+              tone: "info",
+              geojson: missionGeometry as unknown as import("geojson").GeoJsonObject | null,
+              outlineOnly: true,
+              dashed: true,
+            },
+            {
+              id: "dataset-footprint",
+              label: "Dataset footprint",
+              tone: "success",
+              geojson: datasetGeometry as unknown as import("geojson").GeoJsonObject | null,
+              opacity: 0.3,
+            },
+          ]}
+          primaryGeometry={datasetGeometry as unknown as import("geojson").GeoJsonObject | null}
+          note="Rendered from the attached GeoJSON. Area is computed in WGS84 and is approximate for large or distorted extents."
+        />
+
         <GeometryPreviewCard
           title="Mission AOI and dataset footprint"
-          subtitle="Quick visual preview of the current dataset footprint against the mission AOI when both geometries are attached."
+          subtitle="SVG preview for quick toggling when map tiles aren't available."
           missionGeometry={missionGeometry}
           datasetGeometry={datasetGeometry}
         />
