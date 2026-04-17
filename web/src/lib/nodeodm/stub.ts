@@ -136,3 +136,16 @@ export class StubNodeOdmClient extends NodeOdmClient {
 export function createStubNodeOdmClient(options: StubNodeOdmOptions = {}): StubNodeOdmClient {
   return new StubNodeOdmClient(options);
 }
+
+let sharedStub: StubNodeOdmClient | null = null;
+
+export function getSharedStubNodeOdmClient(): StubNodeOdmClient {
+  if (!sharedStub) {
+    sharedStub = new StubNodeOdmClient();
+  }
+  return sharedStub;
+}
+
+export function resetSharedStubNodeOdmClient(): void {
+  sharedStub = null;
+}

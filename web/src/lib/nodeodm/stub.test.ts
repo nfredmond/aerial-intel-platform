@@ -2,10 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createConfiguredNodeOdmClient } from "./config";
 import { NodeOdmError, isNodeOdmError } from "./errors";
-import { createStubNodeOdmClient } from "./stub";
+import { createStubNodeOdmClient, resetSharedStubNodeOdmClient } from "./stub";
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  resetSharedStubNodeOdmClient();
 });
 
 describe("createStubNodeOdmClient", () => {

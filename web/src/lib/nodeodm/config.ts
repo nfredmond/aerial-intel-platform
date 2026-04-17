@@ -1,5 +1,5 @@
 import { NodeOdmClient } from "./client";
-import { createStubNodeOdmClient } from "./stub";
+import { getSharedStubNodeOdmClient } from "./stub";
 
 export type NodeOdmAdapterConfig = {
   configured: boolean;
@@ -40,7 +40,7 @@ export function createConfiguredNodeOdmClient(): NodeOdmClient | null {
         "AERIAL_NODEODM_MODE=stub is disallowed in production. Configure a real NodeODM URL instead.",
       );
     }
-    return createStubNodeOdmClient();
+    return getSharedStubNodeOdmClient();
   }
   if (!config.baseUrl) return null;
   return new NodeOdmClient({
