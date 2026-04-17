@@ -32,6 +32,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|api/dispatch/adapter/callback|api/internal/proving-heartbeat|api/internal/nodeodm-poll|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/dispatch/adapter/callback|api/internal/proving-heartbeat|api/internal/nodeodm-poll|api/internal/nodeodm-upload|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
