@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-04-17 — Gap 1 §3: NodeODM upload + commit cron
+
+Closes §3 of `docs/ops/nodeodm-upload-gap-1-plan.md` — the upload-and-commit step that was blocking Phase C's real round-trip. `uploadImages` and `commitTask` have their first live callers. After this, `launchNodeOdmTask` → images → `commitTask` → poll → `awaiting_output_import` works end-to-end in stub mode, and is ready for a real dataset when the container is up.
+
+- **Pure helpers.** New `web/src/lib/nodeodm-upload.ts` — `isImageFilename`, `extractNodeOdmUploadCursor`, `pickLatestSessionByMission`, `computeBatchSlice`, `shouldEscalateFailure`, `buildUploadCheckpointPatch`. 20 unit tests pin the 13-image single-tick, 75-image two-tick, exact-50 boundary, retry threshold, and sibling-preserving patch behavior.
+- **Storage helpers.** `web/src/lib/supabase/admin-storage.ts` gains `downloadStorageBytes({path})` and `listStorageObjects({prefix, limit?})` with a `sortBy: name asc` default.
+- **Cron route.** New `GET /api/internal/nodeodm-upload` mirrors the `nodeodm-poll` pattern (bearer/UA auth, unconfigured short-circuit, structured logging). Each tick finds jobs in `running/intake_review` with an unfinished `uploadState`, resolves the latest ingest session's `extracted_dataset_path` per mission, lists images, computes the next batch slice (cap 50/tick, 10 parallel per chunk), streams each image via Supabase Storage → `uploadImages`, and calls `commitTask` on the final slice. On failure it bumps `uploadRetryCount`; at threshold 3 it calls `cancelTask` and marks the job `failed`. Added to `vercel.json` with schedule `2-59/5 * * * *` (2 min offset from poll) and to the `proxy.ts` middleware allow-list.
+- **Events.** `nodeodm.task.uploading`, `nodeodm.task.committed`, `nodeodm.task.upload_retrying`, `nodeodm.task.upload_failed` — mirror the existing `nodeodm.task.*` family.
+- **Tests.** New `route.test.ts` (7 tests) walks the stub through: auth reject, no-cursor tick, 13-image single-tick commit, 75-image two-tick with mid-state resume, retry without escalation, retry escalation + cancel + status=failed, and no-session skip. Uses `@vitest-environment node` to match the stub suite.
+- **Scope held.** Commit still happens inside the cron — no Workflow DevKit migration. `retryCount` is a persisted cross-tick counter in `output_summary.nodeodm`, not an in-process loop. The cron pattern matches the existing `nodeodm-poll` sibling. Gate remains status-based (upload cron only processes `running/intake_review`; poll cron only processes post-commit states), so the two crons never touch the same row simultaneously.
+
+Test + lint posture: 48 files / 280 tests green (+7 from the upload route suite +20 from the pure helpers); lint clean; build clean; tsc baseline unchanged.
+
 ## 2026-04-17 — Gap 3: synthetic NodeODM stub outputs
 
 Stub's `downloadAllAssets` now returns a real zip with 4 output-shaped entries (orthophoto / DEM / point cloud / mesh) plus a parseable `benchmark_summary.json` and a `logs/run.log` line. The synthetic summary validates cleanly through `parseManagedBenchmarkSummaryText`, so the managed import path can consume stub outputs end-to-end without a real NodeODM container.
