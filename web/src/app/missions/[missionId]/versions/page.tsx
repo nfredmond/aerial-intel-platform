@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import { getMissionDetail } from "@/lib/missions/detail-data";
+import { buildVersionDiff, type DiffChange } from "@/lib/missions/version-diff";
 import { buildMissionVersionSnapshot, nextVersionNumber } from "@/lib/missions/versions";
 import type { Json } from "@/lib/supabase/types";
 import {
@@ -28,6 +29,26 @@ function versionStatusTone(status: string): Tone {
   }
 }
 
+function diffChangeTone(change: DiffChange): Tone {
+  switch (change) {
+    case "added":
+      return "success";
+    case "removed":
+      return "danger";
+    case "changed":
+      return "warning";
+    default:
+      return "neutral";
+  }
+}
+
+function formatDiffValue(value: Json | undefined): string {
+  if (value === undefined) return "—";
+  if (value === null) return "null";
+  if (typeof value === "string") return value;
+  return JSON.stringify(value);
+}
+
 function formatVersionStatus(status: string): string {
   return status.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
@@ -49,7 +70,14 @@ export default async function MissionVersionsPage({
   searchParams,
 }: {
   params: Promise<{ missionId: string }>;
-  searchParams: Promise<{ snapshotted?: string; promoted?: string; error?: string }>;
+  searchParams: Promise<{
+    snapshotted?: string;
+    promoted?: string;
+    error?: string;
+    compareLeft?: string;
+    compareRight?: string;
+    hideUnchanged?: string;
+  }>;
 }) {
   const access = await getDroneOpsAccess();
   if (!access.user) redirect("/sign-in");
@@ -129,6 +157,21 @@ export default async function MissionVersionsPage({
 
   const versions = [...detail.versions].sort((a, b) => b.version_number - a.version_number);
   const promoteAllowed = canPromote(access.role);
+
+  const defaultRight = versions[0]?.id ?? "";
+  const defaultLeft = versions[1]?.id ?? versions[0]?.id ?? "";
+  const leftId = resolved.compareLeft ?? defaultLeft;
+  const rightId = resolved.compareRight ?? defaultRight;
+  const leftVersion = versions.find((v) => v.id === leftId);
+  const rightVersion = versions.find((v) => v.id === rightId);
+  const hideUnchanged = resolved.hideUnchanged !== "0";
+  const diffEntries =
+    leftVersion && rightVersion
+      ? buildVersionDiff(leftVersion.plan_payload ?? null, rightVersion.plan_payload ?? null)
+      : [];
+  const visibleDiff = hideUnchanged
+    ? diffEntries.filter((d) => d.change !== "unchanged")
+    : diffEntries;
 
   return (
     <main className="mission-detail">
@@ -221,6 +264,86 @@ export default async function MissionVersionsPage({
           </ul>
         )}
       </section>
+
+      {versions.length >= 2 ? (
+        <section className="mission-detail__section">
+          <h2>Compare versions</h2>
+          <form method="get" className="mission-detail__form">
+            <label htmlFor="compare-left">
+              Left
+              <select id="compare-left" name="compareLeft" defaultValue={leftId}>
+                {versions.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    v{v.version_number} · {formatVersionStatus(v.status)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label htmlFor="compare-right">
+              Right
+              <select id="compare-right" name="compareRight" defaultValue={rightId}>
+                {versions.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    v{v.version_number} · {formatVersionStatus(v.status)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label htmlFor="hide-unchanged">
+              <input
+                type="checkbox"
+                id="hide-unchanged"
+                name="hideUnchanged"
+                value="1"
+                defaultChecked={hideUnchanged}
+              />{" "}
+              Hide unchanged rows
+            </label>
+            <button type="submit" className="button button-secondary">
+              Update diff
+            </button>
+          </form>
+
+          {leftVersion && rightVersion ? (
+            leftVersion.id === rightVersion.id ? (
+              <p className="mission-detail__muted">Pick two different versions to see a diff.</p>
+            ) : visibleDiff.length === 0 ? (
+              <p className="mission-detail__muted">
+                No differences between v{leftVersion.version_number} and v{rightVersion.version_number}.
+              </p>
+            ) : (
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Path</th>
+                      <th>v{leftVersion.version_number}</th>
+                      <th>v{rightVersion.version_number}</th>
+                      <th>Change</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleDiff.map((entry, idx) => (
+                      <tr key={`${entry.path}-${idx}`}>
+                        <td className="admin-table__mono">{entry.path || "(root)"}</td>
+                        <td className="admin-table__mono">{formatDiffValue(entry.left)}</td>
+                        <td className="admin-table__mono">{formatDiffValue(entry.right)}</td>
+                        <td>
+                          <span className={statusPillClassName(diffChangeTone(entry.change))}>
+                            {entry.change}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          ) : (
+            <p className="mission-detail__muted">Select two versions to compare.</p>
+          )}
+        </section>
+      ) : null}
     </main>
   );
 }
