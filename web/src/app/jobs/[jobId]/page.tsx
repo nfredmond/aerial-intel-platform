@@ -11,6 +11,10 @@ import {
   launchDispatchViaAdapter,
 } from "@/lib/dispatch-adapter";
 import {
+  getNodeOdmDispatchSummary,
+  launchNodeOdmTask,
+} from "@/lib/dispatch-adapter-nodeodm";
+import {
   formatArtifactHandoffAuditLine,
   getArtifactHandoff,
   summarizeArtifactHandoffs,
@@ -28,6 +32,7 @@ import {
   isManagedProcessingJobDetail,
   recordManagedDispatchAdapterOutcome,
   recordManagedDispatchHandoff,
+  recordManagedNodeOdmLaunchOutcome,
 } from "@/lib/managed-processing";
 import {
   buildManagedImportStoragePath,
@@ -630,6 +635,49 @@ export default async function JobDetailPage({
     }
   }
 
+  async function launchNodeOdmDispatch(formData: FormData) {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (!refreshedAccess.org?.id || !refreshedAccess.hasMembership || !refreshedAccess.hasActiveEntitlement) {
+      redirect("/dashboard");
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/jobs/${jobId}?action=denied`);
+    }
+
+    const refreshedDetail = await getJobDetail(refreshedAccess, jobId);
+    if (!refreshedDetail) {
+      redirect("/missions");
+    }
+
+    const launchNotes = getFormString(formData, "nodeodmDispatchNotes");
+
+    try {
+      const launch = await launchNodeOdmTask({
+        jobId: refreshedDetail.job.id,
+        presetId: "balanced",
+      });
+
+      const outcome = await recordManagedNodeOdmLaunchOutcome({
+        orgId: refreshedAccess.org.id,
+        detail: refreshedDetail,
+        source: "job-detail",
+        launch,
+        launchNotes: launchNotes || null,
+      });
+
+      redirect(`/jobs/${jobId}?action=${outcome}`);
+    } catch {
+      redirect(`/jobs/${jobId}?action=error`);
+    }
+  }
+
   async function prepareManagedImportUpload(formData: FormData) {
     "use server";
 
@@ -926,6 +974,7 @@ Operator note: ${operatorNotes}`
     ? getManagedDispatchAdapterState(detail.outputSummary)
     : null;
   const dispatchAdapterConfig = getDispatchAdapterConfigSummary();
+  const nodeodmAdapterConfig = getNodeOdmDispatchSummary();
   const outputDownloadUrls = new Map(
     await Promise.all(
       detail.outputs.map(async (output) => [
@@ -1240,6 +1289,30 @@ Operator note: ${operatorNotes}`
                       {dispatchAdapterConfig.configured
                         ? "Uses the configured server-side adapter contract. The job only moves to processing when the adapter accepts and returns an external run reference."
                         : "No adapter endpoint is configured in this deployment. Submitting here records a truthful prepared/failed adapter attempt and leaves the job in intake review until a real launch succeeds or a manual handoff is entered."}
+                    </p>
+                  </form>
+
+                  <form action={launchNodeOdmDispatch} className="stack-sm">
+                    <h4>{nodeodmAdapterConfig.configured ? "Launch NodeODM task directly" : "NodeODM direct dispatch (not configured)"}</h4>
+                    <label className="stack-xs">
+                      Launch notes (optional)
+                      <textarea
+                        name="nodeodmDispatchNotes"
+                        rows={3}
+                        placeholder="Preset choice rationale, operator notes, or context for this launch."
+                      />
+                    </label>
+                    <button
+                      type="submit"
+                      className="button button-secondary"
+                      disabled={access.role === "viewer" || !nodeodmAdapterConfig.configured}
+                    >
+                      Launch NodeODM task
+                    </button>
+                    <p className="muted">
+                      {nodeodmAdapterConfig.configured
+                        ? "Creates the task on NodeODM and records the UUID. Images are NOT uploaded yet — the task will sit queued until the upload step lands (see docs/ops/nodeodm-upload-gap-1-plan.md)."
+                        : "AERIAL_NODEODM_URL is not set in this deployment. Set it (and AERIAL_NODEODM_TOKEN if required) to enable direct NodeODM dispatch."}
                     </p>
                   </form>
 

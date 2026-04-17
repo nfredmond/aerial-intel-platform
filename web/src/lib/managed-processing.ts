@@ -1,3 +1,4 @@
+import type { NodeOdmDispatchLaunchResult } from "@/lib/dispatch-adapter-nodeodm";
 import { getJobDetail } from "@/lib/missions/detail-data";
 import {
   insertJobEvent,
@@ -691,4 +692,161 @@ export function getManagedProcessingNextStep(detail: JobDetailResult) {
   }
 
   return null;
+}
+
+export type NodeOdmLaunchOutcome =
+  | "not-managed"
+  | "noop"
+  | "nodeodm-launch-recorded"
+  | "nodeodm-launch-failed"
+  | "nodeodm-launch-unconfigured";
+
+export async function recordManagedNodeOdmLaunchOutcome(options: {
+  orgId: string;
+  detail: JobDetailResult;
+  source: ManagedProcessingActionSource;
+  launch: NodeOdmDispatchLaunchResult;
+  launchNotes?: string | null;
+}): Promise<NodeOdmLaunchOutcome> {
+  if (!isManagedProcessingJobDetail(options.detail)) {
+    return "not-managed";
+  }
+
+  if (!(options.detail.job.status === "running" && options.detail.job.stage === "intake_review")) {
+    return "noop";
+  }
+
+  const now = new Date().toISOString();
+  const sourceLabel = getSourceLabel(options.source);
+  const launchNotes = normalizeOptionalString(options.launchNotes);
+
+  if (options.launch.ok) {
+    const { taskUuid, adapterLabel, presetId, acceptedAt } = options.launch;
+    const taskUuidShort = taskUuid.slice(0, 8);
+
+    await updateProcessingJob(options.detail.job.id, {
+      output_summary: {
+        ...options.detail.outputSummary,
+        workflowMode: "managed_processing_v1",
+        serviceModel: "operator_assisted",
+        eta: "Awaiting image upload to NodeODM",
+        notes: `NodeODM task ${taskUuid} queued via ${adapterLabel} from ${sourceLabel}. Images have NOT been uploaded yet — the task will sit queued until the upload step runs. See docs/ops/nodeodm-upload-gap-1-plan.md.`,
+        latestCheckpoint: `NodeODM task ${taskUuidShort} queued; awaiting upload`,
+        deliveryPosture: "No outputs can exist until images are uploaded and processing completes.",
+        nodeodm: {
+          taskUuid,
+          presetId,
+          adapterLabel,
+          acceptedAt,
+          lastPolledAt: null,
+          statusCode: 10,
+          statusName: "queued",
+          progress: 0,
+          uploadState: "pending",
+          launchNotes,
+        },
+        stageChecklist: getManagedStageChecklist({
+          intakeReview: "running",
+          hostDispatch: "pending",
+          outputsImported: "pending",
+          qaReview: "pending",
+          deliveryRecorded: "pending",
+        }),
+        logTail: [
+          `NodeODM-direct launch requested from ${sourceLabel}.`,
+          `Task ${taskUuid} created on ${adapterLabel} with preset ${presetId}.`,
+          "Images have NOT been uploaded; task is queued pending upload.",
+          launchNotes ? `Launch note: ${launchNotes}` : "No launch note was recorded.",
+        ],
+      },
+    });
+
+    await insertJobEvent({
+      org_id: options.orgId,
+      job_id: options.detail.job.id,
+      event_type: "nodeodm.task.launched",
+      payload: {
+        title: "NodeODM task launched",
+        detail: `NodeODM task ${taskUuid} was created via ${adapterLabel} from ${sourceLabel} with preset ${presetId}. Images still need to be uploaded before processing can begin.`,
+        taskUuid,
+        presetId,
+        adapterLabel,
+        acceptedAt,
+      },
+    });
+
+    if (launchNotes) {
+      await insertJobEvent({
+        org_id: options.orgId,
+        job_id: options.detail.job.id,
+        event_type: "nodeodm.task.launch_note",
+        payload: {
+          title: "NodeODM launch note recorded",
+          detail: `Launch note for task ${taskUuid}: ${launchNotes}`,
+        },
+      });
+    }
+
+    return "nodeodm-launch-recorded";
+  }
+
+  const { kind, message } = options.launch;
+
+  if (kind === "unconfigured") {
+    await insertJobEvent({
+      org_id: options.orgId,
+      job_id: options.detail.job.id,
+      event_type: "nodeodm.task.launch_unconfigured",
+      payload: {
+        title: "NodeODM direct dispatch unavailable",
+        detail: `NodeODM direct dispatch was requested from ${sourceLabel}, but AERIAL_NODEODM_URL is not configured (or stub mode is not enabled). The job remains in intake review until NodeODM is configured or a manual handoff is entered.`,
+      },
+    });
+    return "nodeodm-launch-unconfigured";
+  }
+
+  await updateProcessingJob(options.detail.job.id, {
+    output_summary: {
+      ...options.detail.outputSummary,
+      workflowMode: "managed_processing_v1",
+      serviceModel: "operator_assisted",
+      eta: "NodeODM launch failed",
+      notes: `NodeODM direct launch failed from ${sourceLabel}: ${message}. The job remains in intake review and no task was created.`,
+      latestCheckpoint: "NodeODM-direct launch failed",
+      deliveryPosture: "Outputs still need a real host run before QA and delivery can close.",
+      nodeodm: {
+        ...(asRecord(options.detail.outputSummary).nodeodm as JsonRecord | undefined),
+        lastLaunchError: message,
+        lastLaunchKind: kind,
+        lastLaunchAttemptAt: now,
+      },
+      stageChecklist: getManagedStageChecklist({
+        intakeReview: "running",
+        hostDispatch: "pending",
+        outputsImported: "pending",
+        qaReview: "pending",
+        deliveryRecorded: "pending",
+      }),
+      logTail: [
+        `NodeODM-direct launch requested from ${sourceLabel}.`,
+        `Launch failed: ${message}`,
+        `Error kind: ${kind}`,
+        "No task was created; job remains in intake review.",
+      ],
+    },
+  });
+
+  await insertJobEvent({
+    org_id: options.orgId,
+    job_id: options.detail.job.id,
+    event_type: "nodeodm.task.launch_failed",
+    payload: {
+      title: "NodeODM task launch failed",
+      detail: `NodeODM direct launch from ${sourceLabel} failed: ${message} (kind: ${kind}). No host dispatch was recorded.`,
+      kind,
+      message,
+    },
+  });
+
+  return "nodeodm-launch-failed";
 }
