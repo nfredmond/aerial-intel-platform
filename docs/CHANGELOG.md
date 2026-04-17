@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-04-16 — Post-modernization ship (Phase A + B)
+
+Landed the "ship + verify" arc from `.claude/plans/cheeky-questing-tome.md`:
+
+- **Phase A — durability.** Pushed `b08159a → cd52711` to `origin/main`. Applied `20260417000001_drone_share_links.sql` to the linked Supabase project via `supabase db query --linked --file` (routing around pre-existing local-vs-remote tracker drift). Verified the new table, six indexes, RLS policy, and the `(org_id, id)` uniqueness constraint on `drone_processing_outputs`. Confirmed three Ready Production deploys on Vercel matched the three push events; public smoke via WebFetch (`/`, `/sign-in`) confirmed live content on `aerial-intel-platform.vercel.app`. Full evidence in `docs/ops/2026-04-16-phase-a-b-ship-evidence.md`.
+- **Phase B — plumbing.** Added the NodeODM poller cron (`/api/internal/nodeodm-poll` at `*/5 * * * *`) to `vercel.json`. Added a `web-e2e` GitHub Actions job gated to `push` on `main` (not PRs) that runs the Playwright public-showcase smoke under chromium and uploads the HTML report on failure. Synced `web/.env.example` with seven env vars referenced in code but missing from the example (`AERIAL_NODEODM_URL` / `AERIAL_NODEODM_TOKEN`, `CRON_SECRET`, `AERIAL_LOG_LEVEL`, the MapLibre style overrides). Added `supabase/.temp/` to `.gitignore` so CLI link-state no longer shows up as untracked dirt.
+
+Deferred (unchanged): Phase C real NodeODM round-trip (needs local container + real dataset), Phase D showcase preview (conditional on C), auth-gated Playwright flow (needs a dedicated test Supabase project).
+
 ## 2026-04-16 — Post-modernization follow-up (Phase 3.4 + 4.1 / 4.2 / 4.4)
 
 Four commits landed after the modernization pass to close deferred Phase 3.4 + Phase 4 slices without re-opening the primitives:
