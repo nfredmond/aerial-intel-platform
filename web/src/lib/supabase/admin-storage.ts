@@ -85,3 +85,55 @@ export async function downloadStorageText(input: {
 
   return result.data.text();
 }
+
+export async function downloadStorageBytes(input: {
+  bucket?: string;
+  path: string;
+}): Promise<Blob> {
+  const bucket = input.bucket?.trim() || DRONE_OPS_STORAGE_BUCKET;
+  const supabase = getSupabaseAdminStorageClient();
+  const result = await supabase.storage
+    .from(bucket)
+    .download(input.path);
+
+  if (result.error || !result.data) {
+    throw new Error(result.error?.message ?? "Could not download the storage object.");
+  }
+
+  return result.data;
+}
+
+export type StorageObjectSummary = {
+  name: string;
+  size: number | null;
+};
+
+export async function listStorageObjects(input: {
+  bucket?: string;
+  prefix: string;
+  limit?: number;
+}): Promise<StorageObjectSummary[]> {
+  const bucket = input.bucket?.trim() || DRONE_OPS_STORAGE_BUCKET;
+  const supabase = getSupabaseAdminStorageClient();
+  const result = await supabase.storage
+    .from(bucket)
+    .list(input.prefix, {
+      limit: input.limit ?? 200,
+      sortBy: { column: "name", order: "asc" },
+    });
+
+  if (result.error) {
+    throw new Error(result.error.message ?? "Could not list storage objects.");
+  }
+
+  const rows = Array.isArray(result.data) ? result.data : [];
+  return rows
+    .filter((row) => typeof row?.name === "string" && row.name.length > 0)
+    .map((row) => {
+      const metadataSize = (row.metadata && typeof row.metadata === "object")
+        ? (row.metadata as { size?: unknown }).size
+        : null;
+      const size = typeof metadataSize === "number" ? metadataSize : null;
+      return { name: row.name, size };
+    });
+}
