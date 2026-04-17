@@ -3,6 +3,10 @@
     {
       "path": "/api/internal/proving-heartbeat",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/internal/nodeodm-poll",
+      "schedule": "*/5 * * * *"
     }
   ]
 }
