@@ -1,8 +1,16 @@
+// @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { strFromU8, unzipSync } from "fflate";
+
+import { parseManagedBenchmarkSummaryText } from "@/lib/managed-processing-import";
 
 import { createConfiguredNodeOdmClient } from "./config";
 import { NodeOdmError, isNodeOdmError } from "./errors";
-import { createStubNodeOdmClient, resetSharedStubNodeOdmClient } from "./stub";
+import {
+  buildSyntheticOutputZip,
+  createStubNodeOdmClient,
+  resetSharedStubNodeOdmClient,
+} from "./stub";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -83,6 +91,39 @@ describe("createStubNodeOdmClient", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("application/zip");
     expect(response.headers.get("X-Stub-NodeODM")).toBe("synthetic");
+  });
+
+  it("buildSyntheticOutputZip emits the 6 expected entries", () => {
+    const bytes = buildSyntheticOutputZip("abcdef0123456789", "test-project");
+    const entries = unzipSync(bytes);
+    const names = Object.keys(entries).sort();
+    expect(names).toEqual([
+      "benchmark_summary.json",
+      "logs/run.log",
+      "odm_dem/dsm.tif",
+      "odm_georeferencing/odm_georeferenced_model.laz",
+      "odm_orthophoto/odm_orthophoto.tif",
+      "odm_texturing/odm_textured_model_geo.obj",
+    ]);
+    for (const name of names) {
+      expect(entries[name].byteLength).toBeGreaterThan(0);
+    }
+  });
+
+  it("synthetic benchmark_summary.json parses through the managed import parser", () => {
+    const bytes = buildSyntheticOutputZip("abcdef0123456789", "test-project");
+    const entries = unzipSync(bytes);
+    const summaryText = strFromU8(entries["benchmark_summary.json"]);
+    const parsed = parseManagedBenchmarkSummaryText(summaryText);
+    expect(parsed.outputs).toHaveLength(4);
+    expect(parsed.minimumPass).toBe(true);
+    expect(parsed.requiredOutputsPresent).toBe(true);
+    const keys = parsed.outputs.map((o) => o.key).sort();
+    expect(keys).toEqual(["dem", "mesh", "orthophoto", "point_cloud"]);
+    for (const output of parsed.outputs) {
+      expect(output.exists).toBe(true);
+      expect(output.nonZeroSize).toBe(true);
+    }
   });
 
   it("info reports stub version and reflects running task count", async () => {

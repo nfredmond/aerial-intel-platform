@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-04-17 — Gap 3: synthetic NodeODM stub outputs
+
+Stub's `downloadAllAssets` now returns a real zip with 4 output-shaped entries (orthophoto / DEM / point cloud / mesh) plus a parseable `benchmark_summary.json` and a `logs/run.log` line. The synthetic summary validates cleanly through `parseManagedBenchmarkSummaryText`, so the managed import path can consume stub outputs end-to-end without a real NodeODM container.
+
+- **New helper.** `buildSyntheticOutputZip(uuid, projectName)` in `web/src/lib/nodeodm/stub.ts` — deterministic, compiled with `fflate.zipSync`, emits 6 entries sized for `qa_gate.minimum_pass: true`.
+- **Stub wiring.** `StubNodeOdmClient.downloadAllAssets` now returns a `Response` whose body is the synthetic zip (still tagged `X-Stub-NodeODM: synthetic`).
+- **Tests.** `stub.test.ts` gains two tests — one asserts the 6-entry structure, the second proves `benchmark_summary.json` round-trips through `parseManagedBenchmarkSummaryText` (4 outputs, `minimumPass: true`, required outputs present). Test file is now `@vitest-environment node` because the `jsdom` env resolves `fflate`'s `browser.js` build which mishandles the zip round-trip — runtime code still works fine in Node (stub only runs server-side anyway).
+- **NOT in scope.** Auto-import on NodeODM `statusCode=40` (i.e., the poll cron calling `downloadAllAssets` + handing bytes to the managed import parser without operator involvement) is a separate, future slice. `/jobs/[jobId]` still uses the operator-driven managed output import form.
+
+Test + lint posture: 46 files / 253 tests green (+2 from the stub suite); lint clean; build clean; tsc baseline unchanged.
+
 ## 2026-04-16 — NodeODM-direct launch wiring (Gap 1 §4)
 
 One commit against `main` closes §4 of `docs/ops/nodeodm-upload-gap-1-plan.md` — the launch-wiring work. `launchNodeOdmTask` now has its first live call site, which means `nodeodm-direct` dispatch mode is reachable from the jobs page UI. The upload step (§3) is still blocked on four open decisions and intentionally stays out of scope.

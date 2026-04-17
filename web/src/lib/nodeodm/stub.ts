@@ -1,6 +1,76 @@
+import { strToU8, zipSync } from "fflate";
+
 import { NodeOdmClient, type CreateTaskInit } from "./client";
 import type { NodeOdmInfo, NodeOdmTaskInfo, NodeOdmTaskStatusCode } from "./contracts";
 import { NodeOdmError } from "./errors";
+
+function buildSyntheticBenchmarkSummary(uuid: string, projectName: string): string {
+  const short = uuid.slice(0, 8);
+  const start = new Date().toISOString();
+  const end = new Date(Date.now() + 42_000).toISOString();
+  return JSON.stringify({
+    timestamp_utc: start,
+    end_timestamp_utc: end,
+    project_name: `stub-${short}`,
+    dataset_root: "synthetic://stub",
+    image_count: 13,
+    duration_seconds: 42,
+    odm_image: "stub-nodeodm",
+    odm_args: "--preset balanced (synthetic)",
+    docker_version: "stub",
+    host: "stub-nodeodm-host",
+    run_log: "logs/run.log",
+    status: "success",
+    run_exit_code: 0,
+    outputs: {
+      orthophoto: {
+        path: "odm_orthophoto/odm_orthophoto.tif",
+        exists: true,
+        non_zero_size: true,
+        size_bytes: 32,
+      },
+      dem: {
+        path: "odm_dem/dsm.tif",
+        exists: true,
+        non_zero_size: true,
+        size_bytes: 32,
+      },
+      point_cloud: {
+        path: "odm_georeferencing/odm_georeferenced_model.laz",
+        exists: true,
+        non_zero_size: true,
+        size_bytes: 16,
+      },
+      mesh: {
+        path: "odm_texturing/odm_textured_model_geo.obj",
+        exists: true,
+        non_zero_size: true,
+        size_bytes: 32,
+      },
+    },
+    qa_gate: {
+      required_outputs_present: true,
+      minimum_pass: true,
+      missing_required_outputs: [],
+    },
+    project_name_hint: projectName,
+  });
+}
+
+export function buildSyntheticOutputZip(uuid: string, projectName = "synthetic"): Uint8Array {
+  const tiffMagic = new Uint8Array(32);
+  tiffMagic.set([0x49, 0x49, 0x2a, 0x00]);
+  const lasMagic = new Uint8Array(16);
+  lasMagic.set([0x4c, 0x41, 0x53, 0x46]);
+  return zipSync({
+    "odm_orthophoto/odm_orthophoto.tif": tiffMagic,
+    "odm_dem/dsm.tif": tiffMagic,
+    "odm_georeferencing/odm_georeferenced_model.laz": lasMagic,
+    "odm_texturing/odm_textured_model_geo.obj": strToU8("o synthetic\nv 0 0 0\nf 1 1 1\n"),
+    "benchmark_summary.json": strToU8(buildSyntheticBenchmarkSummary(uuid, projectName)),
+    "logs/run.log": strToU8("[stub] queued\n[stub] processing\n[stub] output-zip assembled\n"),
+  });
+}
 
 export type StubNodeOdmOptions = {
   progressStep?: number;
@@ -124,8 +194,9 @@ export class StubNodeOdmClient extends NodeOdmClient {
   }
 
   override async downloadAllAssets(uuid: string): Promise<Response> {
-    this.requireTask(uuid, "downloadAllAssets");
-    const payload = new Blob([new Uint8Array()], { type: "application/zip" });
+    const task = this.requireTask(uuid, "downloadAllAssets");
+    const bytes = buildSyntheticOutputZip(uuid, task.name);
+    const payload = new Blob([bytes as BlobPart], { type: "application/zip" });
     return new Response(payload, {
       status: 200,
       headers: {
