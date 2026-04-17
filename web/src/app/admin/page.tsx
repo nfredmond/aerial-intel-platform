@@ -10,11 +10,15 @@ import {
   selectMembershipsForOrg,
   selectRecentEventsForOrg,
   selectRecentJobsForOrg,
+  selectShareLinksNearExpiry,
+  selectTopShareLinksByUsage,
+  type ArtifactShareLinkRow,
   type EntitlementAdminRow,
   type MembershipAdminRow,
   type ProcessingJobAdminRow,
   type ProcessingJobEventAdminRow,
 } from "@/lib/supabase/admin";
+import { shareLinkStatus } from "@/lib/sharing";
 import { formatDateTime } from "@/lib/ui/datetime";
 import { statusPillClassName, type Tone } from "@/lib/ui/tones";
 
@@ -63,6 +67,21 @@ function jobStatusTone(status: string): Tone {
       return "danger";
     default:
       return "warning";
+  }
+}
+
+function shareLinkStatusTone(status: ReturnType<typeof shareLinkStatus>): Tone {
+  switch (status) {
+    case "active":
+      return "success";
+    case "revoked":
+      return "danger";
+    case "expired":
+      return "warning";
+    case "exhausted":
+      return "warning";
+    default:
+      return "neutral";
   }
 }
 
@@ -215,6 +234,83 @@ function EventsPanel({ rows }: { rows: ProcessingJobEventAdminRow[] }) {
   );
 }
 
+function TopShareLinksPanel({ rows }: { rows: ArtifactShareLinkRow[] }) {
+  if (rows.length === 0) {
+    return <p className="muted">No share links issued yet.</p>;
+  }
+  return (
+    <div className="admin-table-wrap">
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>Token</th>
+            <th>Artifact</th>
+            <th>Uses</th>
+            <th>Last used</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const status = shareLinkStatus(row);
+            return (
+              <tr key={row.id}>
+                <td className="admin-table__mono">{row.token.slice(0, 10)}…</td>
+                <td className="admin-table__mono">{row.artifact_id.slice(0, 8)}…</td>
+                <td>{row.use_count}</td>
+                <td>{row.last_used_at ? formatDateTime(row.last_used_at) : "—"}</td>
+                <td>
+                  <span className={statusPillClassName(shareLinkStatusTone(status))}>{status}</span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ExpiringShareLinksPanel({ rows }: { rows: ArtifactShareLinkRow[] }) {
+  if (rows.length === 0) {
+    return <p className="muted">No active share links expiring in the next 7 days.</p>;
+  }
+  return (
+    <div className="admin-table-wrap">
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>Token</th>
+            <th>Artifact</th>
+            <th>Expires</th>
+            <th>Uses</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const status = shareLinkStatus(row);
+            return (
+              <tr key={row.id}>
+                <td className="admin-table__mono">{row.token.slice(0, 10)}…</td>
+                <td className="admin-table__mono">{row.artifact_id.slice(0, 8)}…</td>
+                <td>{row.expires_at ? formatDateTime(row.expires_at) : "—"}</td>
+                <td>
+                  {row.use_count}
+                  {row.max_uses !== null ? ` / ${row.max_uses}` : ""}
+                </td>
+                <td>
+                  <span className={statusPillClassName(shareLinkStatusTone(status))}>{status}</span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default async function AdminConsolePage() {
   const access = await getDroneOpsAccess();
   if (!access.user) redirect("/sign-in");
@@ -258,12 +354,15 @@ export default async function AdminConsolePage() {
     );
   }
 
-  const [memberships, entitlements, jobs, events] = await Promise.all([
-    selectMembershipsForOrg(orgId).catch(() => [] as MembershipAdminRow[]),
-    selectEntitlementsForOrg(orgId).catch(() => [] as EntitlementAdminRow[]),
-    selectRecentJobsForOrg(orgId, 20).catch(() => [] as ProcessingJobAdminRow[]),
-    selectRecentEventsForOrg(orgId, 30).catch(() => [] as ProcessingJobEventAdminRow[]),
-  ]);
+  const [memberships, entitlements, jobs, events, topShareLinks, expiringShareLinks] =
+    await Promise.all([
+      selectMembershipsForOrg(orgId).catch(() => [] as MembershipAdminRow[]),
+      selectEntitlementsForOrg(orgId).catch(() => [] as EntitlementAdminRow[]),
+      selectRecentJobsForOrg(orgId, 20).catch(() => [] as ProcessingJobAdminRow[]),
+      selectRecentEventsForOrg(orgId, 30).catch(() => [] as ProcessingJobEventAdminRow[]),
+      selectTopShareLinksByUsage(orgId, 10).catch(() => [] as ArtifactShareLinkRow[]),
+      selectShareLinksNearExpiry(orgId, 7).catch(() => [] as ArtifactShareLinkRow[]),
+    ]);
 
   const activeEntitlements = entitlements.filter((row) => row.status === "active").length;
   const activeJobs = jobs.filter((row) => row.status === "pending" || row.status === "running").length;
@@ -339,6 +438,22 @@ export default async function AdminConsolePage() {
           <h2>Recent events</h2>
         </div>
         <EventsPanel rows={events} />
+      </section>
+
+      <section className="surface stack-sm">
+        <div className="stack-xs">
+          <p className="eyebrow">Sharing</p>
+          <h2>Top share links by usage</h2>
+        </div>
+        <TopShareLinksPanel rows={topShareLinks} />
+      </section>
+
+      <section className="surface stack-sm">
+        <div className="stack-xs">
+          <p className="eyebrow">Sharing</p>
+          <h2>Share links expiring soon</h2>
+        </div>
+        <ExpiringShareLinksPanel rows={expiringShareLinks} />
       </section>
     </main>
   );

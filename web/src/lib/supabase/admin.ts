@@ -444,6 +444,22 @@ export async function selectArtifactShareLinkByToken(
   return rows[0] ?? null;
 }
 
+export async function selectTopShareLinksByUsage(orgId: string, limit: number) {
+  const query =
+    `drone_artifact_share_links?org_id=eq.${encodeURIComponent(orgId)}` +
+    `&select=*&order=use_count.desc,last_used_at.desc.nullslast&limit=${limit}`;
+  return adminRestRequest<ArtifactShareLinkRow[]>(query, { method: "GET" });
+}
+
+export async function selectShareLinksNearExpiry(orgId: string, daysUntil: number) {
+  const horizon = new Date(Date.now() + daysUntil * 86_400_000).toISOString();
+  const query =
+    `drone_artifact_share_links?org_id=eq.${encodeURIComponent(orgId)}` +
+    `&expires_at=not.is.null&expires_at=lt.${encodeURIComponent(horizon)}` +
+    `&revoked_at=is.null&select=*&order=expires_at.asc`;
+  return adminRestRequest<ArtifactShareLinkRow[]>(query, { method: "GET" });
+}
+
 export type ProcessingOutputPublicRow = {
   id: string;
   org_id: string;
