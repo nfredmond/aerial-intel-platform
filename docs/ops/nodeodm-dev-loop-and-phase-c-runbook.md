@@ -39,9 +39,22 @@ Both test suites use `resetSharedStubNodeOdmClient()` in `afterEach` to isolate 
 2. Insert a `drone_processing_jobs` row with `output_summary = {"nodeodm": {"taskUuid": "<some-uuid>"}}` and status `queued` (requires live Supabase).
 3. `curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/internal/nodeodm-poll`
 4. Watch `/admin` → "NodeODM tasks in flight" for the row.
-5. To advance: in a dev shell, `import('./src/lib/nodeodm/stub').getSharedStubNodeOdmClient().commitTask(uuid)` from a Node REPL, then re-hit the poll route.
+5. Advance the stub task state via HTTP (only available when `AERIAL_NODEODM_MODE=stub` and `NODE_ENV !== "production"`):
 
-> ⚠️ Step 5 is ugly. There is no dev-only HTTP trigger for `commitTask` today. See Gap 2.
+   ```bash
+   # Flip to running (simulates commit after upload)
+   curl -X POST "http://localhost:3000/api/internal/dev/nodeodm-stub-advance?taskUuid=<uuid>&to=running"
+   # Tick progress forward one step
+   curl -X POST "http://localhost:3000/api/internal/dev/nodeodm-stub-advance?taskUuid=<uuid>&to=progress"
+   # Jump straight to completed (progress=100, statusCode=40)
+   curl -X POST "http://localhost:3000/api/internal/dev/nodeodm-stub-advance?taskUuid=<uuid>&to=completed"
+   # Simulate failure (statusCode=30)
+   curl -X POST "http://localhost:3000/api/internal/dev/nodeodm-stub-advance?taskUuid=<uuid>&to=failed"
+   # Simulate cancellation (statusCode=50)
+   curl -X POST "http://localhost:3000/api/internal/dev/nodeodm-stub-advance?taskUuid=<uuid>&to=canceled"
+   ```
+
+   Then re-hit the poll route to let the app pick up the new state.
 
 ## Phase C (real NodeODM round-trip): gaps
 
@@ -59,15 +72,9 @@ Both test suites use `resetSharedStubNodeOdmClient()` in `afterEach` to isolate 
 
 Scope: ~4–6 hours, depends on where the dataset lives pre-dispatch.
 
-### Gap 2 — No dev affordance to advance stub tasks over HTTP
+### ~~Gap 2 — No dev affordance to advance stub tasks over HTTP~~ (closed 2026-04-16)
 
-For full stub-mode click-through, operators currently have to drop into a Node REPL or write a one-off script. A tiny dev-only route would close this:
-
-- `POST /api/internal/dev/nodeodm-stub-advance?taskUuid=X&to=running|completed|failed|canceled`
-- Guard: 404 unless `AERIAL_NODEODM_MODE=stub` AND `NODE_ENV !== "production"`
-- Would make `/admin` observability panels live-demonstrable without a container.
-
-Scope: ~30 min. Skip unless the dev-loop friction bites.
+Closed by `POST /api/internal/dev/nodeodm-stub-advance?taskUuid=X&to=running|completed|failed|canceled|progress`, guarded 404 unless `AERIAL_NODEODM_MODE=stub` AND `NODE_ENV !== "production"`. See the "Manual exercise via curl" section above for the call shape. `/admin` observability panels are now live-demonstrable without a container.
 
 ### Gap 3 — Output import is synthetic in stub mode
 

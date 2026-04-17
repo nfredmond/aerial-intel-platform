@@ -106,6 +106,17 @@ export class StubNodeOdmClient extends NodeOdmClient {
     task.statusCode = 50;
   }
 
+  completeTask(uuid: string): void {
+    const task = this.requireTask(uuid, "completeTask");
+    task.progress = 100;
+    task.statusCode = 40;
+  }
+
+  failTask(uuid: string): void {
+    const task = this.requireTask(uuid, "failTask");
+    task.statusCode = 30;
+  }
+
   override async removeTask(uuid: string): Promise<void> {
     if (!this.tasks.delete(uuid)) {
       throw new NodeOdmError("not_found", `stub removeTask: unknown task ${uuid}`);
