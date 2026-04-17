@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-04-16 — Admin NodeODM observability + dev stub loop
+
+Five commits landed on `main` after the Phase E/F/G post-ship fill-in, rounding out the NodeODM lane with operator-visible panels, a written runbook, and an HTTP dev affordance that makes the stub demoable without a container.
+
+- **`/admin` NodeODM task panel + stuck-jobs panel.** Added `selectNodeOdmJobsForOrg(orgId, limit)` and `selectStaleInFlightJobsForOrg(orgId, {minutesStale, limit})` in `web/src/lib/supabase/admin.ts` (raw PostgREST URL pattern, JSON-path filter for `output_summary->nodeodm->>taskUuid`, clamped limits). Extended `/admin` with two new tables: "NodeODM tasks in flight" (task UUID prefix, status, progress, mission, last polled) and "Stuck in-flight jobs" (> 60 min since `updated_at`, with stale-for via `formatRelativeTime`). Added two summary cards alongside the existing ones. Five new URL-shape tests (including fake-timers for the `minutesStale` cutoff math).
+- **NodeODM dev-loop + Phase C runbook.** New `docs/ops/nodeodm-dev-loop-and-phase-c-runbook.md` documents the three runtime modes (webhook / nodeodm-direct / stub), captures the Phase C blockers honestly (Gap 1 upload path, Gap 3 synthetic outputs), and gives the round-trip steps + evidence checklist for when the blockers clear. Closed Gap 2 inline.
+- **Dev-only stub-advance route.** Added `POST /api/internal/dev/nodeodm-stub-advance?taskUuid=X&to=running|completed|failed|canceled|progress` under a 404 guard (`AERIAL_NODEODM_MODE=stub` AND `NODE_ENV !== "production"`). Extended `StubNodeOdmClient` with `completeTask` and `failTask` that jump straight to terminal states (progress=100/statusCode=40, statusCode=30). Ten route tests cover the guards, validation, not-found, and each transition. Makes `/admin` panels + the poll cron live-demoable from curl without Docker.
+- **Gap 1 upload-plan draft.** Added `docs/ops/nodeodm-upload-gap-1-plan.md` — investigation found that Gap 1 is actually two linked gaps: (1a) `launchNodeOdmTask` has no live call site in the dispatch flow, and (1b) `uploadImages` + `commitTask` have no callers at all. Plan sketches three upload-path options (sync server, async cron, client-direct), recommends the async cron (Option B) + the shared launch-wiring work as the production path, and lists four open decisions that block starting implementation. No code changed.
+
+Test + lint posture: 45 files / 244 tests green; lint clean; tsc baseline unchanged (pre-existing errors on `main` from `dispatch-adapter.test.ts`, `job-retries.test.ts`, `managed-processing.test.ts`).
+
+Deferred (unchanged): Phase C real NodeODM round-trip (now gated on the Gap 1 upload plan + a local container + a real dataset), Phase D showcase preview, auth-gated Playwright flow, admin write actions.
+
 ## 2026-04-16 — Post-ship fill-in (Phase E + F + G)
 
 Three shippable slices landed against `main` without blocking on a drone dataset, container pull, or dedicated test Supabase project. See `docs/ops/2026-04-16-phase-e-f-g-evidence.md`.
