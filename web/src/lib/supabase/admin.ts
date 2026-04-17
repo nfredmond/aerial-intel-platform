@@ -564,6 +564,35 @@ export async function selectNodeOdmJobsForOrg(orgId: string, limit = 20) {
   );
 }
 
+export type StaleInFlightJobAdminRow = {
+  id: string;
+  org_id: string;
+  mission_id: string | null;
+  engine: string;
+  status: string;
+  stage: string | null;
+  progress: number | null;
+  updated_at: string;
+};
+
+export async function selectStaleInFlightJobsForOrg(
+  orgId: string,
+  options: { minutesStale?: number; limit?: number } = {},
+) {
+  const { minutesStale = 60, limit = 20 } = options;
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 200);
+  const safeMinutes = Math.max(1, Math.trunc(minutesStale));
+  const cutoff = new Date(Date.now() - safeMinutes * 60_000).toISOString();
+  return adminRestRequest<StaleInFlightJobAdminRow[]>(
+    `drone_processing_jobs?org_id=eq.${encodeURIComponent(
+      orgId,
+    )}&status=in.(pending,queued,processing,awaiting_output_import)&updated_at=lt.${encodeURIComponent(
+      cutoff,
+    )}&select=id,org_id,mission_id,engine,status,stage,progress,updated_at&order=updated_at.asc&limit=${safeLimit}`,
+    { method: "GET" },
+  );
+}
+
 export type ProcessingJobEventAdminRow = {
   id: string;
   org_id: string;

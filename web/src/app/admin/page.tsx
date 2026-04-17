@@ -12,6 +12,7 @@ import {
   selectRecentEventsForOrg,
   selectRecentJobsForOrg,
   selectShareLinksNearExpiry,
+  selectStaleInFlightJobsForOrg,
   selectTopShareLinksByUsage,
   type ArtifactShareLinkRow,
   type EntitlementAdminRow,
@@ -19,9 +20,10 @@ import {
   type NodeOdmJobAdminRow,
   type ProcessingJobAdminRow,
   type ProcessingJobEventAdminRow,
+  type StaleInFlightJobAdminRow,
 } from "@/lib/supabase/admin";
 import { shareLinkStatus } from "@/lib/sharing";
-import { formatDateTime } from "@/lib/ui/datetime";
+import { formatDateTime, formatRelativeTime } from "@/lib/ui/datetime";
 import { statusPillClassName, type Tone } from "@/lib/ui/tones";
 
 export const dynamic = "force-dynamic";
@@ -307,6 +309,50 @@ function NodeOdmJobsPanel({ rows }: { rows: NodeOdmJobAdminRow[] }) {
   );
 }
 
+function StaleJobsPanel({ rows }: { rows: StaleInFlightJobAdminRow[] }) {
+  if (rows.length === 0) {
+    return <p className="muted">No in-flight jobs stuck for more than an hour.</p>;
+  }
+  return (
+    <div className="admin-table-wrap">
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>Job</th>
+            <th>Engine</th>
+            <th>Status</th>
+            <th>Stage</th>
+            <th>Progress</th>
+            <th>Mission</th>
+            <th>Stale for</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id}>
+              <td>
+                <Link href={`/jobs/${row.id}`} className="admin-table__link">
+                  {row.id.slice(0, 8)}…
+                </Link>
+              </td>
+              <td>{row.engine}</td>
+              <td>
+                <span className={statusPillClassName(jobStatusTone(row.status))}>{row.status}</span>
+              </td>
+              <td>{row.stage ?? "—"}</td>
+              <td>{row.progress === null ? "—" : `${Math.round(row.progress * 100)}%`}</td>
+              <td className="admin-table__mono">
+                {row.mission_id ? `${row.mission_id.slice(0, 8)}…` : "—"}
+              </td>
+              <td>{formatRelativeTime(row.updated_at)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function TopShareLinksPanel({ rows }: { rows: ArtifactShareLinkRow[] }) {
   if (rows.length === 0) {
     return <p className="muted">No share links issued yet.</p>;
@@ -443,16 +489,27 @@ export default async function AdminConsolePage() {
     );
   }
 
-  const [memberships, entitlements, jobs, events, topShareLinks, expiringShareLinks, nodeOdmJobs] =
-    await Promise.all([
-      selectMembershipsForOrg(orgId).catch(() => [] as MembershipAdminRow[]),
-      selectEntitlementsForOrg(orgId).catch(() => [] as EntitlementAdminRow[]),
-      selectRecentJobsForOrg(orgId, 20).catch(() => [] as ProcessingJobAdminRow[]),
-      selectRecentEventsForOrg(orgId, 30).catch(() => [] as ProcessingJobEventAdminRow[]),
-      selectTopShareLinksByUsage(orgId, 10).catch(() => [] as ArtifactShareLinkRow[]),
-      selectShareLinksNearExpiry(orgId, 7).catch(() => [] as ArtifactShareLinkRow[]),
-      selectNodeOdmJobsForOrg(orgId, 20).catch(() => [] as NodeOdmJobAdminRow[]),
-    ]);
+  const [
+    memberships,
+    entitlements,
+    jobs,
+    events,
+    topShareLinks,
+    expiringShareLinks,
+    nodeOdmJobs,
+    staleJobs,
+  ] = await Promise.all([
+    selectMembershipsForOrg(orgId).catch(() => [] as MembershipAdminRow[]),
+    selectEntitlementsForOrg(orgId).catch(() => [] as EntitlementAdminRow[]),
+    selectRecentJobsForOrg(orgId, 20).catch(() => [] as ProcessingJobAdminRow[]),
+    selectRecentEventsForOrg(orgId, 30).catch(() => [] as ProcessingJobEventAdminRow[]),
+    selectTopShareLinksByUsage(orgId, 10).catch(() => [] as ArtifactShareLinkRow[]),
+    selectShareLinksNearExpiry(orgId, 7).catch(() => [] as ArtifactShareLinkRow[]),
+    selectNodeOdmJobsForOrg(orgId, 20).catch(() => [] as NodeOdmJobAdminRow[]),
+    selectStaleInFlightJobsForOrg(orgId, { minutesStale: 60, limit: 20 }).catch(
+      () => [] as StaleInFlightJobAdminRow[],
+    ),
+  ]);
 
   const activeEntitlements = entitlements.filter((row) => row.status === "active").length;
   const activeJobs = jobs.filter((row) => row.status === "pending" || row.status === "running").length;
@@ -540,6 +597,18 @@ export default async function AdminConsolePage() {
           </p>
         </div>
         <NodeOdmJobsPanel rows={nodeOdmJobs} />
+      </section>
+
+      <section className="surface stack-sm">
+        <div className="stack-xs">
+          <p className="eyebrow">Compute</p>
+          <h2>Stuck in-flight jobs</h2>
+          <p className="muted">
+            Jobs in pending, queued, processing, or awaiting-output-import with no update for over
+            an hour. Healthy jobs are updated by the cron or adapter every few minutes.
+          </p>
+        </div>
+        <StaleJobsPanel rows={staleJobs} />
       </section>
 
       <section className="surface stack-sm">

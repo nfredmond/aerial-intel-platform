@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   selectNodeOdmJobsForOrg,
   selectShareLinksNearExpiry,
+  selectStaleInFlightJobsForOrg,
   selectTopShareLinksByUsage,
 } from "@/lib/supabase/admin";
 
@@ -141,5 +142,79 @@ describe("selectNodeOdmJobsForOrg", () => {
     await selectNodeOdmJobsForOrg("org-1", 0);
 
     expect(calls[0].url).toContain("limit=1");
+  });
+});
+
+describe("selectStaleInFlightJobsForOrg", () => {
+  it("filters in-flight statuses, computes updated_at cutoff from minutesStale, orders by updated_at asc", async () => {
+    const calls: FetchCall[] = [];
+    globalThis.fetch = stubFetchOnce([], calls);
+
+    const fixed = Date.parse("2026-04-16T12:00:00Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(fixed));
+
+    try {
+      await selectStaleInFlightJobsForOrg("org with space/slash", { minutesStale: 90, limit: 15 });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(calls).toHaveLength(1);
+    const { url, init } = calls[0];
+    expect(url).toContain("https://example.supabase.co/rest/v1/drone_processing_jobs?");
+    expect(url).toContain(`org_id=eq.${encodeURIComponent("org with space/slash")}`);
+    expect(url).toContain("status=in.(pending,queued,processing,awaiting_output_import)");
+    expect(url).toContain(
+      "select=id,org_id,mission_id,engine,status,stage,progress,updated_at",
+    );
+    expect(url).toContain("order=updated_at.asc");
+    expect(url).toContain("limit=15");
+    expect(init?.method).toBe("GET");
+
+    const cutoffMatch = /updated_at=lt\.([^&]+)/.exec(url);
+    expect(cutoffMatch).not.toBeNull();
+    const cutoff = decodeURIComponent(cutoffMatch![1]);
+    expect(cutoff).toBe("2026-04-16T10:30:00.000Z");
+  });
+
+  it("defaults to 60 minutes stale and limit 20", async () => {
+    const calls: FetchCall[] = [];
+    globalThis.fetch = stubFetchOnce([], calls);
+
+    const fixed = Date.parse("2026-04-16T00:00:00Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(fixed));
+
+    try {
+      await selectStaleInFlightJobsForOrg("org-1");
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const { url } = calls[0];
+    expect(url).toContain("limit=20");
+    const cutoffMatch = /updated_at=lt\.([^&]+)/.exec(url);
+    expect(decodeURIComponent(cutoffMatch![1])).toBe("2026-04-15T23:00:00.000Z");
+  });
+
+  it("clamps minutesStale floor to 1 and limit floor to 1", async () => {
+    const calls: FetchCall[] = [];
+    globalThis.fetch = stubFetchOnce([], calls);
+
+    const fixed = Date.parse("2026-04-16T00:00:00Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(fixed));
+
+    try {
+      await selectStaleInFlightJobsForOrg("org-1", { minutesStale: 0, limit: 0 });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const { url } = calls[0];
+    expect(url).toContain("limit=1");
+    const cutoffMatch = /updated_at=lt\.([^&]+)/.exec(url);
+    expect(decodeURIComponent(cutoffMatch![1])).toBe("2026-04-15T23:59:00.000Z");
   });
 });
