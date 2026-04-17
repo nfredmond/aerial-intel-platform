@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-04-16 — NodeODM-direct launch wiring (Gap 1 §4)
+
+One commit against `main` closes §4 of `docs/ops/nodeodm-upload-gap-1-plan.md` — the launch-wiring work. `launchNodeOdmTask` now has its first live call site, which means `nodeodm-direct` dispatch mode is reachable from the jobs page UI. The upload step (§3) is still blocked on four open decisions and intentionally stays out of scope.
+
+- **New writer.** `recordManagedNodeOdmLaunchOutcome` in `web/src/lib/managed-processing.ts` mirrors the existing webhook adapter writer. Three branches: accepted (writes `output_summary.nodeodm.{taskUuid, presetId, adapterLabel, acceptedAt, lastPolledAt, statusCode: 10, statusName: "queued", progress: 0, uploadState: "pending", launchNotes}` + emits `nodeodm.task.launched`), failed (preserves prior nodeodm fields, writes `lastLaunchError/Kind/AttemptAt`, emits `nodeodm.task.launch_failed`), unconfigured (event-only, no `updateProcessingJob` call). Gated on `status === "running" && stage === "intake_review"` like the webhook path.
+- **Server action + form.** New `launchNodeOdmDispatch` server action on `/jobs/[jobId]` + a form alongside the existing webhook adapter form. Gated on `getNodeOdmDispatchSummary().configured` and `role !== viewer`. Form copy tells the truth: "Images are NOT uploaded yet — the task will sit queued until the upload step lands."
+- **Truthful posture.** After this commit, stub-mode `/admin` surfaces the new task immediately. The poll cron advances status through `queued → running → completed` via the dev stub-advance route. No drone dataset moves — that's §3. Intentional seam: `uploadState: "pending"` is where Option B will plug in.
+- **Tests.** New `web/src/lib/managed-processing-nodeodm.test.ts` (7 tests, all green) covers the three launch branches plus `not-managed` and `noop` gates. Full 251-test suite stays green.
+
+Test + lint posture: 46 files / 251 tests green; lint clean; build clean; tsc baseline unchanged (pre-existing errors on `main` from `dispatch-adapter.test.ts`, `job-retries.test.ts`, `managed-processing.test.ts` — untouched).
+
+Deferred (unchanged): Gap 1 §3 upload + commit (four open decisions in the Gap 1 plan block it), Phase C real NodeODM round-trip (needs §3 + a container + a real dataset), Phase D showcase preview, auth-gated Playwright flow, admin write actions.
+
 ## 2026-04-16 — Admin NodeODM observability + dev stub loop
 
 Five commits landed on `main` after the Phase E/F/G post-ship fill-in, rounding out the NodeODM lane with operator-visible panels, a written runbook, and an HTTP dev affordance that makes the stub demoable without a container.
