@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  selectNodeOdmJobsForOrg,
   selectShareLinksNearExpiry,
   selectTopShareLinksByUsage,
 } from "@/lib/supabase/admin";
@@ -110,5 +111,35 @@ describe("selectShareLinksNearExpiry", () => {
     const match = /expires_at=lt\.([^&]+)/.exec(calls[0].url);
     expect(match).not.toBeNull();
     expect(decodeURIComponent(match![1])).toBe("2026-04-17T00:00:00.000Z");
+  });
+});
+
+describe("selectNodeOdmJobsForOrg", () => {
+  it("filters to jobs with a non-null nodeodm taskUuid, orders by updated_at desc, and clamps the limit", async () => {
+    const calls: FetchCall[] = [];
+    globalThis.fetch = stubFetchOnce([], calls);
+
+    await selectNodeOdmJobsForOrg("org with space/slash", 9999);
+
+    expect(calls).toHaveLength(1);
+    const { url, init } = calls[0];
+    expect(url).toContain("https://example.supabase.co/rest/v1/drone_processing_jobs?");
+    expect(url).toContain(`org_id=eq.${encodeURIComponent("org with space/slash")}`);
+    expect(url).toContain("output_summary->nodeodm->>taskUuid=not.is.null");
+    expect(url).toContain("order=updated_at.desc");
+    expect(url).toContain("limit=200");
+    expect(url).toContain(
+      "select=id,org_id,mission_id,status,stage,updated_at,output_summary",
+    );
+    expect(init?.method).toBe("GET");
+  });
+
+  it("clamps non-positive limits to 1", async () => {
+    const calls: FetchCall[] = [];
+    globalThis.fetch = stubFetchOnce([], calls);
+
+    await selectNodeOdmJobsForOrg("org-1", 0);
+
+    expect(calls[0].url).toContain("limit=1");
   });
 });

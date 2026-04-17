@@ -8,6 +8,7 @@ import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import {
   selectEntitlementsForOrg,
   selectMembershipsForOrg,
+  selectNodeOdmJobsForOrg,
   selectRecentEventsForOrg,
   selectRecentJobsForOrg,
   selectShareLinksNearExpiry,
@@ -15,6 +16,7 @@ import {
   type ArtifactShareLinkRow,
   type EntitlementAdminRow,
   type MembershipAdminRow,
+  type NodeOdmJobAdminRow,
   type ProcessingJobAdminRow,
   type ProcessingJobEventAdminRow,
 } from "@/lib/supabase/admin";
@@ -67,6 +69,23 @@ function jobStatusTone(status: string): Tone {
       return "danger";
     default:
       return "warning";
+  }
+}
+
+function nodeOdmStatusTone(statusName: string): Tone {
+  switch (statusName) {
+    case "completed":
+      return "success";
+    case "running":
+    case "processing":
+      return "info";
+    case "queued":
+      return "warning";
+    case "failed":
+    case "canceled":
+      return "danger";
+    default:
+      return "neutral";
   }
 }
 
@@ -234,6 +253,60 @@ function EventsPanel({ rows }: { rows: ProcessingJobEventAdminRow[] }) {
   );
 }
 
+function NodeOdmJobsPanel({ rows }: { rows: NodeOdmJobAdminRow[] }) {
+  if (rows.length === 0) {
+    return <p className="muted">No NodeODM tasks in flight.</p>;
+  }
+  return (
+    <div className="admin-table-wrap">
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>Job</th>
+            <th>Task UUID</th>
+            <th>NodeODM status</th>
+            <th>Progress</th>
+            <th>Mission</th>
+            <th>Last polled</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const summary = (row.output_summary ?? {}) as { nodeodm?: Record<string, unknown> };
+            const nodeodm = summary.nodeodm ?? {};
+            const taskUuid = typeof nodeodm.taskUuid === "string" ? nodeodm.taskUuid : null;
+            const statusName =
+              typeof nodeodm.statusName === "string" && nodeodm.statusName.length > 0
+                ? nodeodm.statusName
+                : row.status;
+            const progressValue = typeof nodeodm.progress === "number" ? nodeodm.progress : null;
+            const lastPolledAt =
+              typeof nodeodm.lastPolledAt === "string" ? nodeodm.lastPolledAt : null;
+            return (
+              <tr key={row.id}>
+                <td>
+                  <Link href={`/jobs/${row.id}`} className="admin-table__link">
+                    {row.id.slice(0, 8)}…
+                  </Link>
+                </td>
+                <td className="admin-table__mono">{taskUuid ? `${taskUuid.slice(0, 8)}…` : "—"}</td>
+                <td>
+                  <span className={statusPillClassName(nodeOdmStatusTone(statusName))}>{statusName}</span>
+                </td>
+                <td>{progressValue === null ? "—" : `${Math.round(progressValue)}%`}</td>
+                <td className="admin-table__mono">
+                  {row.mission_id ? `${row.mission_id.slice(0, 8)}…` : "—"}
+                </td>
+                <td>{lastPolledAt ? formatDateTime(lastPolledAt) : "—"}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function TopShareLinksPanel({ rows }: { rows: ArtifactShareLinkRow[] }) {
   if (rows.length === 0) {
     return <p className="muted">No share links issued yet.</p>;
@@ -370,7 +443,7 @@ export default async function AdminConsolePage() {
     );
   }
 
-  const [memberships, entitlements, jobs, events, topShareLinks, expiringShareLinks] =
+  const [memberships, entitlements, jobs, events, topShareLinks, expiringShareLinks, nodeOdmJobs] =
     await Promise.all([
       selectMembershipsForOrg(orgId).catch(() => [] as MembershipAdminRow[]),
       selectEntitlementsForOrg(orgId).catch(() => [] as EntitlementAdminRow[]),
@@ -378,6 +451,7 @@ export default async function AdminConsolePage() {
       selectRecentEventsForOrg(orgId, 30).catch(() => [] as ProcessingJobEventAdminRow[]),
       selectTopShareLinksByUsage(orgId, 10).catch(() => [] as ArtifactShareLinkRow[]),
       selectShareLinksNearExpiry(orgId, 7).catch(() => [] as ArtifactShareLinkRow[]),
+      selectNodeOdmJobsForOrg(orgId, 20).catch(() => [] as NodeOdmJobAdminRow[]),
     ]);
 
   const activeEntitlements = entitlements.filter((row) => row.status === "active").length;
@@ -454,6 +528,18 @@ export default async function AdminConsolePage() {
           <h2>Recent events</h2>
         </div>
         <EventsPanel rows={events} />
+      </section>
+
+      <section className="surface stack-sm">
+        <div className="stack-xs">
+          <p className="eyebrow">Compute</p>
+          <h2>NodeODM tasks in flight</h2>
+          <p className="muted">
+            Jobs with a NodeODM task cursor. Updated by the internal poll cron — if a job sits here
+            without advancing, the cron is stuck or the NodeODM container is unreachable.
+          </p>
+        </div>
+        <NodeOdmJobsPanel rows={nodeOdmJobs} />
       </section>
 
       <section className="surface stack-sm">

@@ -544,6 +544,26 @@ export async function selectRecentJobsForOrg(orgId: string, limit = 20) {
   );
 }
 
+export type NodeOdmJobAdminRow = {
+  id: string;
+  org_id: string;
+  mission_id: string | null;
+  status: string;
+  stage: string | null;
+  updated_at: string;
+  output_summary: Record<string, unknown> | null;
+};
+
+export async function selectNodeOdmJobsForOrg(orgId: string, limit = 20) {
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 200);
+  return adminRestRequest<NodeOdmJobAdminRow[]>(
+    `drone_processing_jobs?org_id=eq.${encodeURIComponent(
+      orgId,
+    )}&output_summary->nodeodm->>taskUuid=not.is.null&select=id,org_id,mission_id,status,stage,updated_at,output_summary&order=updated_at.desc&limit=${safeLimit}`,
+    { method: "GET" },
+  );
+}
+
 export type ProcessingJobEventAdminRow = {
   id: string;
   org_id: string;
