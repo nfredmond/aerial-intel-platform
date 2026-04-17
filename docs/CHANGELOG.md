@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-04-16 — Post-ship fill-in (Phase E + F + G)
+
+Three shippable slices landed against `main` without blocking on a drone dataset, container pull, or dedicated test Supabase project. See `docs/ops/2026-04-16-phase-e-f-g-evidence.md`.
+
+- **Phase E — Share-link observability.** Added `selectTopShareLinksByUsage(orgId, limit)` and `selectShareLinksNearExpiry(orgId, daysUntil)` in `web/src/lib/supabase/admin.ts` (PostgREST URL style, same as the surrounding helpers). Extended `/admin` with a "Top share links by usage" table (use count, last used, status pill) and a "Share links expiring soon" table (expires-at, usage progress) — both gated behind the existing `admin.support` action check. Unit tests assert the URL shape, filters, and `daysUntil` horizon math under fake timers.
+- **Phase F — Mission-version diff view.** Added `buildVersionDiff(left, right)` in `web/src/lib/missions/version-diff.ts`, a dependency-free JSON walker that returns a flat list of `DiffEntry{path, left, right, change}` entries keyed by dot-path. Wired a compare toggle into `/missions/[missionId]/versions` (left + right picker, hide-unchanged checkbox) that renders a 4-column diff table using the existing admin-table / status-pill styling. 12 unit tests cover deep equality, added / removed / changed paths, nested objects + arrays, array-length asymmetry, null-vs-missing, and both-undefined roots.
+- **Phase G — NodeODM stub for dispatch/poll/import CI.** Added `StubNodeOdmClient` in `web/src/lib/nodeodm/stub.ts` that extends `NodeOdmClient` with a deterministic in-memory task table (status machine: queued → running on `commitTask` → progress advance on `taskInfo` → completed at 100%, cancel transitions to terminal 50). Gated behind `AERIAL_NODEODM_MODE=stub` with a prod guard that throws if anyone tries `NODE_ENV=production` + stub. Synthetic `downloadAllAssets` returns an empty zip tagged `X-Stub-NodeODM: synthetic`. 11 tests cover the state machine, cancel-terminal, upload counting, mode switch, and the prod guard. Unlocks future CI runs of the dispatch-adapter → poll → import path without an `opendronemap/nodeodm` container or real imagery.
+
+Deferred (unchanged): Phase C real NodeODM round-trip (needs local container + real dataset), Phase D showcase preview (conditional on C), auth-gated Playwright flow (needs a dedicated test Supabase project), admin write actions (parked behind email-service decisions).
+
 ## 2026-04-16 — Post-modernization ship (Phase A + B)
 
 Landed the "ship + verify" arc from `.claude/plans/cheeky-questing-tome.md`:
