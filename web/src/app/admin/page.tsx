@@ -553,6 +553,14 @@ export default async function AdminConsolePage() {
           <span className="muted">Jobs in flight</span>
           <strong>{activeJobs}</strong>
         </div>
+        <div className="admin-summary__card">
+          <span className="muted">NodeODM active</span>
+          <strong>{nodeOdmJobs.length}</strong>
+        </div>
+        <div className="admin-summary__card">
+          <span className="muted">Stuck &gt; 1h</span>
+          <strong>{staleJobs.length}</strong>
+        </div>
       </section>
 
       <section className="surface stack-sm">
