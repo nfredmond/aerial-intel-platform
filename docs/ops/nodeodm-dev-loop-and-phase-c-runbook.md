@@ -1,6 +1,6 @@
 # NodeODM dev-loop + Phase C runbook
 
-_Last updated: 2026-04-16 · Applies to: `web/` Next.js app._
+_Last updated: 2026-04-18 · Applies to: `web/` Next.js app._
 
 This doc captures the operator view of the NodeODM dispatch → poll → import path: what you can exercise **today** against the in-memory stub, what's still **blocked** before real NodeODM can round-trip end-to-end, and the runbook for Phase C verification when the blockers are cleared.
 
@@ -11,8 +11,8 @@ The NodeODM integration has three runtime modes:
 | Mode | Flag | When to use | State today |
 |---|---|---|---|
 | **webhook** | `AERIAL_DISPATCH_ADAPTER_URL` set, `AERIAL_NODEODM_URL` unset | External dispatch webhook with async callback | Works |
-| **nodeodm-direct** | `AERIAL_NODEODM_URL` set, `AERIAL_NODEODM_MODE=real` | Direct NodeODM REST against a live container | Dispatch + poll work; upload path missing (see Gap 1) |
-| **nodeodm-stub** | `AERIAL_NODEODM_MODE=stub` | Dev + CI, no container needed | Works in-process; HTTP-driven round-trip blocked on same upload gap |
+| **nodeodm-direct** | `AERIAL_NODEODM_URL` set, `AERIAL_NODEODM_MODE=real` | Direct NodeODM REST against a live container | Full loop wired: dispatch → upload cron → poll → auto-import (real-bundle adapter lands stub-free outputs) |
+| **nodeodm-stub** | `AERIAL_NODEODM_MODE=stub` | Dev + CI, no container needed | Full loop works in-process; integration test walks `processing → succeeded` with synthetic `benchmark_summary.json` |
 
 ## Stub mode: what works today
 
@@ -56,64 +56,93 @@ Both test suites use `resetSharedStubNodeOdmClient()` in `afterEach` to isolate 
 
    Then re-hit the poll route to let the app pick up the new state.
 
-## Phase C (real NodeODM round-trip): gaps
+## Phase C (real NodeODM round-trip): gap status
 
-### Gap 1 — No upload path from app to NodeODM
+### ~~Gap 1 — No upload path from app to NodeODM~~ (closed 2026-04-17)
 
-`NodeOdmClient.uploadImages(uuid, files)` and `commitTask(uuid)` exist on the client (`web/src/lib/nodeodm/client.ts`) and are implemented on the stub. **Nothing in the app layer calls them.** `launchNodeOdmTask()` creates the task UUID and returns — the comment says _"Image upload + commit happen in a second step after the caller has uploaded the dataset"_ but that second step is TBD.
-
-**Impact:** even with a live NodeODM container, the app can't push a dataset to it. The poll cron will sit on a task forever because the task never gets committed.
-
-**Unblock shape:**
-
-- Add `uploadJobImagesToNodeOdm(jobId, dataset)` in `web/src/lib/dispatch-adapter-nodeodm.ts` that streams from storage (Supabase bucket?) to `uploadImages`, then calls `commitTask`.
-- Add an HTTP route or background job that invokes it after dispatch (options: (a) sync after launch, (b) separate `POST /api/internal/nodeodm-upload?jobId=...` cron, (c) client-side from the mission-ingest UI).
-- Record progress/failures as `nodeodm.task.uploading` / `nodeodm.task.committed` events.
-
-Scope: ~4–6 hours, depends on where the dataset lives pre-dispatch.
+Closed by the upload cron at `GET /api/internal/nodeodm-upload` (`CRON_SECRET` bearer guard). It streams extracted-dataset objects out of Supabase Storage (`extracted_dataset_path` on `drone_ingest_sessions`), pushes them to NodeODM via `uploadImages` in batches of up to 50, then calls `commitTask` and emits `nodeodm.task.uploading` / `nodeodm.task.committed` events. Integration coverage lives alongside `web/src/app/api/internal/nodeodm-upload/route.test.ts`. The "Extract dataset" server action shipped the same week, so a real-mode run is now possible end-to-end.
 
 ### ~~Gap 2 — No dev affordance to advance stub tasks over HTTP~~ (closed 2026-04-16)
 
 Closed by `POST /api/internal/dev/nodeodm-stub-advance?taskUuid=X&to=running|completed|failed|canceled|progress`, guarded 404 unless `AERIAL_NODEODM_MODE=stub` AND `NODE_ENV !== "production"`. See the "Manual exercise via curl" section above for the call shape. `/admin` observability panels are now live-demonstrable without a container.
 
-### Gap 3 — Output import is synthetic in stub mode
+### Gap 3 — Output import (real mode closed 2026-04-18, stub mode still short-circuits)
 
-The stub's `taskOutput` returns a synthetic `Uint8Array` tagged with `synthetic: true`. Downstream import code (`web/src/lib/managed-processing-import.ts`) needs to either (a) detect and short-circuit on synthetic outputs, or (b) accept that stub mode stops at `awaiting_output_import` without actually importing.
+Real NodeODM bundles do not emit `benchmark_summary.json` (that file is a stub/scripted-benchmark invention). The poll route (`web/src/app/api/internal/nodeodm-poll/route.ts` → `importCompletedOutputs`) now branches on the presence of `benchmark_summary.json` in the downloaded zip. If present, the existing stub/scripted path runs. If absent, `inventoryNodeOdmBundle` + `synthesizeBenchmarkSummary` (`web/src/lib/nodeodm/real-output-adapter.ts`) build a `ManagedImportSummary`-shaped record from canonical ODM output paths (`odm_orthophoto/odm_orthophoto.tif`, `odm_dem/{dsm,dtm}.tif`, `odm_georeferencing/*.laz` + `entwine_pointcloud/ept.json`, `odm_texturing/*.obj`) and round-trips it through `parseManagedBenchmarkSummaryText` to keep a single source of truth. Real-mode jobs with the two required outputs (orthophoto + DSM) flip to `status=succeeded` with `benchmarkSummary.source=nodeodm-real-bundle`. When neither `benchmark_summary.json` nor any recognized ODM output is found, the import throws and the job stays `awaiting_output_import` with `lastImportError` populated. Stub mode still reports `synthetic: true` in its outputs and its integration walk still ends at `status=succeeded` via the stub's fabricated `benchmark_summary.json`.
 
-Current integration test accepts (b). Real-mode verification will need (a) or equivalent.
+**What's not closed:** bytes are still path-only — no copy-to-Supabase-Storage for the output files. That's the next slice after the first real round-trip is in evidence.
 
-## Phase C runbook (when blockers clear)
+## Phase C runbook — real-mode Toledo round-trip (Gap 1 + Gap 3 closed)
 
 Run this when you have:
 
-- [ ] A local or networked `opendronemap/nodeodm` container (tested against v3.x)
-- [ ] A small drone dataset (10–30 JPEGs is plenty for first round-trip)
-- [ ] The app-layer upload helper from Gap 1 implemented + tested
+- [ ] A local `opendronemap/nodeodm:latest` container (pin the digest in evidence)
+- [ ] A small drone dataset staged as a ZIP (the ODM Toledo subset below is the reference dataset)
+- [ ] `web/.env.local` populated with real Supabase creds (service role + anon + URL)
+- [ ] A seeded mission + org in the Supabase project
 
-### Prereq env
+### Prereq env (`web/.env.local`)
 
 ```env
-AERIAL_NODEODM_URL=http://localhost:3001          # or wherever the container listens
+AERIAL_NODEODM_URL=http://localhost:3101          # NOTE: 3001 is typically taken by opengeo-martin on dev hosts
 AERIAL_NODEODM_MODE=real
-AERIAL_NODEODM_TOKEN=                              # optional, matches container config
+AERIAL_NODEODM_TOKEN=                              # empty — default container has no auth
 CRON_SECRET=<long-random>
+NEXT_PUBLIC_SUPABASE_URL=<existing>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<existing>
+SUPABASE_SERVICE_ROLE_KEY=<existing>
 ```
+
+### One-time dataset staging
+
+```bash
+git clone --depth 1 https://github.com/OpenDroneMap/odm_data_toledo \
+  ~/.openclaw/workspace/datasets/odm_data_toledo   # 87 JPGs, ~428 MB
+
+# Build a tractable 20-image subset (keeps the first round-trip laptop-friendly)
+rm -rf /tmp/toledo-20 && mkdir -p /tmp/toledo-20/images
+ls ~/.openclaw/workspace/datasets/odm_data_toledo/images/*.JPG | sort | head -20 \
+  | xargs -I{} cp {} /tmp/toledo-20/images/
+(cd /tmp/toledo-20 && zip -r ~/toledo-20.zip images)    # ~97 MB
+```
+
+### Container bring-up
+
+```bash
+docker pull opendronemap/nodeodm:latest
+# NOTE: on this dev host the Docker default bridge network is broken for host→container
+# traffic. Create a user-defined bridge and attach the container to it instead.
+docker network create aerial-nodeodm-net 2>/dev/null || true
+docker run -d --name aerial-nodeodm --network aerial-nodeodm-net \
+  -p 3101:3000 --memory 8g --cpus 4 opendronemap/nodeodm:latest
+curl -fsS http://localhost:3101/info | jq
+```
+
+Capture `docker inspect aerial-nodeodm` (abridged) + the image digest + the `/info` response to the evidence doc.
 
 ### Round-trip steps
 
-1. **Start container**: `docker run -d -p 3001:3000 opendronemap/nodeodm`.
-   Verify: `curl http://localhost:3001/info` returns JSON with `version`, `maxImages`, etc.
-2. **Start app**: `npm run dev` in `web/`.
-3. **Create mission** via UI, attach dataset.
-4. **Dispatch** with `dispatchMode: "nodeodm-direct"`, preset `balanced`.
-   Expected: `drone_processing_jobs` row gains `output_summary.nodeodm.taskUuid`.
-5. **Upload** images (per Gap 1 — route TBD).
-   Expected: task transitions from `10 (queued)` to `20 (running)` with increasing `progress`.
-6. **Watch** `/admin` → "NodeODM tasks in flight" panel. Status should advance from `queued` → `running` → `completed` over minutes (dataset-dependent).
-7. **Poll cron** runs every 5 min (see `vercel.json`) or hit manually:
-   `curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/internal/nodeodm-poll`
-8. On `completed`: job row flips to `awaiting_output_import` and emits `nodeodm.task.completed` event.
-9. **Import** outputs (downstream path — verify this lands in `drone_artifacts` or equivalent).
+1. **Start app**: `npm run dev` in `web/`.
+2. **Upload the ZIP** through the mission ingest UI → confirm `drone_ingest_sessions` row with `source_zip_path` populated.
+3. **Click "Extract dataset"** → confirm `extracted_dataset_path` populated and 20 images in the `drone-ops` Storage bucket under `${orgSlug}/missions/${missionId}/extracted/${sessionId}/`.
+4. **Dispatch** a job (UI or direct DB insert to `drone_processing_jobs` with `output_summary.dispatchMode="nodeodm-direct"` and preset `balanced`). Verify via `/admin` → "NodeODM tasks in flight" that `taskUuid` is recorded.
+5. **Trigger upload cron manually** (local dev, don't wait for Vercel schedule):
+   ```bash
+   curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/internal/nodeodm-upload
+   ```
+   Expect `uploadState: committed` after one tick (20 images < 50-batch cap).
+6. **Let NodeODM process.** Toledo-20 at balanced preset is typically 15–45 min on laptop-class hardware. Watch container logs: `docker logs -f aerial-nodeodm`.
+7. **Trigger poll cron** until completion:
+   ```bash
+   while true; do
+     curl -s -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/internal/nodeodm-poll | jq '.details[0]'
+     sleep 60
+   done
+   ```
+8. On `statusCode=40`: the real-bundle adapter fires (no `benchmark_summary.json` in a real ODM zip), the job flips to `succeeded`, and `/admin` shows imported outputs with `importedFromTaskUuid` + `benchmarkSummary.source=nodeodm-real-bundle`. Capture screenshot.
+9. **Verify UI**: navigate to the job detail page; confirm the benchmark summary renders with `orthophoto` and `dsm` marked present.
+
+If a real run lands in `awaiting_output_import` instead of `succeeded`, log `lastImportError` and iterate. Most likely cause: an ODM bundle path variant not in `inventoryNodeOdmBundle` (e.g., a nested or renamed `odm_georeferencing/`). Add the variant to the canonical-path arrays in `web/src/lib/nodeodm/real-output-adapter.ts`, regenerate the test fixture, ship a small follow-up.
 
 ### Evidence to capture
 
@@ -145,6 +174,8 @@ Save to `docs/ops/2026-MM-DD-phase-c-round-trip-evidence.md`:
 - `web/src/lib/dispatch-adapter-nodeodm.ts` — `launchNodeOdmTask`, `pollNodeOdmTask`
 - `web/src/app/api/internal/nodeodm-poll/route.ts` — poll cron
 - `web/src/app/admin/page.tsx` — "NodeODM tasks in flight" + "Stuck in-flight jobs" observability panels
+- `web/src/app/api/internal/nodeodm-upload/route.ts` — upload cron that streams extracted dataset to NodeODM and commits the task
+- `web/src/lib/nodeodm/real-output-adapter.ts` — real-bundle inventory + synthesized `ManagedImportSummary`
 - `docs/V1_SINGLE_HOST_ODM_SLICE.md` — architectural spec for the v1 integration
 - `docs/SAMPLE_DATASET_BENCHMARK_PROTOCOL.md` — dataset selection + benchmark expectations
 - `docs/ops/2026-04-16-phase-e-f-g-evidence.md` — prior ship evidence including stub + integration test
