@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -91,11 +92,23 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
     expect(tickFinal.status).toBe(200);
     const finalBody = await tickFinal.json();
     expect(finalBody.details[0].statusName).toBe("completed");
+    expect(finalBody.details[0].importedOutputs).toBe(4);
 
     const patches = updateProcessingJobMock.mock.calls.map((call) => call[1] as Record<string, unknown>);
-    const completedPatch = patches.find((p) => p.status === "awaiting_output_import");
-    expect(completedPatch).toBeDefined();
-    expect(completedPatch?.stage).toBe("awaiting-output-import");
+    const succeededPatch = patches.find((p) => p.status === "succeeded");
+    expect(succeededPatch).toBeDefined();
+    expect(succeededPatch?.stage).toBe("completed");
+    expect(succeededPatch?.completed_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+    const succeededSummary = (succeededPatch?.output_summary as Record<string, unknown>) ?? {};
+    const succeededNodeodm = (succeededSummary.nodeodm as Record<string, unknown>) ?? {};
+    expect(succeededNodeodm.importedFromTaskUuid).toBe(launch.taskUuid);
+    expect(Array.isArray(succeededNodeodm.outputs)).toBe(true);
+    expect((succeededNodeodm.outputs as Array<unknown>).length).toBe(4);
+    expect(succeededNodeodm.benchmarkSummary).toMatchObject({
+      status: "success",
+      requiredOutputsPresent: true,
+    });
 
     const completedEvents = insertJobEventMock.mock.calls
       .map((call) => call[0] as Record<string, unknown>)
@@ -106,6 +119,52 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
       org_id: "org-1",
       event_type: "nodeodm.task.completed",
     });
+
+    const importedEvents = insertJobEventMock.mock.calls
+      .map((call) => call[0] as Record<string, unknown>)
+      .filter((e) => e.event_type === "nodeodm.task.imported");
+    expect(importedEvents).toHaveLength(1);
+    expect((importedEvents[0].payload as Record<string, unknown>).outputCount).toBe(4);
+  });
+
+  it("falls back to awaiting_output_import when benchmark_summary.json is missing from the asset bundle", async () => {
+    const launch = await launchNodeOdmTask({ jobId: "job-2", presetId: "balanced" });
+    if (!launch.ok) throw new Error(`expected launch to succeed, got ${launch.kind}`);
+
+    adminSelectMock.mockResolvedValue([
+      {
+        id: "job-2",
+        org_id: "org-2",
+        status: "queued",
+        stage: "dispatched",
+        output_summary: { nodeodm: { taskUuid: launch.taskUuid } },
+      },
+    ]);
+
+    const stubClient = (await import("@/lib/nodeodm/stub")).getSharedStubNodeOdmClient();
+    const originalDownload = stubClient.downloadAllAssets.bind(stubClient);
+    vi.spyOn(stubClient, "downloadAllAssets").mockImplementation(async () => {
+      const { zipSync } = await import("fflate");
+      const emptyBundle = zipSync({ "notes.txt": new Uint8Array([1]) });
+      return new Response(new Blob([emptyBundle as BlobPart], { type: "application/zip" }), {
+        status: 200,
+        headers: { "content-type": "application/zip" },
+      });
+    });
+    stubClient.completeTask(launch.taskUuid);
+
+    try {
+      await GET(authorizedPollRequest());
+      const patches = updateProcessingJobMock.mock.calls.map((call) => call[1] as Record<string, unknown>);
+      const awaitingPatch = patches.find((p) => p.status === "awaiting_output_import");
+      expect(awaitingPatch).toBeDefined();
+      expect(awaitingPatch?.stage).toBe("awaiting-output-import");
+      const awaitingSummary = (awaitingPatch?.output_summary as Record<string, unknown>) ?? {};
+      const awaitingNodeodm = (awaitingSummary.nodeodm as Record<string, unknown>) ?? {};
+      expect(typeof awaitingNodeodm.lastImportError).toBe("string");
+    } finally {
+      vi.spyOn(stubClient, "downloadAllAssets").mockImplementation(originalDownload);
+    }
   });
 
   it("returns 401 without a valid bearer", async () => {

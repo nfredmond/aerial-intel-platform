@@ -1,8 +1,10 @@
+import { strFromU8, unzipSync } from "fflate";
 import { NextRequest, NextResponse } from "next/server";
 
 import { pollNodeOdmTask } from "@/lib/dispatch-adapter-nodeodm";
 import { createLogger, extractRequestId } from "@/lib/logging";
-import { getNodeOdmAdapterConfig } from "@/lib/nodeodm/config";
+import { parseManagedBenchmarkSummaryText } from "@/lib/managed-processing-import";
+import { createConfiguredNodeOdmClient, getNodeOdmAdapterConfig } from "@/lib/nodeodm/config";
 import { statusCodeName } from "@/lib/nodeodm/contracts";
 import { isNodeOdmError } from "@/lib/nodeodm/errors";
 import { adminSelect, insertJobEvent, updateProcessingJob } from "@/lib/supabase/admin";
@@ -55,6 +57,39 @@ async function fetchActiveNodeOdmJobs(): Promise<NodeOdmJobCursor[]> {
     .filter((cursor): cursor is NodeOdmJobCursor => cursor !== null);
 }
 
+async function importCompletedOutputs(cursor: NodeOdmJobCursor): Promise<{
+  summaryPatch: Record<string, unknown>;
+  outputCount: number;
+} | null> {
+  const client = createConfiguredNodeOdmClient();
+  if (!client) return null;
+
+  const response = await client.downloadAllAssets(cursor.taskUuid);
+  const arrayBuffer = await response.arrayBuffer();
+  const zipEntries = unzipSync(new Uint8Array(arrayBuffer));
+  const summaryBytes = zipEntries["benchmark_summary.json"];
+  if (!summaryBytes || summaryBytes.length === 0) {
+    throw new Error("benchmark_summary.json missing from NodeODM output bundle");
+  }
+
+  const parsed = parseManagedBenchmarkSummaryText(strFromU8(summaryBytes));
+
+  return {
+    outputCount: parsed.outputs.filter((output) => output.exists && output.nonZeroSize).length,
+    summaryPatch: {
+      benchmarkSummary: parsed as unknown as Json,
+      outputs: parsed.outputs as unknown as Json,
+      qaGate: {
+        requiredOutputsPresent: parsed.requiredOutputsPresent,
+        minimumPass: parsed.minimumPass,
+        missingRequiredOutputs: parsed.missingRequiredOutputs,
+      } as Json,
+      importedAt: new Date().toISOString(),
+      importedFromTaskUuid: cursor.taskUuid,
+    },
+  };
+}
+
 async function advanceJobFromTaskInfo(cursor: NodeOdmJobCursor) {
   const taskInfo = await pollNodeOdmTask(cursor.taskUuid);
   const statusName = statusCodeName(taskInfo.status?.code);
@@ -70,13 +105,50 @@ async function advanceJobFromTaskInfo(cursor: NodeOdmJobCursor) {
   };
 
   let patch: Record<string, unknown> = { output_summary: summary };
+  let importedOutputs: number | null = null;
 
   if (taskInfo.status?.code === 40) {
-    patch = {
-      ...patch,
-      status: "awaiting_output_import",
-      stage: "awaiting-output-import",
-    };
+    let importResult: Awaited<ReturnType<typeof importCompletedOutputs>> = null;
+    let importError: string | null = null;
+    try {
+      importResult = await importCompletedOutputs(cursor);
+    } catch (error) {
+      importError = error instanceof Error ? error.message : "unknown import error";
+    }
+
+    if (importResult) {
+      summary.nodeodm = {
+        ...(summary.nodeodm as Record<string, unknown>),
+        ...importResult.summaryPatch,
+      };
+      importedOutputs = importResult.outputCount;
+      patch = {
+        output_summary: summary,
+        status: "succeeded",
+        stage: "completed",
+        completed_at: new Date().toISOString(),
+      };
+      await insertJobEvent({
+        job_id: cursor.jobId,
+        org_id: cursor.orgId,
+        event_type: "nodeodm.task.imported",
+        payload: {
+          taskUuid: cursor.taskUuid,
+          outputCount: importResult.outputCount,
+        } as Json,
+      });
+    } else {
+      summary.nodeodm = {
+        ...(summary.nodeodm as Record<string, unknown>),
+        lastImportError: importError ?? "output import unavailable",
+      };
+      patch = {
+        output_summary: summary,
+        status: "awaiting_output_import",
+        stage: "awaiting-output-import",
+      };
+    }
+
     await insertJobEvent({
       job_id: cursor.jobId,
       org_id: cursor.orgId,
@@ -103,7 +175,7 @@ async function advanceJobFromTaskInfo(cursor: NodeOdmJobCursor) {
   }
 
   await updateProcessingJob(cursor.jobId, patch as Parameters<typeof updateProcessingJob>[1]);
-  return { jobId: cursor.jobId, statusName, progress: taskInfo.progress ?? null };
+  return { jobId: cursor.jobId, statusName, progress: taskInfo.progress ?? null, importedOutputs };
 }
 
 export async function GET(request: NextRequest) {
@@ -132,14 +204,19 @@ export async function GET(request: NextRequest) {
 
   try {
     const cursors = await fetchActiveNodeOdmJobs();
-    const processed: Array<{ jobId: string; statusName: string; progress: number | null }> = [];
+    const processed: Array<{ jobId: string; statusName: string; progress: number | null; importedOutputs: number | null }> = [];
     const failures: Array<{ jobId: string; error: string }> = [];
 
     for (const cursor of cursors) {
       try {
         const result = await advanceJobFromTaskInfo(cursor);
         processed.push(result);
-        log.info("job.advanced", { jobId: result.jobId, statusName: result.statusName, progress: result.progress });
+        log.info("job.advanced", {
+          jobId: result.jobId,
+          statusName: result.statusName,
+          progress: result.progress,
+          importedOutputs: result.importedOutputs,
+        });
       } catch (error) {
         if (isNodeOdmError(error)) {
           failures.push({ jobId: cursor.jobId, error: `${error.kind}: ${error.message}` });
