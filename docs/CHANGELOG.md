@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-04-18 — Phase C stub round-trip: extraction + auto-import
+
+Closes the last two gaps blocking an end-to-end stub-mode NodeODM round-trip. An audit of the freshly-shipped Gap 1 §3 upload cron surfaced a hard gap: `drone_ingest_sessions.extracted_dataset_path` had no writer anywhere in the codebase, which meant the upload cron would always hit `skipped:no-session` in practice. The second gap was that poll stopped at `awaiting_output_import` — the synthetic `benchmark_summary.json` built in Gap 3 was never consumed.
+
+- **Extraction.** New `web/src/lib/zip-extraction.ts` (`parseZipToImages`, `sanitizeStorageFilename`) — `fflate.unzipSync`, rejects `..` / `.` path traversal, flattens nested `images/foo.jpg` → `foo.jpg`, filters via `isImageFilename`, dedupes by basename, sorted output. 12 tests pin every rejection and acceptance rule.
+- **Storage helper.** `uploadStorageBytes({path, bytes, contentType?, upsert?})` added to `admin-storage.ts` (parallel to the existing `downloadStorageBytes` / `listStorageObjects`).
+- **Admin helper.** `updateIngestSession(id, patch)` + `IngestSessionPatch` type added to `admin.ts` (raw PostgREST URL pattern, matches `updateProcessingJob`).
+- **Server action + UI.** New `extractIngestSession` server action on `/missions/[missionId]` mirrors `finalizeBrowserZipUpload` auth guards. Downloads the ZIP, flattens images into `${orgSlug}/missions/${missionId}/extracted/${sessionId}/`, uploads 10 parallel per chunk, then writes `{extracted_dataset_path, image_count, status: "extracted"}` on the session. Explicit "Extract dataset" button on the ingest-session card, gated on `source_zip_path` present, no prior `extracted_dataset_path`, and `role !== viewer`. New `?extract=...` callout branch covers recorded / no-images / already-extracted / missing-zip / missing-session / malformed-zip-path / denied / failed.
+- **Auto-import.** `web/src/app/api/internal/nodeodm-poll/route.ts` extended: when a task hits `statusCode=40`, `downloadAllAssets` → `unzipSync` → pull `benchmark_summary.json` → `parseManagedBenchmarkSummaryText` → advance job to `status=succeeded / stage=completed` with `output_summary.nodeodm.{outputs, qaGate, benchmarkSummary, importedAt, importedFromTaskUuid}` populated. Emits `nodeodm.task.imported` alongside the existing `nodeodm.task.completed`. If the bundle lacks `benchmark_summary.json` or parse fails, falls back to `awaiting_output_import` with `lastImportError` — the cron keeps making forward progress on other cursors.
+- **Tests.** +12 extraction, +1 poll fallback, updated existing poll integration walk to assert `succeeded` end-state + `output_summary.nodeodm.outputs` length 4 + `importedFromTaskUuid` + `nodeodm.task.imported` event. Added `@vitest-environment node` to the poll suite (jsdom mishandles `fflate` unzipSync round-trip, same trap as `stub.test.ts`).
+- **Scope held.** Path-only import — output files stay referenced at their NodeODM asset paths for this slice; copy-to-storage is a follow-up for real-mode. No client-side extraction. No migration. No rework of `parseManagedBenchmarkSummaryText`. In-memory `unzipSync` caps ZIPs at ~500 MB — large-ZIP chunking is a follow-up.
+
+Test + lint posture: 49 files / 293 tests green (+13 new); tsc baseline unchanged.
+
 ## 2026-04-17 — Gap 1 §3: NodeODM upload + commit cron
 
 Closes §3 of `docs/ops/nodeodm-upload-gap-1-plan.md` — the upload-and-commit step that was blocking Phase C's real round-trip. `uploadImages` and `commitTask` have their first live callers. After this, `launchNodeOdmTask` → images → `commitTask` → poll → `awaiting_output_import` works end-to-end in stub mode, and is ready for a real dataset when the container is up.
