@@ -170,6 +170,61 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
     }
   });
 
+  it("auto-imports a real ODM bundle (no benchmark_summary.json) into a success state", async () => {
+    const launch = await launchNodeOdmTask({ jobId: "job-3", presetId: "balanced" });
+    if (!launch.ok) throw new Error(`expected launch to succeed, got ${launch.kind}`);
+
+    adminSelectMock.mockResolvedValue([
+      {
+        id: "job-3",
+        org_id: "org-3",
+        status: "queued",
+        stage: "dispatched",
+        output_summary: { nodeodm: { taskUuid: launch.taskUuid } },
+      },
+    ]);
+
+    const stubClient = (await import("@/lib/nodeodm/stub")).getSharedStubNodeOdmClient();
+    vi.spyOn(stubClient, "downloadAllAssets").mockImplementation(async () => {
+      const { zipSync } = await import("fflate");
+      const tiffMagic = new Uint8Array(32);
+      tiffMagic.set([0x49, 0x49, 0x2a, 0x00]);
+      const lasMagic = new Uint8Array(16);
+      lasMagic.set([0x4c, 0x41, 0x53, 0x46]);
+      const realBundle = zipSync({
+        "odm_orthophoto/odm_orthophoto.tif": tiffMagic,
+        "odm_dem/dsm.tif": tiffMagic,
+        "odm_georeferencing/odm_georeferenced_model.laz": lasMagic,
+        "logs/run.log": new Uint8Array([0x6f, 0x6b]),
+      });
+      return new Response(new Blob([realBundle as BlobPart], { type: "application/zip" }), {
+        status: 200,
+        headers: { "content-type": "application/zip" },
+      });
+    });
+    stubClient.completeTask(launch.taskUuid);
+
+    await GET(authorizedPollRequest());
+    const patches = updateProcessingJobMock.mock.calls.map((call) => call[1] as Record<string, unknown>);
+    const succeededPatch = patches.find((p) => p.status === "succeeded");
+    expect(succeededPatch).toBeDefined();
+    expect(succeededPatch?.stage).toBe("completed");
+
+    const succeededSummary = (succeededPatch?.output_summary as Record<string, unknown>) ?? {};
+    const benchmarkSummary = succeededSummary.benchmarkSummary as Record<string, unknown>;
+    expect(benchmarkSummary.source).toBe("nodeodm-real-bundle");
+    expect(benchmarkSummary.task_uuid).toBe(launch.taskUuid);
+    expect(benchmarkSummary.status).toBe("success");
+
+    const qaGate = benchmarkSummary.qa_gate as Record<string, unknown>;
+    expect(qaGate.required_outputs_present).toBe(true);
+
+    const outputs = benchmarkSummary.outputs as Record<string, Record<string, unknown>>;
+    expect(outputs.orthophoto.exists).toBe(true);
+    expect(outputs.orthophoto.non_zero_size).toBe(true);
+    expect(outputs.dem.exists).toBe(true);
+  });
+
   it("returns 401 without a valid bearer", async () => {
     const response = await GET(
       new NextRequest("https://example.com/api/internal/nodeodm-poll", {

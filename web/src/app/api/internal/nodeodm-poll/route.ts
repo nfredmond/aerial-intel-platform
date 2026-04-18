@@ -7,6 +7,10 @@ import { parseManagedBenchmarkSummaryText } from "@/lib/managed-processing-impor
 import { createConfiguredNodeOdmClient, getNodeOdmAdapterConfig } from "@/lib/nodeodm/config";
 import { statusCodeName } from "@/lib/nodeodm/contracts";
 import { isNodeOdmError } from "@/lib/nodeodm/errors";
+import {
+  inventoryNodeOdmBundle,
+  synthesizeBenchmarkSummary,
+} from "@/lib/nodeodm/real-output-adapter";
 import { adminSelect, insertJobEvent, updateProcessingJob } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/supabase/types";
 
@@ -68,20 +72,38 @@ async function importCompletedOutputs(cursor: NodeOdmJobCursor): Promise<{
   const response = await client.downloadAllAssets(cursor.taskUuid);
   const arrayBuffer = await response.arrayBuffer();
   const zipEntries = unzipSync(new Uint8Array(arrayBuffer));
-  const summaryBytes = zipEntries["benchmark_summary.json"];
-  if (!summaryBytes || summaryBytes.length === 0) {
-    throw new Error("benchmark_summary.json missing from NodeODM output bundle");
-  }
-
-  const parsed = parseManagedBenchmarkSummaryText(strFromU8(summaryBytes));
   const importedAt = new Date().toISOString();
 
-  const presentCount = parsed.outputs.filter((o) => o.exists && o.nonZeroSize).length;
+  const summaryBytes = zipEntries["benchmark_summary.json"];
+  let parsedRaw: Record<string, unknown>;
+  let presentCount: number;
+
+  if (summaryBytes && summaryBytes.length > 0) {
+    const parsed = parseManagedBenchmarkSummaryText(strFromU8(summaryBytes));
+    parsedRaw = parsed.raw;
+    presentCount = parsed.outputs.filter((o) => o.exists && o.nonZeroSize).length;
+  } else {
+    const inventory = inventoryNodeOdmBundle(zipEntries);
+    if (
+      !inventory.orthophoto &&
+      !inventory.dsm &&
+      !inventory.dtm &&
+      !inventory.pointCloud &&
+      !inventory.mesh
+    ) {
+      throw new Error(
+        "NodeODM output bundle missing both benchmark_summary.json and recognized ODM output files",
+      );
+    }
+    parsedRaw = synthesizeBenchmarkSummary(inventory, { taskUuid: cursor.taskUuid, importedAt });
+    const reparsed = parseManagedBenchmarkSummaryText(JSON.stringify(parsedRaw));
+    presentCount = reparsed.outputs.filter((o) => o.exists && o.nonZeroSize).length;
+  }
 
   return {
     outputCount: presentCount,
     topLevelPatch: {
-      benchmarkSummary: parsed.raw as unknown as Json,
+      benchmarkSummary: parsedRaw as unknown as Json,
     },
     nodeodmPatch: {
       importedAt,
