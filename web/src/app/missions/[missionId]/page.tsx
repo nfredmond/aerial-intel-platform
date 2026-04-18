@@ -78,10 +78,16 @@ import {
   insertJobEvent,
   insertProcessingJob,
   insertProcessingOutputs,
+  updateIngestSession,
   updateMission,
   updateMissionVersion,
 } from "@/lib/supabase/admin";
-import { createDroneOpsSignedUploadTicket } from "@/lib/supabase/admin-storage";
+import {
+  createDroneOpsSignedUploadTicket,
+  downloadStorageBytes,
+  uploadStorageBytes,
+} from "@/lib/supabase/admin-storage";
+import { parseZipToImages } from "@/lib/zip-extraction";
 import type { Json } from "@/lib/supabase/types";
 
 function getJobPillClassName(status: string) {
@@ -194,6 +200,7 @@ function getCalloutMessage(options: {
   aoi?: string;
   overlay?: string;
   created?: string;
+  extract?: string;
 }) {
   if (options.created === "1") {
     return "Mission draft created. Next: attach a dataset, then queue a processing job to produce reviewable artifacts.";
@@ -317,6 +324,29 @@ function getCalloutMessage(options: {
         : "Overlay review could not be updated. Check server configuration and try again.";
   }
 
+  if (options.extract) {
+    switch (options.extract) {
+      case "recorded":
+        return "Dataset extracted. Images are now in protected storage at the ingest session's extracted path, and the NodeODM upload cron can find them.";
+      case "no-images":
+        return "The ZIP did not contain any recognizable images (.jpg, .jpeg, .png, .tif, .tiff). No extracted dataset path was recorded.";
+      case "already-extracted":
+        return "This ingest session already has an extracted dataset path. No re-extraction was attempted.";
+      case "missing-zip":
+        return "This ingest session has no source ZIP path recorded, so there is nothing to extract.";
+      case "missing-session":
+        return "The extraction target ingest session could not be resolved for this mission.";
+      case "missing-mission":
+        return "Mission context could not be refreshed while attempting extraction.";
+      case "malformed-zip-path":
+        return "The recorded source ZIP path was missing a bucket or object key prefix.";
+      case "denied":
+        return "Viewer access cannot extract ingest sessions.";
+      default:
+        return "Dataset extraction could not complete. Check server logs and try again.";
+    }
+  }
+
   return null;
 }
 
@@ -325,7 +355,7 @@ export default async function MissionDetailPage({
   searchParams,
 }: {
   params: Promise<{ missionId: string }>;
-  searchParams: Promise<{ queued?: string; attached?: string; ingest?: string; seeded?: string; proving?: string; bundled?: string; approved?: string; installed?: string; delivered?: string; aoi?: string; overlay?: string; created?: string; dataset?: string }>;
+  searchParams: Promise<{ queued?: string; attached?: string; ingest?: string; seeded?: string; proving?: string; bundled?: string; approved?: string; installed?: string; delivered?: string; aoi?: string; overlay?: string; created?: string; dataset?: string; extract?: string }>;
 }) {
   const access = await getDroneOpsAccess();
 
@@ -733,6 +763,108 @@ export default async function MissionDetailPage({
     }
 
     return { ok: true as const, redirectTo: `/missions/${missionId}?ingest=browser-uploaded` };
+  }
+
+  async function extractIngestSession(formData: FormData) {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) {
+      redirect("/sign-in");
+    }
+
+    if (
+      !refreshedAccess.org?.id ||
+      !refreshedAccess.org.slug ||
+      !refreshedAccess.hasMembership ||
+      !refreshedAccess.hasActiveEntitlement
+    ) {
+      redirect(`/missions/${missionId}?extract=denied`);
+    }
+
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/missions/${missionId}?extract=denied`);
+    }
+
+    const sessionIdValue = formData.get("sessionId");
+    const sessionId = typeof sessionIdValue === "string" ? sessionIdValue.trim() : "";
+    if (!sessionId) {
+      redirect(`/missions/${missionId}?extract=missing-session`);
+    }
+
+    const refreshedDetail = await getMissionDetail(refreshedAccess, missionId);
+    if (!refreshedDetail) {
+      redirect(`/missions/${missionId}?extract=missing-mission`);
+    }
+
+    const session = refreshedDetail.ingestSessions.find((item) => item.id === sessionId);
+    if (!session) {
+      redirect(`/missions/${missionId}?extract=missing-session`);
+    }
+
+    if (!session.source_zip_path) {
+      redirect(`/missions/${missionId}?extract=missing-zip`);
+    }
+
+    if (session.extracted_dataset_path) {
+      redirect(`/missions/${missionId}?extract=already-extracted`);
+    }
+
+    const [rawBucket, ...rawParts] = session.source_zip_path.split("/");
+    const sourceBucket = rawBucket?.trim() || "";
+    const sourcePath = rawParts.join("/").trim();
+    if (!sourceBucket || !sourcePath) {
+      redirect(`/missions/${missionId}?extract=malformed-zip-path`);
+    }
+
+    let outcome: "recorded" | "no-images" | "failed" = "failed";
+
+    try {
+      const blob = await downloadStorageBytes({ bucket: sourceBucket, path: sourcePath });
+      const arrayBuffer = await blob.arrayBuffer();
+      const zipBytes = new Uint8Array(arrayBuffer);
+      const images = parseZipToImages(zipBytes);
+
+      if (images.length === 0) {
+        outcome = "no-images";
+      } else {
+        const destPath = `${refreshedAccess.org.slug}/missions/${missionId}/extracted/${sessionId}`;
+        const chunkSize = 10;
+        for (let i = 0; i < images.length; i += chunkSize) {
+          const chunk = images.slice(i, i + chunkSize);
+          await Promise.all(
+            chunk.map((image) =>
+              uploadStorageBytes({
+                path: `${destPath}/${image.name}`,
+                bytes: image.bytes,
+                upsert: true,
+              }),
+            ),
+          );
+        }
+
+        await updateIngestSession(sessionId, {
+          extracted_dataset_path: destPath,
+          image_count: images.length,
+          status: "extracted",
+        });
+
+        console.info("ingest.session.extracted", {
+          sessionId,
+          missionId,
+          imageCount: images.length,
+          extractedDatasetPath: destPath,
+        });
+
+        outcome = "recorded";
+      }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "unknown error";
+      console.error("extractIngestSession failed", { sessionId, missionId, error: detail });
+      outcome = "failed";
+    }
+
+    redirect(`/missions/${missionId}?extract=${outcome}`);
   }
 
   async function queueMissionProcessing() {
@@ -1610,7 +1742,8 @@ export default async function MissionDetailPage({
     ?? resolvedSearchParams.installed
     ?? resolvedSearchParams.delivered
     ?? resolvedSearchParams.aoi
-    ?? resolvedSearchParams.overlay;
+    ?? resolvedSearchParams.overlay
+    ?? resolvedSearchParams.extract;
 
   return (
     <main className="app-shell stack-md">
@@ -2139,6 +2272,18 @@ export default async function MissionDetailPage({
                   <a href={ingestDownloadUrls.get(session.id) ?? undefined} className="button button-secondary" target="_blank" rel="noreferrer">
                     Download review bundle
                   </a>
+                ) : null}
+                {session.source_zip_path && !session.extracted_dataset_path && access.role !== "viewer" ? (
+                  <form action={extractIngestSession} className="stack-xs">
+                    <input type="hidden" name="sessionId" value={session.id} />
+                    <button type="submit" className="button button-secondary">
+                      Extract dataset
+                    </button>
+                    <p className="muted">Downloads the ZIP, flattens images into storage, and records an extracted dataset path the NodeODM upload cron can find.</p>
+                  </form>
+                ) : null}
+                {session.extracted_dataset_path ? (
+                  <p className="muted"><strong>Extracted path:</strong> {session.extracted_dataset_path}</p>
                 ) : null}
                 {session.notes ? <p className="muted"><strong>Notes:</strong> {session.notes}</p> : null}
               </article>

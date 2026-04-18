@@ -126,6 +126,21 @@ export type IngestSessionInsert = {
   created_by?: string | null;
 };
 
+export type IngestSessionPatch = {
+  status?: string;
+  source_zip_path?: string | null;
+  extracted_dataset_path?: string | null;
+  benchmark_summary_path?: string | null;
+  run_log_path?: string | null;
+  review_bundle_zip_path?: string | null;
+  image_count?: number | null;
+  file_size_bytes?: number | null;
+  review_bundle_ready?: boolean;
+  truthful_pass?: boolean | null;
+  metadata?: Json;
+  notes?: string | null;
+};
+
 export type ProcessingJobInsert = {
   org_id: string;
   project_id: string;
@@ -283,6 +298,18 @@ export async function insertIngestSession(input: IngestSessionInsert) {
     {
       method: "POST",
       body: JSON.stringify(input),
+    },
+  );
+
+  return rows[0] ?? null;
+}
+
+export async function updateIngestSession(id: string, patch: IngestSessionPatch) {
+  const rows = await adminRestRequest<Array<{ id: string }>>(
+    `drone_ingest_sessions?id=eq.${encodeURIComponent(id)}&select=id`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(patch),
     },
   );
 

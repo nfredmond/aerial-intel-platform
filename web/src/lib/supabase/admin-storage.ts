@@ -86,6 +86,32 @@ export async function downloadStorageText(input: {
   return result.data.text();
 }
 
+export async function uploadStorageBytes(input: {
+  bucket?: string;
+  path: string;
+  bytes: Uint8Array | Blob;
+  contentType?: string;
+  upsert?: boolean;
+}): Promise<{ path: string }> {
+  const bucket = input.bucket?.trim() || DRONE_OPS_STORAGE_BUCKET;
+  const supabase = getSupabaseAdminStorageClient();
+  const body = input.bytes instanceof Blob
+    ? input.bytes
+    : new Blob([input.bytes as BlobPart], { type: input.contentType ?? "application/octet-stream" });
+  const result = await supabase.storage
+    .from(bucket)
+    .upload(input.path, body, {
+      contentType: input.contentType,
+      upsert: input.upsert ?? true,
+    });
+
+  if (result.error || !result.data) {
+    throw new Error(result.error?.message ?? "Could not upload the storage object.");
+  }
+
+  return { path: result.data.path };
+}
+
 export async function downloadStorageBytes(input: {
   bucket?: string;
   path: string;
