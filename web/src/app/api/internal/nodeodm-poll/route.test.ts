@@ -104,15 +104,14 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
     const succeededNodeodm = (succeededSummary.nodeodm as Record<string, unknown>) ?? {};
     expect(succeededNodeodm.importedFromTaskUuid).toBe(launch.taskUuid);
     expect(succeededNodeodm.importedOutputCount).toBe(4);
-    expect(Array.isArray(succeededSummary.outputs)).toBe(true);
-    expect((succeededSummary.outputs as Array<unknown>).length).toBe(4);
-    expect(succeededSummary.benchmarkSummary).toMatchObject({
+    const benchmarkSummary = succeededSummary.benchmarkSummary as Record<string, unknown>;
+    expect(benchmarkSummary).toMatchObject({
       status: "success",
+      project_name: expect.any(String),
+      timestamp_utc: expect.any(String),
     });
-    expect(succeededSummary.qaGate).toMatchObject({
-      requiredOutputsPresent: true,
-      minimumPass: true,
-    });
+    expect((benchmarkSummary.qa_gate as Record<string, unknown>).required_outputs_present).toBe(true);
+    expect(benchmarkSummary.outputs).toBeTruthy();
 
     const completedEvents = insertJobEventMock.mock.calls
       .map((call) => call[0] as Record<string, unknown>)

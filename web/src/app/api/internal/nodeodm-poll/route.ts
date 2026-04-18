@@ -76,21 +76,17 @@ async function importCompletedOutputs(cursor: NodeOdmJobCursor): Promise<{
   const parsed = parseManagedBenchmarkSummaryText(strFromU8(summaryBytes));
   const importedAt = new Date().toISOString();
 
+  const presentCount = parsed.outputs.filter((o) => o.exists && o.nonZeroSize).length;
+
   return {
-    outputCount: parsed.outputs.filter((output) => output.exists && output.nonZeroSize).length,
+    outputCount: presentCount,
     topLevelPatch: {
       benchmarkSummary: parsed.raw as unknown as Json,
-      outputs: parsed.outputs as unknown as Json,
-      qaGate: {
-        requiredOutputsPresent: parsed.requiredOutputsPresent,
-        minimumPass: parsed.minimumPass,
-        missingRequiredOutputs: parsed.missingRequiredOutputs,
-      } as Json,
     },
     nodeodmPatch: {
       importedAt,
       importedFromTaskUuid: cursor.taskUuid,
-      importedOutputCount: parsed.outputs.filter((o) => o.exists && o.nonZeroSize).length,
+      importedOutputCount: presentCount,
     },
   };
 }
