@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-04-18 — ODM benchmark pipeline hardening (PR #7 → main)
+
+Landed the deterministic benchmark-pipeline-hardening work from PR #7 (open 50+ days, base diverged by 176 commits so a clean merge was not possible). Cherry-picked `scripts/run_odm_benchmark.sh` + the dated progress note; the stale PR-side doc updates (README / LAUNCH_STATUS_REPORT / SAMPLE_DATASET_BENCHMARK_PROTOCOL) were not carried forward because their base state moved significantly after the PR was opened.
+
+- **Hardened `scripts/run_odm_benchmark.sh`:** `--preflight-only` mode; dataset-contract validation (`images/` + supported extensions); Docker daemon reachability check; disk-headroom gate (`MIN_FREE_GB`, default 40GB); pinned `opendronemap/odm:3.5.5`; deterministic argument mode (`ODM_EXTRA_ARGS`) with explicit legacy override (`ODM_ARGS`); richer artifacts (`preflight.txt`, `output_inventory.tsv`, expanded `summary.json`).
+- **Review-applied fixes on top of the PR version:**
+  - Portable file-size wrapper (`file_size()` — prefers GNU `stat -c%s`, falls back to BSD/macOS `stat -f%z`); replaces the two hard-coded GNU-only `stat -c%s` calls in the output inventory.
+  - Failed preflight writes a `preflight.txt` artifact with `preflight_status=failed` + `failure_reason=…` (dataset missing, images folder missing, images empty, docker unreachable, disk short) — operators no longer have to re-derive why a preflight bailed.
+  - Mount-scope comment above the `docker run -v "${DATASET_PARENT}:/datasets"` line — documents that anything under `DATASET_PARENT` is visible to the container and warns against pointing `DATASET_ROOT` at `$HOME` or similarly broad paths.
+  - Usage note that `ODM_ARGS` and `ODM_EXTRA_ARGS` are whitespace-split (no shell quoting support) — caught during review because the PR's deterministic mode silently word-splits these envs.
+- **Progress note.** `docs/2026-02-25-benchmark-pipeline-hardening.md` — dated operator-facing writeup of the increment, kept at the PR's original authoring date.
+- **PR #7 closed** with a pointer to this commit. No follow-up hardening rolled into this slice — sample dataset is still the blocker for actual benchmark evidence.
+
 ## 2026-04-18 — Phase C stub round-trip: extraction + auto-import
 
 Closes the last two gaps blocking an end-to-end stub-mode NodeODM round-trip. An audit of the freshly-shipped Gap 1 §3 upload cron surfaced a hard gap: `drone_ingest_sessions.extracted_dataset_path` had no writer anywhere in the codebase, which meant the upload cron would always hit `skipped:no-session` in practice. The second gap was that poll stopped at `awaiting_output_import` — the synthetic `benchmark_summary.json` built in Gap 3 was never consumed.
