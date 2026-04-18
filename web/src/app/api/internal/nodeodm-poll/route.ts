@@ -58,7 +58,8 @@ async function fetchActiveNodeOdmJobs(): Promise<NodeOdmJobCursor[]> {
 }
 
 async function importCompletedOutputs(cursor: NodeOdmJobCursor): Promise<{
-  summaryPatch: Record<string, unknown>;
+  topLevelPatch: Record<string, unknown>;
+  nodeodmPatch: Record<string, unknown>;
   outputCount: number;
 } | null> {
   const client = createConfiguredNodeOdmClient();
@@ -73,19 +74,23 @@ async function importCompletedOutputs(cursor: NodeOdmJobCursor): Promise<{
   }
 
   const parsed = parseManagedBenchmarkSummaryText(strFromU8(summaryBytes));
+  const importedAt = new Date().toISOString();
 
   return {
     outputCount: parsed.outputs.filter((output) => output.exists && output.nonZeroSize).length,
-    summaryPatch: {
-      benchmarkSummary: parsed as unknown as Json,
+    topLevelPatch: {
+      benchmarkSummary: parsed.raw as unknown as Json,
       outputs: parsed.outputs as unknown as Json,
       qaGate: {
         requiredOutputsPresent: parsed.requiredOutputsPresent,
         minimumPass: parsed.minimumPass,
         missingRequiredOutputs: parsed.missingRequiredOutputs,
       } as Json,
-      importedAt: new Date().toISOString(),
+    },
+    nodeodmPatch: {
+      importedAt,
       importedFromTaskUuid: cursor.taskUuid,
+      importedOutputCount: parsed.outputs.filter((o) => o.exists && o.nonZeroSize).length,
     },
   };
 }
@@ -119,8 +124,9 @@ async function advanceJobFromTaskInfo(cursor: NodeOdmJobCursor) {
     if (importResult) {
       summary.nodeodm = {
         ...(summary.nodeodm as Record<string, unknown>),
-        ...importResult.summaryPatch,
+        ...importResult.nodeodmPatch,
       };
+      Object.assign(summary, importResult.topLevelPatch);
       importedOutputs = importResult.outputCount;
       patch = {
         output_summary: summary,
