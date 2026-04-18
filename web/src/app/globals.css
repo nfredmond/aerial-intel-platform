@@ -1426,3 +1426,12 @@ main {
   text-decoration: underline;
   text-decoration-color: rgba(148, 163, 184, 0.5);
 }
+
+.admin-table__error {
+  max-width: 18rem;
+  font-size: 0.8rem;
+  color: rgba(248, 113, 113, 0.9);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

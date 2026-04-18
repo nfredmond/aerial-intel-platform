@@ -270,6 +270,7 @@ function NodeOdmJobsPanel({ rows }: { rows: NodeOdmJobAdminRow[] }) {
             <th>Progress</th>
             <th>Mission</th>
             <th>Last polled</th>
+            <th>Last error</th>
           </tr>
         </thead>
         <tbody>
@@ -284,6 +285,11 @@ function NodeOdmJobsPanel({ rows }: { rows: NodeOdmJobAdminRow[] }) {
             const progressValue = typeof nodeodm.progress === "number" ? nodeodm.progress : null;
             const lastPolledAt =
               typeof nodeodm.lastPolledAt === "string" ? nodeodm.lastPolledAt : null;
+            const lastError =
+              (typeof nodeodm.lastImportError === "string" && nodeodm.lastImportError) ||
+              (typeof nodeodm.lastUploadError === "string" && nodeodm.lastUploadError) ||
+              (typeof nodeodm.lastLaunchError === "string" && nodeodm.lastLaunchError) ||
+              null;
             return (
               <tr key={row.id}>
                 <td>
@@ -300,6 +306,9 @@ function NodeOdmJobsPanel({ rows }: { rows: NodeOdmJobAdminRow[] }) {
                   {row.mission_id ? `${row.mission_id.slice(0, 8)}…` : "—"}
                 </td>
                 <td>{lastPolledAt ? formatDateTime(lastPolledAt) : "—"}</td>
+                <td className="admin-table__error" title={lastError ?? undefined}>
+                  {lastError ?? "—"}
+                </td>
               </tr>
             );
           })}
