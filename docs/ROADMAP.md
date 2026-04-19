@@ -6,7 +6,7 @@
 - Phase 1 mission-control shell — **complete**, now decomposed around shared UI primitives.
 - Phase 2 ingest / preflight / processing — **largely complete**; NodeODM-direct dispatch added this pass alongside the existing webhook adapter.
 - Phase 3 viewing / delivery / collaboration — **near-complete (delivery pillar honest)**: MapLibre-backed planning + coverage maps shipped; install-bundle export shipped; mission-version snapshot + promote shipped; side-by-side version diff shipped; signed-share artifact links shipped (`/s/[token]`); read-only admin console shipped (`/admin`); Playwright public-showcase smoke shipped; copy-to-storage for real NodeODM outputs shipped (W1-A); artifact comments + approvals shipped (W1-C); TiTiler-backed raster viewer shipped (W1-B — wired, awaits TiTiler sidecar on dev host for exit-gate evidence). Admin write actions (invite/pause) still deferred.
-- Phase 4 AI / domain modules — **not started**.
+- Phase 4 AI / domain modules — **in progress (Wave 2 copilot landing)**: Aerial Copilot framework + mission-brief (W2-C1) + processing-QA (W2-C2) shipped, default-off per org, grounded via citation-gated output; C-3 data-cleaning scout still pending; live staging verification still pending (`ANTHROPIC_API_KEY` + org `copilot_enabled` flip).
 - Phase 5 enterprise / ecosystem — **not started**.
 
 ## Phase 0 — Foundations and architecture spikes
@@ -58,11 +58,12 @@ Goal: provide WebODM-grade output review with stronger delivery UX.
 - Playwright E2E scaffold (shipped with public-showcase smoke; auth-gated flow deferred)
 
 ## Phase 4 — AI and domain modules
-Goal: add high-leverage assistance, not gimmicks.
+Goal: add high-leverage assistance, not gimmicks. Narrow grounded skills, citation-gated output, no autonomous write actions (see `docs/ADR/ADR-002-aerial-copilot-architecture.md` and `docs/AI_DISCLOSURE.md`).
 
 ### In scope
-- mission setup assistant
-- preflight / processing QA assistant
+- mission-brief generator (shipped — W2-C1 — on `/missions/[missionId]`)
+- preflight / processing QA assistant (shipped — W2-C2 — on `/jobs/[jobId]` when the job is actually diagnosable)
+- data-cleaning scout for dataset extraction (deferred — W2-C3 — not yet started; deterministic EXIF/blur classification with LLM used only for human-readable explanation)
 - docs search / support assistant
 - report summary generation
 - change-intelligence and agronomy modules later
