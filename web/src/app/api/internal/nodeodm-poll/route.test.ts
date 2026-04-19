@@ -11,24 +11,37 @@ const {
   adminSelectMock,
   updateProcessingJobMock,
   insertJobEventMock,
+  insertProcessingOutputsMock,
+  uploadStorageBytesMock,
 } = vi.hoisted(() => ({
   adminSelectMock: vi.fn(),
   updateProcessingJobMock: vi.fn(),
   insertJobEventMock: vi.fn(),
+  insertProcessingOutputsMock: vi.fn(),
+  uploadStorageBytesMock: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/admin", () => ({
   adminSelect: adminSelectMock,
   updateProcessingJob: updateProcessingJobMock,
   insertJobEvent: insertJobEventMock,
+  insertProcessingOutputs: insertProcessingOutputsMock,
+}));
+
+vi.mock("@/lib/supabase/admin-storage", () => ({
+  uploadStorageBytes: uploadStorageBytesMock,
 }));
 
 beforeEach(() => {
   adminSelectMock.mockReset();
   updateProcessingJobMock.mockReset();
   insertJobEventMock.mockReset();
+  insertProcessingOutputsMock.mockReset();
+  uploadStorageBytesMock.mockReset();
   updateProcessingJobMock.mockResolvedValue(undefined);
   insertJobEventMock.mockResolvedValue(undefined);
+  insertProcessingOutputsMock.mockResolvedValue([]);
+  uploadStorageBytesMock.mockImplementation(async ({ path }: { path: string }) => ({ path }));
   vi.stubEnv("AERIAL_NODEODM_MODE", "stub");
   vi.stubEnv("NODE_ENV", "test");
   vi.stubEnv("CRON_SECRET", "integration-secret");
@@ -54,9 +67,12 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
       {
         id: "job-1",
         org_id: "org-1",
+        mission_id: "mission-1",
+        dataset_id: "dataset-1",
         status: "queued",
         stage: "dispatched",
         output_summary: { nodeodm: { taskUuid: launch.taskUuid } },
+        org: { slug: "gv-ops" },
       },
     ]);
 
@@ -138,9 +154,12 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
       {
         id: "job-2",
         org_id: "org-2",
+        mission_id: null,
+        dataset_id: null,
         status: "queued",
         stage: "dispatched",
         output_summary: { nodeodm: { taskUuid: launch.taskUuid } },
+        org: { slug: "gv-ops" },
       },
     ]);
 
@@ -178,9 +197,12 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
       {
         id: "job-3",
         org_id: "org-3",
+        mission_id: "mission-3",
+        dataset_id: "dataset-3",
         status: "queued",
         stage: "dispatched",
         output_summary: { nodeodm: { taskUuid: launch.taskUuid } },
+        org: { slug: "tribal-lands" },
       },
     ]);
 
@@ -223,6 +245,36 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
     expect(outputs.orthophoto.exists).toBe(true);
     expect(outputs.orthophoto.non_zero_size).toBe(true);
     expect(outputs.dem.exists).toBe(true);
+
+    const uploadedPaths = uploadStorageBytesMock.mock.calls
+      .map((call) => (call[0] as { path: string }).path)
+      .sort();
+    expect(uploadedPaths).toEqual([
+      "tribal-lands/jobs/job-3/outputs/dsm/dsm.tif",
+      "tribal-lands/jobs/job-3/outputs/orthomosaic/odm_orthophoto.tif",
+      "tribal-lands/jobs/job-3/outputs/point_cloud/odm_georeferenced_model.laz",
+    ]);
+    expect(outputs.orthophoto.storage_bucket).toBe("drone-ops");
+    expect(outputs.orthophoto.storage_path).toBe(
+      "tribal-lands/jobs/job-3/outputs/orthomosaic/odm_orthophoto.tif",
+    );
+
+    expect(insertProcessingOutputsMock).toHaveBeenCalledTimes(1);
+    const insertedRows = insertProcessingOutputsMock.mock.calls[0][0] as Array<Record<string, unknown>>;
+    const kinds = insertedRows.map((row) => row.kind).sort();
+    expect(kinds).toEqual(["dsm", "orthomosaic", "point_cloud"]);
+    for (const row of insertedRows) {
+      expect(row.org_id).toBe("org-3");
+      expect(row.job_id).toBe("job-3");
+      expect(row.mission_id).toBe("mission-3");
+      expect(row.dataset_id).toBe("dataset-3");
+      expect(row.status).toBe("ready");
+      expect(row.storage_bucket).toBe("drone-ops");
+    }
+
+    const succeededNodeodm = (succeededSummary.nodeodm as Record<string, unknown>) ?? {};
+    expect(succeededNodeodm.copiedToStorageCount).toBe(3);
+    expect(succeededNodeodm.storageBucket).toBe("drone-ops");
   });
 
   it("returns 401 without a valid bearer", async () => {
