@@ -44,12 +44,6 @@ export function buildTitilerTileUrl(options: TitilerTileUrlOptions): string {
   return `${base}/cog/tiles/${tms}/{z}/{x}/{y}.${format}?${params.toString()}`;
 }
 
-export function buildTitilerBoundsUrl(options: TitilerInfoUrlOptions): string {
-  const base = requireBaseUrl(options.baseUrl);
-  const params = new URLSearchParams({ url: options.cogUrl });
-  return `${base}/cog/bounds?${params.toString()}`;
-}
-
 export function buildTitilerInfoUrl(options: TitilerInfoUrlOptions): string {
   const base = requireBaseUrl(options.baseUrl);
   const params = new URLSearchParams({ url: options.cogUrl });
@@ -75,25 +69,25 @@ export function buildTitilerTileJsonUrl(
   return `${base}/cog/${tms}/tilejson.json?${params.toString()}`;
 }
 
-export type TitilerBounds = {
+export type TitilerInfoResponse = {
   bounds: [number, number, number, number];
   crs?: string;
 };
 
-export async function fetchTitilerBounds(
+export async function fetchTitilerInfo(
   options: TitilerInfoUrlOptions & { fetchImpl?: typeof fetch },
-): Promise<TitilerBounds> {
-  const url = buildTitilerBoundsUrl(options);
+): Promise<TitilerInfoResponse> {
+  const url = buildTitilerInfoUrl(options);
   const fetchImpl = options.fetchImpl ?? fetch;
   const response = await fetchImpl(url, { cache: "no-store" });
   if (!response.ok) {
     throw new Error(
-      `TiTiler bounds request failed: ${response.status} ${response.statusText}`,
+      `TiTiler info request failed: ${response.status} ${response.statusText}`,
     );
   }
-  const payload = (await response.json()) as TitilerBounds;
+  const payload = (await response.json()) as TitilerInfoResponse;
   if (!Array.isArray(payload.bounds) || payload.bounds.length !== 4) {
-    throw new Error("TiTiler bounds response missing bounds array");
+    throw new Error("TiTiler info response missing bounds array");
   }
   return payload;
 }

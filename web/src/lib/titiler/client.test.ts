@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  buildTitilerBoundsUrl,
   buildTitilerInfoUrl,
   buildTitilerTileJsonUrl,
   buildTitilerTileUrl,
-  fetchTitilerBounds,
+  fetchTitilerInfo,
 } from "./client";
 
 const ORIGINAL_TITILER_URL = process.env.AERIAL_TITILER_URL;
@@ -51,16 +50,8 @@ describe("buildTitilerTileUrl", () => {
   });
 });
 
-describe("buildTitilerBoundsUrl and buildTitilerInfoUrl", () => {
-  it("encodes the COG URL as a query parameter", () => {
-    const boundsUrl = buildTitilerBoundsUrl({
-      baseUrl: "https://tiles.example.com",
-      cogUrl: "https://bucket.example.com/ortho.tif",
-    });
-    expect(boundsUrl).toBe(
-      "https://tiles.example.com/cog/bounds?url=https%3A%2F%2Fbucket.example.com%2Fortho.tif",
-    );
-
+describe("buildTitilerInfoUrl", () => {
+  it("encodes the COG URL as a query parameter on /cog/info", () => {
     const infoUrl = buildTitilerInfoUrl({
       baseUrl: "https://tiles.example.com",
       cogUrl: "https://bucket.example.com/ortho.tif",
@@ -86,7 +77,7 @@ describe("buildTitilerTileJsonUrl", () => {
   });
 });
 
-describe("fetchTitilerBounds", () => {
+describe("fetchTitilerInfo", () => {
   it("returns parsed bounds when request succeeds", async () => {
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: true,
@@ -95,7 +86,7 @@ describe("fetchTitilerBounds", () => {
       json: async () => ({ bounds: [-123, 39, -121, 40], crs: "EPSG:4326" }),
     } as unknown as Response);
 
-    const result = await fetchTitilerBounds({
+    const result = await fetchTitilerInfo({
       baseUrl: "https://tiles.example.com",
       cogUrl: "https://bucket.example.com/ortho.tif",
       fetchImpl: fetchImpl as unknown as typeof fetch,
@@ -103,7 +94,7 @@ describe("fetchTitilerBounds", () => {
 
     expect(result.bounds).toEqual([-123, 39, -121, 40]);
     expect(fetchImpl).toHaveBeenCalledWith(
-      expect.stringContaining("/cog/bounds?url="),
+      expect.stringContaining("/cog/info?url="),
       { cache: "no-store" },
     );
   });
@@ -117,11 +108,11 @@ describe("fetchTitilerBounds", () => {
     } as unknown as Response);
 
     await expect(
-      fetchTitilerBounds({
+      fetchTitilerInfo({
         baseUrl: "https://tiles.example.com",
         cogUrl: "https://bucket.example.com/ortho.tif",
         fetchImpl: fetchImpl as unknown as typeof fetch,
       }),
-    ).rejects.toThrow(/bounds request failed/);
+    ).rejects.toThrow(/info request failed/);
   });
 });

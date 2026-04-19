@@ -10,7 +10,7 @@ responds with PNG tiles. The app itself does not need to proxy anything.
 The only env var the app reads is:
 
 ```
-AERIAL_TITILER_URL=http://localhost:8090
+AERIAL_TITILER_URL=http://localhost:8000
 ```
 
 Set it for local dev (via `.env.local`) and for the Vercel project (per
@@ -19,26 +19,47 @@ unset — users see a "viewer not configured" card instead of a broken embed.
 
 ## Run TiTiler locally (Docker)
 
-The first-party `ghcr.io/developmentseed/titiler` image speaks the endpoints
-the client uses. One-liner for a scratch dev instance:
+On this dev host the OpenGeo stack already runs a TiTiler 2.0.1 container at
+`opengeo-titiler` exposing port 8000. You can reuse it as-is; the client's URL
+builders target `/cog/tiles/{tileMatrixSetId}/{z}/{x}/{y}.{format}` and
+`/cog/info`, both of which are in the 2.x surface.
+
+For a scratch instance on a fresh host:
 
 ```bash
-docker run --rm -p 8090:80 \
-  -e PORT=80 \
-  -e CORS_ORIGINS='*' \
+docker run --rm -p 8000:8000 \
+  -e PORT=8000 \
+  -e CORS_ORIGINS='http://localhost:3000,http://localhost:3001' \
   -e MOSAIC_ENDPOINT_ENABLED=FALSE \
-  ghcr.io/developmentseed/titiler:latest \
-  uvicorn titiler.application.main:app --host 0.0.0.0 --port 80
+  ghcr.io/developmentseed/titiler:latest
 ```
 
-Then hit:
+Smoke-check against the upstream sample COG:
 
 ```
-curl -fsS 'http://localhost:8090/cog/bounds?url=https%3A%2F%2Fexample.com%2Fortho.tif'
+curl -fsSo /tmp/tile.png -w 'http=%{http_code} type=%{content_type}\n' \
+  'http://localhost:8000/cog/tiles/WebMercatorQuad/2/1/1.png?url=https%3A%2F%2Fraw.githubusercontent.com%2Fcogeotiff%2Frio-tiler%2Fmaster%2Ftests%2Ffixtures%2Fcog.tif'
+file /tmp/tile.png   # expect: PNG image data, 256 x 256
 ```
 
 `CORS_ORIGINS='*'` is safe for dev only. In production, restrict it to the
 deployed app origin.
+
+## Supabase Storage reachability
+
+TiTiler fetches the COG bytes over HTTP from the URL passed via `?url=`. The
+Next.js server hands the browser a Supabase signed URL (6 h TTL). For
+TiTiler-inside-a-container to resolve that URL, the Supabase Storage endpoint
+must be reachable from *inside* the container:
+
+- **Hosted Supabase (prod / staging):** works by default — the signed URL is an
+  HTTPS `supabase.co` URL, TiTiler fetches it like any other upstream.
+- **Local Supabase (`supabase start`):** the signed URL points at
+  `http://localhost:54321`. A container on the default bridge network cannot
+  resolve `localhost` on the host. Either (a) put TiTiler on the `host` network
+  (`--network host`), or (b) rewrite the Supabase base URL the app uses for
+  signed-download to `http://host.docker.internal:54321` before handing the URL
+  to the browser. Keeping TiTiler on host-network is simplest for dev loops.
 
 ## Running beside NodeODM
 
