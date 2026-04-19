@@ -3,8 +3,12 @@ import { notFound, redirect } from "next/navigation";
 
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
+import { ProcessingQaPanel } from "@/components/copilot/processing-qa-panel";
 import { ManagedOutputImportForm } from "@/components/managed-output-import-form";
+import { canPerformDroneOpsAction } from "@/lib/auth/actions";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
+import { getCopilotConfig } from "@/lib/copilot/config";
+import { readOrgCopilotEnabled } from "@/lib/copilot/quota";
 import {
   buildDispatchRequestId,
   getDispatchAdapterConfigSummary,
@@ -952,6 +956,30 @@ Operator note: ${operatorNotes}`
   }
 
   const benchmarkSummary = getBenchmarkSummaryView(detail.outputSummary.benchmarkSummary ?? detail.outputSummary);
+  const copilotConfig = getCopilotConfig();
+  const copilotOrgEnabled = access.org?.id
+    ? await readOrgCopilotEnabled(access.org.id)
+    : false;
+  const copilotUserAllowed = canPerformDroneOpsAction(access, "copilot.generate");
+  const copilotAvailable =
+    copilotConfig.globalEnabled &&
+    copilotConfig.hasApiKey &&
+    copilotOrgEnabled &&
+    copilotUserAllowed;
+  const copilotHint = !copilotConfig.globalEnabled
+    ? "Aerial Copilot is disabled on this deployment."
+    : !copilotConfig.hasApiKey
+      ? "Aerial Copilot is missing server credentials."
+      : !copilotOrgEnabled
+        ? "Aerial Copilot is not enabled for this organization yet."
+        : !copilotUserAllowed
+          ? "Your role does not include copilot.generate."
+          : "Aerial Copilot is ready.";
+  const copilotRelevant =
+    detail.job.status === "failed" ||
+    detail.job.status === "needs_review" ||
+    benchmarkSummary?.minimumPass === false ||
+    (detail.job.status === "succeeded" && detail.outputs.length === 0);
   const latestCheckpoint = getString(detail.outputSummary.latestCheckpoint, "No checkpoint recorded yet.");
   const stageChecklist = getStageChecklist(detail.outputSummary);
   const logTail = Array.isArray(detail.outputSummary.logTail)
@@ -1508,6 +1536,13 @@ Operator note: ${operatorNotes}`
           <p className="muted">{getString(detail.outputSummary.notes, "No job notes recorded yet.")}</p>
         </article>
       </section>
+
+      <ProcessingQaPanel
+        jobId={detail.job.id}
+        available={copilotAvailable}
+        availabilityHint={copilotHint}
+        relevant={copilotRelevant}
+      />
 
       {benchmarkSummary ? (
         <section className="surface stack-sm">
