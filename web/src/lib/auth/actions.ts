@@ -36,6 +36,7 @@ export const DRONE_OPS_ACTIONS = [
   "admin.memberships",
   "admin.entitlements",
   "admin.support",
+  "copilot.generate",
 ] as const;
 
 export type DroneOpsAction = (typeof DRONE_OPS_ACTIONS)[number];
@@ -66,6 +67,7 @@ const ANALYST_WRITE_ACTIONS: DroneOpsAction[] = [
   "handoffs.write",
   "versions.write",
   "versions.promote",
+  "copilot.generate",
 ];
 
 const ADMIN_DESTRUCTIVE_ACTIONS: DroneOpsAction[] = [
