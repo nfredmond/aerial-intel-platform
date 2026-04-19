@@ -42,7 +42,7 @@ function blockedMessage(state: MissionBriefFormState): string | null {
     case "global-disabled":
       return "Aerial Copilot is disabled on this deployment (env kill-switch).";
     case "missing-api-key":
-      return "Aerial Copilot is missing its Anthropic API key. Check server config.";
+      return "Aerial Copilot is missing its AI Gateway credentials. Check server config.";
     case "org-disabled":
       return "Aerial Copilot is off for this organization. An admin can enable it in org settings.";
     case "mission-not-found":

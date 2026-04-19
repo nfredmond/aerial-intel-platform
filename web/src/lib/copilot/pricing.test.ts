@@ -13,7 +13,7 @@ describe("estimateSpendTenthCents", () => {
     //   output: 500 * 75 000 / 1 000 000 = 37.5 → ceiled to 38 tenth-cents
     //   total = 53 tenth-cents (= $0.053)
     const cost = estimateSpendTenthCents({
-      modelId: "claude-opus-4-7",
+      modelId: "anthropic/claude-opus-4.7",
       inputTokens: 1_000,
       outputTokens: 500,
     });
@@ -22,12 +22,12 @@ describe("estimateSpendTenthCents", () => {
 
   it("haiku is ~15x cheaper than opus for the same shape", () => {
     const opus = estimateSpendTenthCents({
-      modelId: "claude-opus-4-7",
+      modelId: "anthropic/claude-opus-4.7",
       inputTokens: 10_000,
       outputTokens: 2_000,
     });
     const haiku = estimateSpendTenthCents({
-      modelId: "claude-haiku-4-5-20251001",
+      modelId: "anthropic/claude-haiku-4.5",
       inputTokens: 10_000,
       outputTokens: 2_000,
     });
@@ -40,7 +40,7 @@ describe("estimateSpendTenthCents", () => {
   it("zero-token call returns zero", () => {
     expect(
       estimateSpendTenthCents({
-        modelId: "claude-haiku-4-5-20251001",
+        modelId: "anthropic/claude-haiku-4.5",
         inputTokens: 0,
         outputTokens: 0,
       }),
@@ -62,7 +62,7 @@ describe("estimateSpendTenthCents", () => {
     // 1 output token at Haiku: 1 * 5 000 / 1 000 000 = 0.005 → ceiled to 1
     // total = 2 tenth-cents
     const cost = estimateSpendTenthCents({
-      modelId: "claude-haiku-4-5-20251001",
+      modelId: "anthropic/claude-haiku-4.5",
       inputTokens: 1,
       outputTokens: 1,
     });
@@ -80,7 +80,7 @@ describe("formatTenthCentsUsd", () => {
 
 describe("MODEL_PRICING", () => {
   it("opus output is strictly more expensive than input", () => {
-    const opus = MODEL_PRICING["claude-opus-4-7"];
+    const opus = MODEL_PRICING["anthropic/claude-opus-4.7"];
     expect(opus.outputPerMillionTenthCents).toBeGreaterThan(opus.inputPerMillionTenthCents);
   });
 });

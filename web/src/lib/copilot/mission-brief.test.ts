@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const generateTextMock = vi.hoisted(() => vi.fn());
 
 vi.mock("ai", () => ({ generateText: generateTextMock }));
-vi.mock("@ai-sdk/anthropic", () => ({ anthropic: (id: string) => ({ __modelId: id }) }));
 
 import { generateMissionBrief } from "./mission-brief";
 
@@ -53,7 +52,7 @@ describe("generateMissionBrief", () => {
       ["dataset:toledo-20-rgb", "job:toledo-20-job", "mission:toledo-20", "qa:toledo-20-verdict", "review:toledo-20-first-note"].sort(),
     );
     expect(result.text.includes("[fact:")).toBe(false);
-    expect(result.modelId).toBe("claude-opus-4-7");
+    expect(result.modelId).toBe("anthropic/claude-opus-4.7");
   });
 
   it("refuses when the model hallucinates an unknown citation on >30% of sentences", async () => {

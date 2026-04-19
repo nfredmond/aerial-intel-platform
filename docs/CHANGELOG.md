@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-04-19 — Copilot provider: route through Vercel AI Gateway (ADR-002 revised)
+
+Reversed ADR-002 Decision 3 one day after accepting it. Aerial Copilot now routes through Vercel AI Gateway instead of the direct `@ai-sdk/anthropic` provider. The migration cost was trivial (model-id format change, one env swap, one mock removal) and buys provider-swap-by-env plus unified spend attribution when C-3 or a future multi-provider experiment lands.
+
+- **Skill modules.** `web/src/lib/copilot/{mission-brief,processing-qa}.ts` drop the `@ai-sdk/anthropic` import and pass model id as a string to `generateText`. The AI SDK's default global provider is AI Gateway, so no provider import is needed.
+- **Model ids.** `pricing.ts` `CopilotModelId` moves from `"claude-opus-4-7" | "claude-haiku-4-5-20251001"` to `"anthropic/claude-opus-4.7" | "anthropic/claude-haiku-4.5"` (gateway canonical form, dots not hyphens). Model ids were fetched from `https://ai-gateway.vercel.sh/v1/models` at code-write time per skill guidance. Anthropic pricing numbers are unchanged — the gateway passes through at cost.
+- **Auth.** `config.ts` `hasApiKey` now checks `AI_GATEWAY_API_KEY` first, then falls back to `VERCEL_OIDC_TOKEN` so Vercel deployments auto-authenticate without an explicit key. `.env.example` updated. `ANTHROPIC_API_KEY` is no longer read anywhere.
+- **UI strings.** Both copilot panels now say "AI Gateway credentials" instead of "Anthropic API key" in the `missing-api-key` blocked state.
+- **Dep graph.** `@ai-sdk/anthropic` removed from `package.json` (no remaining imports).
+- **Tests + verification.** 31/31 copilot vitest cases green, typecheck clean, eslint clean on all changed files.
+- **Docs.** `docs/ADR/ADR-002-aerial-copilot.md` Decision 3 rewritten with the revised posture; original decision preserved in a "Superseded decision" block so the reversal is traceable. `docs/AI_DISCLOSURE.md` updated to name AI Gateway as the routing layer.
+
 ## 2026-04-18 — Wave 2 copilot: mission-brief + processing-QA skills (W2-C1, W2-C2)
 
 First two Aerial Copilot skills on main. Both follow the narrow-grounded pattern locked by `docs/ADR/ADR-002-aerial-copilot-architecture.md`: citation-gated output via `[fact:<id>]` tokens, integer-tenth-cent spend cap per org per month, default-off per org, direct Anthropic SDK (not AI Gateway). Feature-flag stack: `AERIAL_COPILOT_ENABLED` env + `drone_org_settings.copilot_enabled` per-org toggle + `copilot.generate` RBAC action (analyst+).

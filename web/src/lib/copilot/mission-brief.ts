@@ -1,4 +1,3 @@
-import { anthropic } from "@ai-sdk/anthropic";
 import { generateText } from "ai";
 
 import { validateGrounding } from "./grounding-validator";
@@ -58,7 +57,7 @@ export type MissionBriefResult =
       outputTokens: number;
     };
 
-const DEFAULT_MODEL: CopilotModelId = "claude-opus-4-7";
+const DEFAULT_MODEL: CopilotModelId = "anthropic/claude-opus-4.7";
 
 const SYSTEM_PROMPT = `You draft client-ready mission briefs for Nat Ford Planning's aerial operations platform. Write in plain, low-fluff English suited to a planning agency audience.
 
@@ -98,7 +97,7 @@ export async function generateMissionBrief(
   ].join("\n");
 
   const { text: rawText, usage } = await generateText({
-    model: anthropic(modelId),
+    model: modelId,
     system: SYSTEM_PROMPT,
     prompt,
   });

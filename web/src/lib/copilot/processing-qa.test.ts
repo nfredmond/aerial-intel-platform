@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const generateTextMock = vi.hoisted(() => vi.fn());
 
 vi.mock("ai", () => ({ generateText: generateTextMock }));
-vi.mock("@ai-sdk/anthropic", () => ({ anthropic: (id: string) => ({ __modelId: id }) }));
 
 import { generateProcessingQaNote } from "./processing-qa";
 

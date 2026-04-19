@@ -1,6 +1,6 @@
 # Aerial Copilot — AI disclosure
 
-_Last updated: 2026-04-18. Applies to Wave 2 copilot features on `main`._
+_Last updated: 2026-04-19. Applies to Wave 2 copilot features on `main`._
 
 Aerial Copilot is the name for AI-assisted surfaces inside the Aerial Intel Platform. This page exists because the Nat Ford Operating Covenant requires us to tell clients and operators exactly what AI is doing, what guarantees we make, and where the limits are. If anything on this page is unclear for a specific deliverable, ask before relying on the copilot output.
 
@@ -17,10 +17,10 @@ Neither surface can take write actions. The copilot emits text and suggestions; 
 
 ## What model is used
 
-- Narrative outputs (mission brief, QA diagnostic): **Claude Opus 4.7** via the direct `@ai-sdk/anthropic` provider.
-- Future classification / data-cleaning surfaces (planned W2-C3): **Claude Haiku 4.5** for cost-efficient structured classification.
+- Narrative outputs (mission brief, QA diagnostic): **Claude Opus 4.7** (`anthropic/claude-opus-4.7`).
+- Future classification / data-cleaning surfaces (planned W2-C3): **Claude Haiku 4.5** (`anthropic/claude-haiku-4.5`) for cost-efficient structured classification.
 
-Model ids are stored in `web/src/lib/copilot/config.ts`. We do not route through an AI gateway today; ADR-002 locks this decision and flags the conditions under which we'd revisit it. The model id used for each generation is persisted on the result and shown inline on every rendered copilot output.
+All copilot calls route through **Vercel AI Gateway** (ADR-002 revised 2026-04-19). This gives us provider-agnostic spend attribution, a single authentication story (OIDC on Vercel, `AI_GATEWAY_API_KEY` locally), and the option to swap or add providers via env change rather than code change. Model ids are stored as string literals in `web/src/lib/copilot/pricing.ts` and the two skill files. The model id used for each generation is persisted on the result and shown inline on every rendered copilot output, so the provider and model are never hidden from the user.
 
 ## Grounding guarantee
 

@@ -3,7 +3,11 @@ export type CopilotConfig = {
   globalEnabled: boolean;
   /** Default monthly cap (tenth-of-cent units) to seed a new `drone_org_ai_quota` row. */
   defaultCapTenthCents: number;
-  /** Anthropic API key presence flag. We never return the key itself. */
+  /**
+   * AI Gateway credential presence flag. We never return the key itself.
+   * True if either `AI_GATEWAY_API_KEY` is set, or the runtime is Vercel
+   * with OIDC enabled (indicated by `VERCEL_OIDC_TOKEN`).
+   */
   hasApiKey: boolean;
 };
 
@@ -31,7 +35,10 @@ export function getCopilotConfig(): CopilotConfig {
     process.env.AERIAL_COPILOT_DEFAULT_CAP_TENTH_CENTS,
     50000,
   );
-  const hasApiKey = Boolean(normalizeEnvString(process.env.ANTHROPIC_API_KEY));
+  const hasApiKey = Boolean(
+    normalizeEnvString(process.env.AI_GATEWAY_API_KEY) ??
+      normalizeEnvString(process.env.VERCEL_OIDC_TOKEN),
+  );
   return { globalEnabled, defaultCapTenthCents, hasApiKey };
 }
 

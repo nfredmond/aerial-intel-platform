@@ -1,8 +1,8 @@
 # ADR-002 — Aerial Copilot architecture
 
-**Status:** Accepted · 2026-04-18
+**Status:** Accepted · 2026-04-18 · Revised 2026-04-19 (Decision 3 reversed)
 **Supersedes:** none
-**Related:** `docs/ROADMAP.md` Phase 4, 2026-04-18 three-wave plan (`.claude/plans/cheeky-questing-tome.md`)
+**Related:** `docs/ROADMAP.md` Phase 4, 2026-04-18 three-wave plan (`.claude/plans/cheeky-questing-tome.md`), `docs/AI_DISCLOSURE.md`
 
 ## Context
 
@@ -22,13 +22,15 @@ Wave 2 of the 2026-04-18 strategic plan introduces a grounded, narrow AI-assist 
 
 **Why.** Matches the covenant's responsible-AI-use line. Prevents cloud-cost surprises on a per-org basis — first abuse case in a multi-tenant product is always unexpected spend. Also gives the user (or Nathaniel as operator) an explicit moment to explain the feature + disclosure language to the org admin before it goes live.
 
-### 3. Provider integration: direct Anthropic SDK (not AI Gateway — yet)
+### 3. Provider integration: Vercel AI Gateway (revised 2026-04-19)
 
-**Decision.** Use the AI SDK v6 with Anthropic as the direct provider (`@ai-sdk/anthropic` + server-side `ANTHROPIC_API_KEY`). **Not** Vercel AI Gateway.
+**Decision (current, 2026-04-19).** Route the AI SDK v6 through **Vercel AI Gateway**. Skill modules pass string model ids (`anthropic/claude-opus-4.7`, `anthropic/claude-haiku-4.5`) to `generateText`; the gateway is the SDK's default global provider, so no provider import is needed. Authentication is OIDC on Vercel (auto-injected `VERCEL_OIDC_TOKEN`) and `AI_GATEWAY_API_KEY` for local dev / non-Vercel deployments.
 
-**Why.** At the MVP stage there's one provider and one model family (Claude). AI Gateway's core value is provider-agnostic routing + unified observability across providers; with one provider, it's overkill and adds an indirection. Revisit when (a) spend-attribution across multiple providers becomes a real question, or (b) we need provider-fallback for durability. Direct SDK is faster to ship and easier to reason about for the grounding-validator path.
+**Why (revised).** Even with one provider shipped (Anthropic), operating through the gateway is a small cost today that buys real option value: provider swap via env only, unified observability + spend attribution, and an obvious upgrade path to OpenAI/Gemini fallbacks without another refactor. The earlier argument ("one provider → gateway is overkill") underweighted the cost of a future code-change migration; doing it once up front is cheaper than doing it later under pressure.
 
-**Models.** `claude-opus-4-7` for narrative tasks (mission brief, QA diagnostic note). `claude-haiku-4-5-20251001` for classification passes (data-scout EXIF/plausibility scoring). Both selected for 2026-Q2 capability; revisit on model-family updates.
+**Models.** `anthropic/claude-opus-4.7` for narrative tasks (mission brief, QA diagnostic note). `anthropic/claude-haiku-4.5` for classification passes (data-scout EXIF/plausibility scoring — W2-C3, not yet shipped). Model ids are fetched from `curl -s https://ai-gateway.vercel.sh/v1/models` at code-write time, not pulled from memory. Both selected for 2026-Q2 capability; revisit on model-family updates.
+
+**Superseded decision (2026-04-18).** Original Decision 3 picked direct `@ai-sdk/anthropic` over AI Gateway on the grounds that one provider at MVP didn't justify the gateway indirection. Reversed one day later after reviewing how cheap the migration was: the only code change was model-id format (hyphens → dots) + dropping the provider import + swapping the env check from `ANTHROPIC_API_KEY` to `AI_GATEWAY_API_KEY`. 31/31 tests remained green. The historical record is preserved here to make the reversal traceable — if the gateway path fails in staging verification, we know what to revert to.
 
 ### 4. Thermal / M4T support: deferred
 
@@ -45,7 +47,7 @@ Wave 2 of the 2026-04-18 strategic plan introduces a grounded, narrow AI-assist 
 ## Consequences
 
 - New Supabase migration will add `org_settings.copilot_enabled boolean default false` and a new `org_ai_quota` table (org_id, month_start, spend_cents, cap_cents).
-- Credentials: `ANTHROPIC_API_KEY` goes to server-side env only. Never exposed to the browser. Added to `.env.example` as a documented optional.
+- Credentials: `AI_GATEWAY_API_KEY` (or Vercel-injected `VERCEL_OIDC_TOKEN`) goes to server-side env only. Never exposed to the browser. Added to `.env.example` as a documented optional.
 - New module shape: `web/src/lib/copilot/` with one file per skill + a shared `grounding-validator.ts` (ported-pattern from clawmodeler, not code — regex + set-membership over known `fact_id` values derived from live DB rows).
 - Every skill result carries an `ai_disclosure` block (model name, grounding-validator version, fact-id coverage percentage) rendered on the page where the output appears. Matches the covenant's "responsible AI use" + "accountability and auditability" gates.
 - No AI write actions in year one. Skills emit text + suggestions; humans click.

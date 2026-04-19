@@ -1,4 +1,3 @@
-import { anthropic } from "@ai-sdk/anthropic";
 import { generateText } from "ai";
 
 import { validateGrounding } from "./grounding-validator";
@@ -46,7 +45,7 @@ export type ProcessingQaResult =
       outputTokens: number;
     };
 
-const DEFAULT_MODEL: CopilotModelId = "claude-opus-4-7";
+const DEFAULT_MODEL: CopilotModelId = "anthropic/claude-opus-4.7";
 
 const SYSTEM_PROMPT = `You are a processing-QA troubleshooting assistant for Nat Ford Planning's aerial operations platform. When a NodeODM job fails, struggles, or produces a thin output set, you help a planner figure out what likely went wrong and what to try next.
 
@@ -91,7 +90,7 @@ export async function generateProcessingQaNote(
   ].join("\n");
 
   const { text: rawText, usage } = await generateText({
-    model: anthropic(modelId),
+    model: modelId,
     system: SYSTEM_PROMPT,
     prompt,
   });

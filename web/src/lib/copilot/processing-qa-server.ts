@@ -44,7 +44,7 @@ export type ProcessingQaServerResult =
   | { status: "error"; message: string };
 
 const PRE_CHECK_ESTIMATE_TENTH_CENTS = estimateSpendTenthCents({
-  modelId: "claude-opus-4-7",
+  modelId: "anthropic/claude-opus-4.7",
   inputTokens: 1500,
   outputTokens: 300,
 });
