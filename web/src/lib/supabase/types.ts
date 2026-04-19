@@ -278,6 +278,42 @@ export type Database = {
           created_at?: string;
         };
       };
+      drone_org_settings: {
+        Row: {
+          org_id: string;
+          copilot_enabled: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          org_id: string;
+          copilot_enabled?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      drone_org_ai_quota: {
+        Row: {
+          id: string;
+          org_id: string;
+          period_month: string;
+          spend_tenth_cents: number;
+          cap_tenth_cents: number;
+          last_call_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          period_month: string;
+          spend_tenth_cents?: number;
+          cap_tenth_cents?: number;
+          last_call_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
   };
 };
