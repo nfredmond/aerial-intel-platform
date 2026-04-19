@@ -5,7 +5,7 @@
 - Phase 0 foundations — **complete**.
 - Phase 1 mission-control shell — **complete**, now decomposed around shared UI primitives.
 - Phase 2 ingest / preflight / processing — **largely complete**; NodeODM-direct dispatch added this pass alongside the existing webhook adapter.
-- Phase 3 viewing / delivery / collaboration — **partial**: MapLibre-backed planning + coverage maps shipped; install-bundle export shipped; mission-version snapshot + promote shipped; signed-share artifact links shipped (`/s/[token]`); read-only admin console shipped (`/admin`); Playwright public-showcase smoke shipped. Side-by-side version diff, TiTiler raster delivery, and admin write actions still deferred.
+- Phase 3 viewing / delivery / collaboration — **near-complete (delivery pillar honest)**: MapLibre-backed planning + coverage maps shipped; install-bundle export shipped; mission-version snapshot + promote shipped; side-by-side version diff shipped; signed-share artifact links shipped (`/s/[token]`); read-only admin console shipped (`/admin`); Playwright public-showcase smoke shipped; copy-to-storage for real NodeODM outputs shipped (W1-A); artifact comments + approvals shipped (W1-C); TiTiler-backed raster viewer shipped (W1-B — wired, awaits TiTiler sidecar on dev host for exit-gate evidence). Admin write actions (invite/pause) still deferred.
 - Phase 4 AI / domain modules — **not started**.
 - Phase 5 enterprise / ecosystem — **not started**.
 
@@ -47,13 +47,14 @@ Goal: turn the shell into a real operational pipeline.
 Goal: provide WebODM-grade output review with stronger delivery UX.
 
 ### In scope
-- TiTiler-backed COG raster delivery (deferred)
-- orthomosaic/DSM viewing (deferred)
+- TiTiler-backed COG raster delivery (shipped — W1-B — wired behind `AERIAL_TITILER_URL`; pending live sidecar evidence)
+- orthomosaic/DSM viewing (shipped — `/artifacts/[artifactId]` renders a MapLibre raster overlay for ready COGs)
 - share pages and export bundles (share pages shipped at `/s/[token]`; export bundles shipped via install-bundle route)
-- comments, approvals, and activity feed depth (activity feed shipped; comments/approvals deferred)
+- comments, approvals, and activity feed depth (activity feed shipped; comments/approvals shipped — W1-C)
 - client-safe packaging and report surfaces (install-bundle shipped)
 - read-only admin / support console (shipped at `/admin`)
-- mission-version snapshot + promote UI (shipped at `/missions/[missionId]/versions`; side-by-side diff deferred)
+- mission-version snapshot + promote UI (shipped at `/missions/[missionId]/versions`; side-by-side diff shipped — W1-D)
+- copy-to-storage for real NodeODM outputs (shipped — W1-A — `drone-ops/${orgSlug}/jobs/${jobId}/outputs/${kind}/`)
 - Playwright E2E scaffold (shipped with public-showcase smoke; auth-gated flow deferred)
 
 ## Phase 4 — AI and domain modules

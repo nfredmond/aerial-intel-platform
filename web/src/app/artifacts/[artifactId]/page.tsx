@@ -38,8 +38,13 @@ import {
   updateProcessingOutput,
   type ArtifactApprovalDecision,
 } from "@/lib/supabase/admin";
+import { buildTitilerTileUrl } from "@/lib/titiler/client";
+import { getTitilerConfig } from "@/lib/titiler/config";
 import { formatDateTime } from "@/lib/ui/datetime";
 import { statusPillClassName, type Tone } from "@/lib/ui/tones";
+import { RasterViewer } from "@/components/raster-viewer";
+
+const COG_RASTER_KINDS = new Set(["orthomosaic", "dsm", "dtm", "dem"]);
 
 function statusClass(status: string) {
   const tone: Tone =
@@ -654,6 +659,26 @@ export default async function ArtifactDetailPage({
   const hasApprovedApproval = Boolean(latestApproval && latestApproval.decision === "approved");
   const callout = getCalloutMessage(resolvedSearchParams.action);
 
+  const titilerConfig = getTitilerConfig();
+  const isCogArtifact =
+    COG_RASTER_KINDS.has(detail.output.kind) &&
+    detail.output.status === "ready" &&
+    Boolean(detail.output.storage_bucket) &&
+    Boolean(detail.output.storage_path);
+  const rasterCogUrl = isCogArtifact && titilerConfig.configured
+    ? await tryCreateSignedDownloadUrl({
+        bucket: detail.output.storage_bucket,
+        path: detail.output.storage_path,
+        expiresInSeconds: 60 * 60 * 6,
+      })
+    : null;
+  const rasterTileUrlTemplate = rasterCogUrl
+    ? buildTitilerTileUrl({
+        baseUrl: titilerConfig.baseUrl ?? undefined,
+        cogUrl: rasterCogUrl,
+      })
+    : null;
+
   return (
     <main className="app-shell stack-md">
       <section className="surface section-header">
@@ -851,6 +876,34 @@ export default async function ArtifactDetailPage({
           </div>
         </aside>
       </section>
+
+      {rasterTileUrlTemplate ? (
+        <section className="surface stack-sm">
+          <div className="stack-xs">
+            <p className="eyebrow">Raster preview</p>
+            <h2>{detail.output.kind.replaceAll("_", " ")} overlay</h2>
+            <p className="muted">
+              Streamed from TiTiler. Drag to pan, scroll or pinch to zoom, and adjust opacity to compare against the base map.
+            </p>
+          </div>
+          <RasterViewer
+            tileUrlTemplate={rasterTileUrlTemplate}
+            label={artifactName}
+            attribution="TiTiler · Supabase Storage"
+            ariaLabel={`${detail.output.kind} raster preview for ${artifactName}`}
+          />
+        </section>
+      ) : isCogArtifact && !titilerConfig.configured ? (
+        <section className="surface stack-sm">
+          <div className="stack-xs">
+            <p className="eyebrow">Raster preview</p>
+            <h2>Viewer not configured</h2>
+            <p className="muted">
+              Set <code>AERIAL_TITILER_URL</code> to point at a running TiTiler service to enable the in-page raster viewer for this artifact.
+            </p>
+          </div>
+        </section>
+      ) : null}
 
       <section className="grid-cards">
         <article className="surface stack-sm info-card">
