@@ -638,3 +638,101 @@ export async function selectRecentEventsForOrg(orgId: string, limit = 30) {
     { method: "GET" },
   );
 }
+
+export type ArtifactCommentInsert = {
+  org_id: string;
+  artifact_id: string;
+  parent_id?: string | null;
+  author_user_id?: string | null;
+  author_email?: string | null;
+  body: string;
+};
+
+export type ArtifactCommentPatch = {
+  body?: string;
+  resolved_at?: string | null;
+};
+
+export type ArtifactCommentRow = {
+  id: string;
+  org_id: string;
+  artifact_id: string;
+  parent_id: string | null;
+  author_user_id: string | null;
+  author_email: string | null;
+  body: string;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function insertArtifactComment(input: ArtifactCommentInsert) {
+  const rows = await adminRestRequest<ArtifactCommentRow[]>(
+    "drone_artifact_comments?select=*",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return rows[0] ?? null;
+}
+
+export async function updateArtifactComment(id: string, patch: ArtifactCommentPatch) {
+  const rows = await adminRestRequest<ArtifactCommentRow[]>(
+    `drone_artifact_comments?id=eq.${encodeURIComponent(id)}&select=*`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    },
+  );
+  return rows[0] ?? null;
+}
+
+export async function selectArtifactCommentsByArtifact(artifactId: string) {
+  const query = `drone_artifact_comments?artifact_id=eq.${encodeURIComponent(
+    artifactId,
+  )}&select=*&order=created_at.asc`;
+  return adminRestRequest<ArtifactCommentRow[]>(query, { method: "GET" });
+}
+
+export type ArtifactApprovalDecision = "approved" | "changes_requested";
+
+export type ArtifactApprovalInsert = {
+  org_id: string;
+  artifact_id: string;
+  reviewer_user_id?: string | null;
+  reviewer_email?: string | null;
+  decision: ArtifactApprovalDecision;
+  note?: string | null;
+};
+
+export type ArtifactApprovalRow = {
+  id: string;
+  org_id: string;
+  artifact_id: string;
+  reviewer_user_id: string | null;
+  reviewer_email: string | null;
+  decision: ArtifactApprovalDecision;
+  note: string | null;
+  decided_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function insertArtifactApproval(input: ArtifactApprovalInsert) {
+  const rows = await adminRestRequest<ArtifactApprovalRow[]>(
+    "drone_artifact_approvals?select=*",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return rows[0] ?? null;
+}
+
+export async function selectArtifactApprovalsByArtifact(artifactId: string) {
+  const query = `drone_artifact_approvals?artifact_id=eq.${encodeURIComponent(
+    artifactId,
+  )}&select=*&order=decided_at.desc`;
+  return adminRestRequest<ArtifactApprovalRow[]>(query, { method: "GET" });
+}
