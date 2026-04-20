@@ -4,6 +4,19 @@
 - Alert routing
 - On-call/escalation expectations
 
+## Release gates
+
+Use `docs/RELEASE_CHECKLIST.md` before production promotion. At minimum:
+
+```bash
+AERIAL_RELEASE_TARGET=production scripts/check_release_readiness.sh
+AERIAL_TITILER_URL=https://titiler.example.com scripts/smoke_titiler.sh
+```
+
+Production raster delivery requires a controlled TiTiler service. The deployable
+container and Cloud Run example live in `infra/titiler/`; `https://titiler.xyz`
+is Preview-only evidence and must not be used as a production claim.
+
 ## Managed processing dispatch handoff (current truthful v1 lane)
 
 Use this when a mission has a `managed-processing-v1` job and operator intake review is complete.

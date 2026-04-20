@@ -1,0 +1,13 @@
+services:
+  titiler:
+    build:
+      context: .
+      args:
+        TITILER_IMAGE: ${TITILER_IMAGE:-ghcr.io/developmentseed/titiler:latest}
+    ports:
+      - "${TITILER_PORT:-8080}:8080"
+    environment:
+      PORT: "8080"
+      HOST: "0.0.0.0"
+      MOSAIC_ENDPOINT_ENABLED: "FALSE"
+      CORS_ORIGINS: ${TITILER_CORS_ORIGINS:-http://localhost:3000,http://localhost:3001}

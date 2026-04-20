@@ -63,6 +63,11 @@ AERIAL_E2E_SKIP_SERVER=1 \
 
 ## CI posture
 
-Per the plan, E2E should run on non-PR `main` pushes only — PR CI stays fast
-with lint + vitest + build. Add the E2E step behind a branch gate when you
-wire it up.
+Per the plan, unauthenticated public E2E runs on non-PR `main` pushes only —
+PR CI stays fast with lint + vitest + build.
+
+The authenticated operational smoke is wired as a separate `web-auth-smoke`
+job and remains disabled unless the repository variable
+`AERIAL_E2E_AUTH_SMOKE_ENABLED=1` is set. Configure the dedicated Supabase
+project variables and secrets in `docs/ops/test-supabase-project.md` before
+enabling it.

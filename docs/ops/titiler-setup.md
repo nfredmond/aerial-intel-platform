@@ -87,6 +87,22 @@ services:
       MOSAIC_ENDPOINT_ENABLED: "FALSE"
 ```
 
+## Controlled service artifacts
+
+The deployable service shape now lives in `infra/titiler/`:
+
+- `Dockerfile` wraps the official TiTiler image with the expected port and
+  disabled mosaic endpoint.
+- `docker-compose.yml` runs the same shape locally.
+- `cloud-run.service.yaml.example` captures the Cloud Run container settings,
+  resource floor, and CORS envs to fill for a Nat Ford deployment.
+
+Smoke any controlled endpoint before wiring the app to it:
+
+```bash
+AERIAL_TITILER_URL=https://titiler.example.com scripts/smoke_titiler.sh
+```
+
 ## Production deployment notes
 
 - Host TiTiler on its own fly.io / ECS / Cloud Run service. Do not co-locate
@@ -98,6 +114,9 @@ services:
   reloading the artifact page after the TTL expires get a new URL automatically.
   Nothing in TiTiler needs Supabase credentials.
 - Lock `CORS_ORIGINS` to the deployed Next.js origin + any preview domains.
+- Before production promotion, run
+  `AERIAL_RELEASE_TARGET=production scripts/check_release_readiness.sh` and
+  confirm it does not reject the configured TiTiler URL.
 
 ## Verification
 
