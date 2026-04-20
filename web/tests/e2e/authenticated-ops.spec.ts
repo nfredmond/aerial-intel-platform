@@ -182,7 +182,7 @@ test.describe("authenticated operational smoke", () => {
   test.skip(!shouldRun, "Set AERIAL_E2E_AUTH_SMOKE=1 with explicit Supabase smoke env to run.");
   test.setTimeout(180_000);
 
-  test("validates RLS suspension, comment scoping, copilot citations, and raster delivery", async ({
+  test("validates RLS suspension, comment scoping, copilot citations, support docs, and raster delivery", async ({
     browser,
   }) => {
     const config = readConfig();
@@ -404,6 +404,16 @@ test.describe("authenticated operational smoke", () => {
       await copilotPanel.getByRole("button", { name: "Ask Aerial Copilot" }).click();
       await expect(copilotPanel.getByText(/\[fact:/)).toBeVisible({ timeout: 120_000 });
       await expect(copilotPanel.getByText(/\d+\/\d+ sentences kept/)).toBeVisible();
+
+      await page.goto("/admin/copilot", { waitUntil: "networkidle" });
+      const supportPanel = page.locator("section", { hasText: "Ask the ops docs" }).first();
+      await expect(supportPanel).toBeVisible();
+      await supportPanel
+        .getByLabel("Support question")
+        .fill("What still blocks the production raster claim?");
+      await supportPanel.getByRole("button", { name: "Ask support copilot" }).click();
+      await expect(supportPanel.getByText(/\[fact:support:/)).toBeVisible({ timeout: 120_000 });
+      await expect(supportPanel.getByText(/Cited support sources/)).toBeVisible();
 
       expect(consoleMessages).toEqual([]);
     } finally {

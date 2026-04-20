@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
+import { SupportAssistantPanel } from "@/components/copilot/support-assistant-panel";
 import { canPerformDroneOpsAction } from "@/lib/auth/actions";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import { getCopilotConfig } from "@/lib/copilot/config";
@@ -167,7 +168,18 @@ export default async function AdminCopilotPage() {
 
   const currentRow = quotaRows.find((row) => row.period_month.startsWith(currentPeriod.slice(0, 7)));
   const orgEnabled = settings?.copilot_enabled ?? false;
+  const copilotUserAllowed = canPerformDroneOpsAction(access, "copilot.generate");
   const copilotReady = config.globalEnabled && config.hasApiKey && orgEnabled;
+  const supportAssistantAvailable = copilotReady && copilotUserAllowed;
+  const supportAssistantHint = !config.globalEnabled
+    ? "Aerial Copilot is disabled on this deployment."
+    : !config.hasApiKey
+      ? "Aerial Copilot is missing AI Gateway credentials."
+      : !orgEnabled
+        ? "Aerial Copilot is off for this organization."
+        : !copilotUserAllowed
+          ? "Your role does not include copilot.generate."
+          : "Support assistant is ready.";
 
   const spendThisMonth = currentRow?.spend_tenth_cents ?? 0;
   const capThisMonth = currentRow?.cap_tenth_cents ?? config.defaultCapTenthCents;
@@ -291,6 +303,11 @@ export default async function AdminCopilotPage() {
           `drone_org_ai_quota` row, updated by `recordSpend` after every call.
         </p>
       </section>
+
+      <SupportAssistantPanel
+        available={supportAssistantAvailable}
+        availabilityHint={supportAssistantHint}
+      />
     </main>
   );
 }

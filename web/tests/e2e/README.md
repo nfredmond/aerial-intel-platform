@@ -8,7 +8,7 @@ Playwright-backed E2E tests for the web app.
   dependency; safe to run on any build.
 - `authenticated-ops.spec.ts` — opt-in signed-in smoke for the current
   DroneOps operating slice. It verifies active vs suspended RLS, artifact
-  comment scoping, copilot citations, and optionally TiTiler raster tiles.
+  comment scoping, copilot citations, admin support docs, and optionally TiTiler raster tiles.
   It creates temporary smoke users/comments and removes them in `finally`.
 
 ## What's NOT wired yet
