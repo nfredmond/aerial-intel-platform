@@ -20,3 +20,22 @@ This matrix compares current open-source ODM options with the proposed Nat Ford 
 - Phase 1: Foundation artifacts for reproducible benchmarks, comparison narrative, and initial demo credibility.
 - Phase 2: Packaging and operational hardening for client pilots.
 - Phase 3: Domain-tailored analytics/reporting extensions.
+
+## Shipped now (Wave 1 + Wave 2, as of 2026-04-19)
+
+The matrix above describes the ODM+ direction. This section lists what is actually merged and running in the Aerial Intel Platform today, so client-facing copy on natfordplanning.com can claim these without caveat. The Toledo-20 orthomosaic was end-to-end verified through TiTiler /cog/info, /cog/tilejson, and /cog/preview on 2026-04-19; browser-side MapLibre rendering of the same artifact is authored but awaits a signed-in hands-on check.
+
+| Capability | Status | How it lands |
+| --- | --- | --- |
+| Browser raster viewer for ODM orthomosaics | Shipped | `RasterViewer` (MapLibre + PMTiles) on `/artifacts/[id]` backed by TiTiler COG tiling. Verified against the 7.8 MB Toledo-20 orthomosaic (5107×5905 RGB, EPSG:32617, overviews 2/4/8/16). |
+| Client-portal comments + per-artifact approvals | Shipped | `drone_artifact_comments` + `drone_artifact_approvals`, wired into the artifact page as server actions with RLS-scoped reads. |
+| Time-boxed, usage-capped share links | Shipped | `drone_share_links` with `expires_in_hours` + `max_uses`; public consumer route `/s/[token]`. |
+| Handoff workflow (reviewed → shared → exported) | Shipped | `getArtifactHandoff` + `updateArtifactHandoffMetadata`; stage pills on the artifact page; export packet builder. |
+| Benchmark evidence in artifact metadata | Shipped | Each published artifact carries `benchmark.sourcePath`, `sha256`, `derivative` command, NodeODM task UUID, and `storagePublication` timestamp. |
+| AI-assisted mission brief (Aerial Copilot W2-C1) | Shipped | Grounded brief generator over mission + site context, routed through Vercel AI Gateway (Opus 4.7), per-org enable toggle + tenth-cent spend cap. |
+| AI-assisted processing-failure diagnostic (W2-C2) | Shipped | QA assistant that explains why a NodeODM run failed, grounded on job events; same quota + disclosure posture as W2-C1. |
+| AI-assisted dataset quality scout (W2-C3) | Shipped | Pre-dispatch per-image EXIF/GPS/blur classifier with a Haiku-generated human-readable summary, advisory only. |
+| Operator spend + refusal dashboard | Shipped | `/admin/copilot` per-org month-to-date spend, refusal rate, drop ratio, read-only. |
+| Org admin invitations + seat suspend/reactivate | Shipped | `/admin/people` with token-based invitation URLs, ADR-003 boundary (only owners may mint admins). |
+
+Items still explicitly deferred: live-feedback pass against the Aerial Copilot skills (blocked on the operator running the W2-C1/C2 verification loops), multi-org copilot rollout (waiting on the spend dashboard being exercised against a second org), and any volume/NDVI work (Wave 3, deliberately not started until at least one copilot skill has fired against a live org).

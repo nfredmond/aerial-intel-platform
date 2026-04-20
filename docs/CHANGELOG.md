@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-04-19 — Wave 1 exit: Toledo-20 raster pipeline verified end-to-end
+
+Wave 1 raster viewer claim is honest: the full path from Supabase Storage → signed URL → TiTiler `/cog/info` + `/cog/WebMercatorQuad/tilejson.json` + `/cog/preview.png` renders real pixels for artifact `6c413396-7475-4010-a1fe-b90cbc22977a`. TiTiler reports 3-band uint8 RGB, EPSG:32617 (UTM Zone 17N, Toledo OH), 5107×5905, overviews 2/4/8/16, driven off a 7.8 MB COG derived from the NodeODM task `8dda4117-a73d-4acb-914d-4342b32de64b` orthophoto with a `gdal_translate -of COG -co COMPRESS=JPEG -co QUALITY=85` derivative recorded in the artifact metadata. Browser-side MapLibre rendering of the same artifact is authored but still awaits a signed-in hands-on check — called out explicitly rather than claimed.
+
+Also landed `supabase/migrations/20260420000002_fix_drone_memberships_rls_recursion.sql`: the 2026-03-04 `members_can_read_memberships` policy self-referenced `drone_memberships` in its USING clause and was throwing "infinite recursion detected in policy" on sign-in once the staging schema had the full DroneOps surface applied. Replaced with `users_read_own_memberships` (`user_id = auth.uid()`); admin UIs and invitation-accept already read cross-member state through service-role `adminRestRequest` which bypasses RLS, so no app-level change.
+
+`docs/ODM_PLUS_COMPARISON_MATRIX.md` now includes a "Shipped now (Wave 1 + Wave 2)" section that lists the raster viewer, comments + approvals, share links, handoff workflow, benchmark evidence, the three Aerial Copilot skills, the `/admin/copilot` spend dashboard, and `/admin/people` invitations with the ADR-003 boundary — so client-facing copy on natfordplanning.com can reference these capabilities without caveat.
+
 ## 2026-04-19 — Security: scope invitation revoke by org (IDOR fix)
 
 `updateInvitationStatus(id, patch)` filtered the PATCH only by invitation id, which meant `revokeInvitationAction` could flip any invitation row to `revoked` before its post-update `row.org_id !== orgId` check ran — an admin of org A could revoke a pending invitation belonging to org B. Caught during `/review` of the Wave 2.5 bridge slice.
