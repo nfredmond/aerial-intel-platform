@@ -182,7 +182,7 @@ test.describe("authenticated operational smoke", () => {
   test.skip(!shouldRun, "Set AERIAL_E2E_AUTH_SMOKE=1 with explicit Supabase smoke env to run.");
   test.setTimeout(180_000);
 
-  test("validates RLS suspension, comment scoping, copilot citations, support docs, and raster delivery", async ({
+  test("validates RLS suspension, comment scoping, copilot citations, report/support docs, and raster delivery", async ({
     browser,
   }) => {
     const config = readConfig();
@@ -395,6 +395,14 @@ test.describe("authenticated operational smoke", () => {
           })
           .toBeTruthy();
       }
+
+      const reportPanel = page
+        .locator("section", { hasText: "Aerial Copilot - Report Summary" })
+        .first();
+      await expect(reportPanel).toBeVisible();
+      await reportPanel.getByRole("button", { name: "Generate report summary" }).click();
+      await expect(reportPanel.getByText(/\[fact:/)).toBeVisible({ timeout: 120_000 });
+      await expect(reportPanel.getByText(/\d+\/\d+ sentences kept/)).toBeVisible();
 
       await page.goto(`/jobs/${config.syntheticJobId}`, { waitUntil: "networkidle" });
       const copilotPanel = page

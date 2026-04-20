@@ -4,6 +4,9 @@ import { notFound, redirect } from "next/navigation";
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-button";
+import { ReportSummaryPanel } from "@/components/copilot/report-summary-panel";
+import { RasterViewer } from "@/components/raster-viewer";
+import { canPerformDroneOpsAction } from "@/lib/auth/actions";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import {
   buildArtifactExportPacket,
@@ -16,6 +19,8 @@ import {
   getBenchmarkOutputForArtifact,
   getBenchmarkSummaryView,
 } from "@/lib/benchmark-summary";
+import { getCopilotConfig } from "@/lib/copilot/config";
+import { readOrgCopilotEnabled } from "@/lib/copilot/quota";
 import { getArtifactDetail, getString } from "@/lib/missions/detail-data";
 import { tryCreateSignedDownloadUrl } from "@/lib/storage-delivery";
 import {
@@ -42,7 +47,6 @@ import { buildTitilerTileUrl, fetchTitilerTileJson } from "@/lib/titiler/client"
 import { getTitilerConfig } from "@/lib/titiler/config";
 import { formatDateTime } from "@/lib/ui/datetime";
 import { statusPillClassName, type Tone } from "@/lib/ui/tones";
-import { RasterViewer } from "@/components/raster-viewer";
 
 const COG_RASTER_KINDS = new Set(["orthomosaic", "dsm", "dtm", "dem"]);
 
@@ -667,6 +671,25 @@ export default async function ArtifactDetailPage({
   const latestApproval = approvals[0] ?? null;
   const hasApprovedApproval = Boolean(latestApproval && latestApproval.decision === "approved");
   const callout = getCalloutMessage(resolvedSearchParams.action);
+  const copilotConfig = getCopilotConfig();
+  const copilotOrgEnabled = access.org?.id
+    ? await readOrgCopilotEnabled(access.org.id)
+    : false;
+  const copilotUserAllowed = canPerformDroneOpsAction(access, "copilot.generate");
+  const reportSummaryAvailable =
+    copilotConfig.globalEnabled &&
+    copilotConfig.hasApiKey &&
+    copilotOrgEnabled &&
+    copilotUserAllowed;
+  const reportSummaryHint = !copilotConfig.globalEnabled
+    ? "Aerial Copilot is disabled on this deployment."
+    : !copilotConfig.hasApiKey
+      ? "Aerial Copilot is missing server credentials."
+      : !copilotOrgEnabled
+        ? "Aerial Copilot is not enabled for this organization yet."
+        : !copilotUserAllowed
+          ? "Your role does not include copilot.generate."
+          : "Aerial Copilot is ready.";
 
   const titilerConfig = getTitilerConfig();
   const isCogArtifact =
@@ -891,6 +914,13 @@ export default async function ArtifactDetailPage({
           </div>
         </aside>
       </section>
+
+      <ReportSummaryPanel
+        artifactId={detail.output.id}
+        artifactName={artifactName}
+        available={reportSummaryAvailable}
+        availabilityHint={reportSummaryHint}
+      />
 
       {rasterTileUrlTemplate ? (
         <section className="surface stack-sm">
