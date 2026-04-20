@@ -21,6 +21,19 @@ handoff → import a fixture output → confirm artifact) requires:
 2. A seeded test user with an active DroneOps entitlement.
 3. Env vars pointing Playwright + the Next.js server at that project.
 
+Provision the dedicated-project fixtures with:
+
+```bash
+SUPABASE_URL=https://PROJECT_REF.supabase.co \
+SUPABASE_ANON_KEY=... \
+SUPABASE_SERVICE_ROLE_KEY=... \
+  node scripts/provision_e2e_supabase_fixtures.mjs
+```
+
+The script prints the exact `AERIAL_E2E_*` values consumed below. Add
+`AERIAL_E2E_EXPECT_RASTER=1` and `AERIAL_E2E_RASTER_FIXTURE_PATH=/absolute/path/to/fixture.cog.tif`
+when the target deployment should validate TiTiler tile delivery.
+
 The authenticated smoke is present but skipped unless explicitly enabled:
 
 ```bash
