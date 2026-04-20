@@ -61,6 +61,9 @@ export async function inviteMemberAction(
 
   const role = normalizeRole(formData.get("role"));
   if (!role) return { status: "error", message: "Pick a valid role." };
+  if (role === "admin" && access.role !== "owner") {
+    return { status: "error", message: "Only owners can invite admins." };
+  }
 
   const existing = await selectInvitationsForOrg(orgId).catch(() => []);
   if (existing.some((row) => row.status === "pending" && row.email.toLowerCase() === email)) {

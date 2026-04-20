@@ -154,6 +154,33 @@ describe("inviteMemberAction", () => {
     expect(insertInvitationMock).not.toHaveBeenCalled();
   });
 
+  it("blocks admins from inviting peer admins (ADR-003 boundary)", async () => {
+    getDroneOpsAccessMock.mockResolvedValue(buildAccess("admin"));
+    const result = await inviteMemberAction(
+      IDLE,
+      formData({ email: "x@y.com", role: "admin" }),
+    );
+    expect(result).toEqual({
+      status: "error",
+      message: "Only owners can invite admins.",
+    });
+    expect(insertInvitationMock).not.toHaveBeenCalled();
+  });
+
+  it("owners may invite admins", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://app.example.com");
+    getDroneOpsAccessMock.mockResolvedValue(buildAccess("owner"));
+    insertInvitationMock.mockResolvedValue({ id: "inv-1" });
+    const result = await inviteMemberAction(
+      IDLE,
+      formData({ email: "x@y.com", role: "admin" }),
+    );
+    expect(result.status).toBe("ok");
+    expect(insertInvitationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ role: "admin" }),
+    );
+  });
+
   it("rejects duplicate pending invitation (case-insensitive)", async () => {
     getDroneOpsAccessMock.mockResolvedValue(buildAccess("admin"));
     selectInvitationsForOrgMock.mockResolvedValue([
