@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-04-19 — Wave 2.5 Track D: data-cleaning scout (W2-C3, Haiku)
+
+Third Aerial Copilot skill on main. The scout inspects a dataset's `metadata.per_image_summary[]` with deterministic rules (missing-gps / missing-exif / missing-timestamp / low blur variance / duplicate basename) and asks Haiku 4.5 for one grounded paragraph explaining what the planner should do before dispatch. Every sentence cites a `[fact:<id>]` drawn from the per-image aggregates — same narrow-grounded contract as mission-brief and processing-QA.
+
+- **Lib modules.** `web/src/lib/copilot/data-scout.ts` (orchestration + grounding, default model `anthropic/claude-haiku-4.5` — first use of the Haiku routing path), `data-scout-facts.ts` (deterministic classification, blur threshold 80, only explicit negatives trigger flags — unknown fields stay unknown), `data-scout-server.ts` (auth + quota + spend-record cascade, matches mission-brief-server / processing-qa-server shape).
+- **UI.** `web/src/components/copilot/data-scout-panel.tsx` + server action at `web/src/app/datasets/[datasetId]/copilot-actions.ts`. Panel mounted on `/datasets/[datasetId]` between the callout and the detail grid; shows blocked/refused reasons, the grounded summary, and up to 10 per-image flags with kind + measured detail. Scout is advisory — it never blocks dispatch.
+- **RBAC.** New `copilot.scout` DroneOps action, analyst+ (same tier as `copilot.generate`). Added to `ANALYST_WRITE_ACTIONS` matrix; vitest assertions updated.
+- **Tests.** 11 new vitest cases: `data-scout.test.ts` (5) covers ok path, hallucination refusal (>30% dropped), empty-output refusal, too-short refusal, and Haiku pricing math (1/5 tenth-cents per MTok → 1000/500 token call = 4 tenth-cents). `data-scout-facts.test.ts` (6) covers all-clean → no flags, each flag kind, low-variance threshold boundary, duplicate-basename counting, unknown-field treatment, and per-image-length fallback when `image_count` is missing. Full copilot suite now 42/42; full web suite 370/370.
+- **Scope note.** The scout reads whatever the ingest pipeline already populates in `dataset.metadata.per_image_summary[]`. No changes to the ingest pipeline itself in this slice — when ingest later starts writing richer per-image fields, the scout lights them up automatically.
+
 ## 2026-04-19 — Copilot provider: route through Vercel AI Gateway (ADR-002 revised)
 
 Reversed ADR-002 Decision 3 one day after accepting it. Aerial Copilot now routes through Vercel AI Gateway instead of the direct `@ai-sdk/anthropic` provider. The migration cost was trivial (model-id format change, one env swap, one mock removal) and buys provider-swap-by-env plus unified spend attribution when C-3 or a future multi-provider experiment lands.

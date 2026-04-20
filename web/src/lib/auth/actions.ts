@@ -37,6 +37,7 @@ export const DRONE_OPS_ACTIONS = [
   "admin.entitlements",
   "admin.support",
   "copilot.generate",
+  "copilot.scout",
   "members.invite",
   "members.suspend",
 ] as const;
@@ -70,6 +71,7 @@ const ANALYST_WRITE_ACTIONS: DroneOpsAction[] = [
   "versions.write",
   "versions.promote",
   "copilot.generate",
+  "copilot.scout",
 ];
 
 const ADMIN_DESTRUCTIVE_ACTIONS: DroneOpsAction[] = [

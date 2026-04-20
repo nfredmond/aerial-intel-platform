@@ -4,10 +4,14 @@ import { notFound, redirect } from "next/navigation";
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-button";
+import { DataScoutPanel } from "@/components/copilot/data-scout-panel";
 import { GeometryJsonField } from "@/components/geometry-json-field";
 import { GeometryPreviewCard } from "@/components/geometry-preview-card";
 import { GeometryPreviewMap } from "@/components/map/geometry-preview-map";
+import { canPerformDroneOpsAction } from "@/lib/auth/actions";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
+import { getCopilotConfig } from "@/lib/copilot/config";
+import { readOrgCopilotEnabled } from "@/lib/copilot/quota";
 import { formatGeoJsonSurface, parseGeoJsonSurface } from "@/lib/geojson";
 import { buildDatasetGisBrief } from "@/lib/gis-briefs";
 import { getCoverageComparisonInsight, getDatasetCoverageInsight } from "@/lib/geometry-insights";
@@ -225,6 +229,26 @@ export default async function DatasetDetailPage({
   const geometryJson = formatGeoJsonSurface(datasetGeometry);
   const callout = getCalloutMessage({ reviewed: resolvedSearchParams.reviewed, geometry: resolvedSearchParams.geometry });
 
+  const copilotConfig = getCopilotConfig();
+  const copilotOrgEnabled = access.org?.id
+    ? await readOrgCopilotEnabled(access.org.id)
+    : false;
+  const copilotUserAllowed = canPerformDroneOpsAction(access, "copilot.scout");
+  const copilotAvailable =
+    copilotConfig.globalEnabled &&
+    copilotConfig.hasApiKey &&
+    copilotOrgEnabled &&
+    copilotUserAllowed;
+  const copilotHint = !copilotConfig.globalEnabled
+    ? "Aerial Copilot is disabled on this deployment."
+    : !copilotConfig.hasApiKey
+      ? "Aerial Copilot is missing server credentials."
+      : !copilotOrgEnabled
+        ? "Aerial Copilot is not enabled for this organization yet."
+        : !copilotUserAllowed
+          ? "Your role does not include copilot.scout."
+          : "Aerial Copilot is ready.";
+
   return (
     <main className="app-shell stack-md">
       <section className="surface section-header">
@@ -250,6 +274,12 @@ export default async function DatasetDetailPage({
           {callout.text}
         </section>
       ) : null}
+
+      <DataScoutPanel
+        datasetId={detail.dataset.id}
+        available={copilotAvailable}
+        availabilityHint={copilotHint}
+      />
 
       <section className="detail-grid">
         <article className="surface stack-sm">
