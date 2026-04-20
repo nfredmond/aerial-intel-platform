@@ -602,9 +602,13 @@ export type InvitationStatusPatch = {
   accepted_by?: string | null;
 };
 
-export async function updateInvitationStatus(id: string, patch: InvitationStatusPatch) {
+export async function updateInvitationStatus(
+  id: string,
+  orgId: string,
+  patch: InvitationStatusPatch,
+) {
   const rows = await adminRestRequest<InvitationRow[]>(
-    `drone_invitations?id=eq.${encodeURIComponent(id)}&select=*`,
+    `drone_invitations?id=eq.${encodeURIComponent(id)}&org_id=eq.${encodeURIComponent(orgId)}&select=*`,
     {
       method: "PATCH",
       body: JSON.stringify(patch),

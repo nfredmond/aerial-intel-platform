@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-04-19 — Security: scope invitation revoke by org (IDOR fix)
+
+`updateInvitationStatus(id, patch)` filtered the PATCH only by invitation id, which meant `revokeInvitationAction` could flip any invitation row to `revoked` before its post-update `row.org_id !== orgId` check ran — an admin of org A could revoke a pending invitation belonging to org B. Caught during `/review` of the Wave 2.5 bridge slice.
+
+- **Helper signature.** `updateInvitationStatus(id, orgId, patch)` in `web/src/lib/supabase/admin.ts` — PostgREST filter is now `id=eq.X&org_id=eq.Y`, so no row matches and no UPDATE fires when an admin submits an invitation id from a different org.
+- **Callers.** `revokeInvitationAction` (`web/src/app/admin/people/actions.ts`) passes the admin's `orgId`; `/invitations/[token]/page.tsx` (expire + accept) passes `invitation.org_id` from the token-scoped lookup.
+- **Tests.** Existing `updateInvitationStatus` test updated to assert the `org_id` filter; new test covers the cross-org revoke attempt and asserts the helper returns null without mutating. Full web suite 371/371.
+
 ## 2026-04-19 — Wave 2.5 Track D: data-cleaning scout (W2-C3, Haiku)
 
 Third Aerial Copilot skill on main. The scout inspects a dataset's `metadata.per_image_summary[]` with deterministic rules (missing-gps / missing-exif / missing-timestamp / low blur variance / duplicate basename) and asks Haiku 4.5 for one grounded paragraph explaining what the planner should do before dispatch. Every sentence cites a `[fact:<id>]` drawn from the per-image aggregates — same narrow-grounded contract as mission-brief and processing-QA.

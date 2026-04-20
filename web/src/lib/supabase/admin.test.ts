@@ -410,11 +410,11 @@ describe("invitations", () => {
     expect(await selectInvitationByToken("missing")).toBeNull();
   });
 
-  it("updateInvitationStatus PATCHes the row by id and forwards the patch", async () => {
+  it("updateInvitationStatus PATCHes the row scoped by id+org_id and forwards the patch", async () => {
     const calls: FetchCall[] = [];
     globalThis.fetch = stubFetchOnce([], calls);
 
-    await updateInvitationStatus("inv-1", {
+    await updateInvitationStatus("inv-1", "org-1", {
       status: "accepted",
       accepted_at: "2026-04-19T00:00:00Z",
       accepted_by: "user-1",
@@ -422,10 +422,29 @@ describe("invitations", () => {
 
     expect(calls).toHaveLength(1);
     const { url, init } = calls[0];
-    expect(url).toContain(`drone_invitations?id=eq.${encodeURIComponent("inv-1")}&select=*`);
+    expect(url).toContain(`id=eq.${encodeURIComponent("inv-1")}`);
+    expect(url).toContain(`org_id=eq.${encodeURIComponent("org-1")}`);
+    expect(url).toContain("select=*");
     expect(init?.method).toBe("PATCH");
     expect(init?.body).toContain('"status":"accepted"');
     expect(init?.body).toContain('"accepted_by":"user-1"');
+  });
+
+  it("updateInvitationStatus returns null when the (id, org_id) pair does not match any row", async () => {
+    // Simulates an admin of org-A submitting an invitationId belonging to org-B:
+    // PostgREST filters on id=X AND org_id=Y, no row matches, no UPDATE fires.
+    const calls: FetchCall[] = [];
+    globalThis.fetch = stubFetchOnce([], calls);
+
+    const result = await updateInvitationStatus("inv-belongs-to-other-org", "attacker-org", {
+      status: "revoked",
+    });
+
+    expect(result).toBeNull();
+    expect(calls).toHaveLength(1);
+    const { url } = calls[0];
+    expect(url).toContain(`id=eq.${encodeURIComponent("inv-belongs-to-other-org")}`);
+    expect(url).toContain(`org_id=eq.${encodeURIComponent("attacker-org")}`);
   });
 });
 

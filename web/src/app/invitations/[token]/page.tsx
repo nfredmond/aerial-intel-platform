@@ -113,7 +113,9 @@ export default async function AcceptInvitationPage({
   }
 
   if (await isExpired(invitation.expires_at)) {
-    await updateInvitationStatus(invitation.id, { status: "expired" }).catch(() => undefined);
+    await updateInvitationStatus(invitation.id, invitation.org_id, { status: "expired" }).catch(
+      () => undefined,
+    );
     return (
       <Frame heading="Invitation expired" variant="error">
         <p>This invitation is past its expiration date. Ask your org admin to send a new one.</p>
@@ -142,7 +144,7 @@ export default async function AcceptInvitationPage({
   }
 
   await upsertMembership(invitation.org_id, user.id, invitation.role);
-  await updateInvitationStatus(invitation.id, {
+  await updateInvitationStatus(invitation.id, invitation.org_id, {
     status: "accepted",
     accepted_at: new Date().toISOString(),
     accepted_by: user.id,

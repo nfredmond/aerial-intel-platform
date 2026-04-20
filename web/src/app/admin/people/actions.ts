@@ -171,8 +171,8 @@ export async function revokeInvitationAction(
     return { status: "error", message: "Missing invitationId." };
   }
 
-  const row = await updateInvitationStatus(invitationId, { status: "revoked" });
-  if (!row || row.org_id !== orgId) {
+  const row = await updateInvitationStatus(invitationId, orgId, { status: "revoked" });
+  if (!row) {
     return { status: "error", message: "Invitation not found." };
   }
 
