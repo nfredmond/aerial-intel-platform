@@ -543,6 +543,9 @@ export default async function AdminConsolePage() {
           <Link href="/missions" className="button button-secondary">
             Missions
           </Link>
+          <Link href="/admin/people" className="button button-secondary">
+            People
+          </Link>
           {copilotConfig.globalEnabled ? (
             <Link href="/admin/copilot" className="button button-secondary">
               Copilot spend

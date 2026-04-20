@@ -37,6 +37,8 @@ export const DRONE_OPS_ACTIONS = [
   "admin.entitlements",
   "admin.support",
   "copilot.generate",
+  "members.invite",
+  "members.suspend",
 ] as const;
 
 export type DroneOpsAction = (typeof DRONE_OPS_ACTIONS)[number];
@@ -77,6 +79,8 @@ const ADMIN_DESTRUCTIVE_ACTIONS: DroneOpsAction[] = [
   "admin.memberships",
   "admin.entitlements",
   "admin.support",
+  "members.invite",
+  "members.suspend",
 ];
 
 export const DRONE_OPS_ROLE_ACTION_MATRIX: Record<DroneMembershipRole, readonly DroneOpsAction[]> = {

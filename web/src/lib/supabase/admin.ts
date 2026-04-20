@@ -515,6 +515,7 @@ export type MembershipAdminRow = {
   org_id: string;
   user_id: string;
   role: string;
+  status: "active" | "suspended";
   created_at: string;
 };
 
@@ -523,6 +524,107 @@ export async function selectMembershipsForOrg(orgId: string) {
     `drone_memberships?org_id=eq.${encodeURIComponent(orgId)}&select=*&order=created_at.asc`,
     { method: "GET" },
   );
+}
+
+export type MembershipStatusPatch = {
+  status: "active" | "suspended";
+};
+
+export async function updateMembershipStatus(
+  orgId: string,
+  userId: string,
+  patch: MembershipStatusPatch,
+) {
+  const rows = await adminRestRequest<MembershipAdminRow[]>(
+    `drone_memberships?org_id=eq.${encodeURIComponent(
+      orgId,
+    )}&user_id=eq.${encodeURIComponent(userId)}&select=*`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    },
+  );
+  return rows[0] ?? null;
+}
+
+export type InvitationRow = {
+  id: string;
+  org_id: string;
+  email: string;
+  role: "owner" | "admin" | "analyst" | "viewer";
+  invited_by: string;
+  status: "pending" | "accepted" | "revoked" | "expired";
+  token: string;
+  created_at: string;
+  expires_at: string;
+  accepted_at: string | null;
+  accepted_by: string | null;
+};
+
+export type InvitationInsert = {
+  org_id: string;
+  email: string;
+  role: "owner" | "admin" | "analyst" | "viewer";
+  invited_by: string;
+  token: string;
+  expires_at?: string;
+};
+
+export async function insertInvitation(input: InvitationInsert) {
+  const rows = await adminRestRequest<InvitationRow[]>(
+    "drone_invitations?select=*",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return rows[0] ?? null;
+}
+
+export async function selectInvitationsForOrg(orgId: string) {
+  return adminRestRequest<InvitationRow[]>(
+    `drone_invitations?org_id=eq.${encodeURIComponent(orgId)}&select=*&order=created_at.desc`,
+    { method: "GET" },
+  );
+}
+
+export async function selectInvitationByToken(token: string) {
+  const rows = await adminRestRequest<InvitationRow[]>(
+    `drone_invitations?token=eq.${encodeURIComponent(token)}&select=*`,
+    { method: "GET" },
+  );
+  return rows[0] ?? null;
+}
+
+export type InvitationStatusPatch = {
+  status: "pending" | "accepted" | "revoked" | "expired";
+  accepted_at?: string | null;
+  accepted_by?: string | null;
+};
+
+export async function updateInvitationStatus(id: string, patch: InvitationStatusPatch) {
+  const rows = await adminRestRequest<InvitationRow[]>(
+    `drone_invitations?id=eq.${encodeURIComponent(id)}&select=*`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    },
+  );
+  return rows[0] ?? null;
+}
+
+export type OrgEventInsert = {
+  org_id: string;
+  actor_user_id?: string | null;
+  event_type: string;
+  payload?: Json;
+};
+
+export async function insertOrgEvent(input: OrgEventInsert) {
+  await adminRestRequest("drone_org_events", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 export type EntitlementAdminRow = {

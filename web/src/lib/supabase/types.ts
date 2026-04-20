@@ -7,6 +7,8 @@ export type Json =
   | Json[];
 
 export type DroneMembershipRole = "owner" | "admin" | "analyst" | "viewer";
+export type DroneMembershipStatus = "active" | "suspended";
+export type DroneInvitationStatus = "pending" | "accepted" | "revoked" | "expired";
 export type DroneEntitlementStatus =
   | "active"
   | "past_due"
@@ -30,6 +32,32 @@ export type Database = {
           org_id: string;
           user_id: string;
           role: DroneMembershipRole;
+          status: DroneMembershipStatus;
+          created_at: string;
+        };
+      };
+      drone_invitations: {
+        Row: {
+          id: string;
+          org_id: string;
+          email: string;
+          role: DroneMembershipRole;
+          invited_by: string;
+          status: DroneInvitationStatus;
+          token: string;
+          created_at: string;
+          expires_at: string;
+          accepted_at: string | null;
+          accepted_by: string | null;
+        };
+      };
+      drone_org_events: {
+        Row: {
+          id: string;
+          org_id: string;
+          actor_user_id: string | null;
+          event_type: string;
+          payload: Json;
           created_at: string;
         };
       };

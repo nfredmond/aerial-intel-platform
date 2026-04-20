@@ -41,6 +41,8 @@ describe("DRONE_OPS_ROLE_ACTION_MATRIX", () => {
     expect(analyst).toContain("artifacts.share");
     expect(analyst).not.toContain("missions.delete");
     expect(analyst).not.toContain("admin.memberships");
+    expect(analyst).not.toContain("members.invite");
+    expect(analyst).not.toContain("members.suspend");
   });
 
   it("grants admin and owner the full action set", () => {
@@ -48,7 +50,15 @@ describe("DRONE_OPS_ROLE_ACTION_MATRIX", () => {
     const owner = DRONE_OPS_ROLE_ACTION_MATRIX.owner;
     expect(admin).toContain("admin.memberships");
     expect(admin).toContain("missions.delete");
+    expect(admin).toContain("members.invite");
+    expect(admin).toContain("members.suspend");
     expect(owner).toEqual(admin);
+  });
+
+  it("denies viewer on members.invite + members.suspend", () => {
+    const viewer = DRONE_OPS_ROLE_ACTION_MATRIX.viewer;
+    expect(viewer).not.toContain("members.invite");
+    expect(viewer).not.toContain("members.suspend");
   });
 });
 
