@@ -1,0 +1,74 @@
+name: Deploy TiTiler Cloud Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Optional image tag. Defaults to the short commit SHA."
+        required: false
+        type: string
+      smoke_cog_url:
+        description: "Optional COG URL for post-deploy smoke."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: deploy-controlled-titiler
+    runs-on: ubuntu-latest
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      GCP_ARTIFACT_REPOSITORY: ${{ vars.GCP_ARTIFACT_REPOSITORY }}
+      GCP_CLOUD_RUN_SERVICE: ${{ vars.GCP_CLOUD_RUN_SERVICE }}
+      TITILER_CORS_ORIGINS: ${{ vars.TITILER_CORS_ORIGINS }}
+      TITILER_BASE_IMAGE: ${{ vars.TITILER_BASE_IMAGE || 'ghcr.io/developmentseed/titiler:latest' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Resolve image tag
+        run: |
+          set -euo pipefail
+          tag="${{ inputs.image_tag }}"
+          if [ -z "$tag" ]; then
+            tag="${GITHUB_SHA::12}"
+          fi
+          echo "TITILER_IMAGE_TAG=$tag" >> "$GITHUB_ENV"
+
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      - name: Deploy TiTiler to Cloud Run
+        id: deploy
+        run: scripts/deploy_titiler_cloud_run.sh
+
+      - name: Smoke deployed TiTiler
+        env:
+          AERIAL_TITILER_URL: ${{ steps.deploy.outputs.service_url }}
+          SMOKE_COG_URL: ${{ inputs.smoke_cog_url }}
+        run: |
+          set -euo pipefail
+          if [ -n "$SMOKE_COG_URL" ]; then
+            scripts/smoke_titiler.sh "$SMOKE_COG_URL"
+          else
+            scripts/smoke_titiler.sh
+          fi
+
+      - name: Deployment summary
+        run: |
+          {
+            echo "## Controlled TiTiler deployment"
+            echo ""
+            echo "- Image: \`${{ steps.deploy.outputs.image_uri }}\`"
+            echo "- Service URL: ${{ steps.deploy.outputs.service_url }}"
+            echo ""
+            echo "Next: set Vercel \`AERIAL_TITILER_URL\` to the service URL for Preview and production, then run the authenticated raster smoke."
+          } >> "$GITHUB_STEP_SUMMARY"
