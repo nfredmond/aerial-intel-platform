@@ -299,7 +299,7 @@ describe("selectRecentCopilotEventsForOrg", () => {
     expect(url).toContain("event_type=like.copilot.call.*");
     expect(url).toContain("select=*");
     expect(url).toContain("order=created_at.desc");
-    expect(url).toContain("limit=100");
+    expect(url).toContain("limit=500");
     expect(init?.method).toBe("GET");
   });
 

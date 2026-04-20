@@ -669,7 +669,7 @@ export type OrgEventRow = {
 };
 
 export async function selectRecentCopilotEventsForOrg(orgId: string, limit = 30) {
-  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 100);
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 500);
   return adminRestRequest<OrgEventRow[]>(
     `drone_org_events?org_id=eq.${encodeURIComponent(
       orgId,

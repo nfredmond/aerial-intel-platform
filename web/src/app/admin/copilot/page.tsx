@@ -413,9 +413,14 @@ export default async function AdminCopilotPage() {
       </section>
 
       <section className="surface stack-sm">
-        <div className="stack-xs">
-          <p className="eyebrow">Audit trail</p>
-          <h2>Recent copilot events</h2>
+        <div className="section-header">
+          <div className="stack-xs">
+            <p className="eyebrow">Audit trail</p>
+            <h2>Recent copilot events</h2>
+          </div>
+          <Link href="/api/admin/copilot/events" className="button button-secondary">
+            Export CSV
+          </Link>
         </div>
         <CopilotEventsPanel rows={copilotEvents} />
       </section>

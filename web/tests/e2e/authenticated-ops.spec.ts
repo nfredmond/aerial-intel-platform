@@ -429,6 +429,14 @@ test.describe("authenticated operational smoke", () => {
       await expect(auditPanel.getByText("succeeded").first()).toBeVisible();
       await expect(auditPanel.getByText("support-assistant").first()).toBeVisible();
       await expect(auditPanel.getByText(/\d+\/\d+ kept, \d+ dropped/).first()).toBeVisible();
+      const auditExport = await page.request.get(
+        `${config.baseUrl}/api/admin/copilot/events?limit=20`,
+      );
+      expect(auditExport.status()).toBe(200);
+      expect(auditExport.headers()["content-type"]).toContain("text/csv");
+      const auditCsv = await auditExport.text();
+      expect(auditCsv).toContain("created_at,event_type,actor_user_id,skill,status");
+      expect(auditCsv).toContain("support-assistant");
 
       expect(consoleMessages).toEqual([]);
     } finally {
