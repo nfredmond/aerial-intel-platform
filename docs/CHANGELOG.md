@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-04-19 — Supabase security-advisor disposition
+
+Worked the three items surfaced by `get_advisors(security)` on project `bvrmnesiamadpnysqiqd`. Result is honest, not pretty: one is a real fix carried over from the RLS recursion work, two are not fixable in place on a hosted Supabase DB, one requires a dashboard click.
+
+- **`rls_disabled_in_public` on `public.spatial_ref_sys` (ERROR)** — `ALTER TABLE public.spatial_ref_sys ENABLE ROW LEVEL SECURITY` errors with `42501: must be owner of table spatial_ref_sys` because the table belongs to the PostGIS extension; forcing it through would break every geometry query. Dismissed as false positive.
+- **`extension_in_public` for `postgis` (WARN)** — `ALTER EXTENSION postgis SET SCHEMA extensions` errors with `0A000: extension "postgis" does not support SET SCHEMA` (PostGIS declares itself non-relocatable). The only in-place alternative is `DROP EXTENSION postgis CASCADE; CREATE EXTENSION postgis SCHEMA extensions`, which would cascade through every `geometry` column in `drone_datasets`, `drone_missions`, and `drone_sites` and destroy data. Not worth it for an advisory warning. Dismissed.
+- **`auth_leaked_password_protection` (WARN)** — enables HaveIBeenPwned check for Supabase Auth signups. Not reachable through the Supabase MCP surface (no Auth-config tool); dashboard toggle only. Flagged in `docs/ops/2026-04-19-supabase-advisor-state.md` with the exact click path.
+
+Added a risk-register row capturing the PostGIS-in-public posture and the conditions under which it could be revisited (new Supabase project from scratch with `CREATE EXTENSION postgis SCHEMA extensions` on day one). Added `docs/ops/2026-04-19-supabase-advisor-state.md` so the next audit doesn't repeat the diagnosis.
+
+No DDL merged. The earlier-authored `20260420000003_move_postgis_to_extensions_schema.sql` was deleted after it hit the `0A000` error against the live DB — it was never applied to the ledger.
+
 ## 2026-04-19 — Wave 1 exit: Toledo-20 raster pipeline verified end-to-end
 
 Wave 1 raster viewer claim is honest: the full path from Supabase Storage → signed URL → TiTiler `/cog/info` + `/cog/WebMercatorQuad/tilejson.json` + `/cog/preview.png` renders real pixels for artifact `6c413396-7475-4010-a1fe-b90cbc22977a`. TiTiler reports 3-band uint8 RGB, EPSG:32617 (UTM Zone 17N, Toledo OH), 5107×5905, overviews 2/4/8/16, driven off a 7.8 MB COG derived from the NodeODM task `8dda4117-a73d-4acb-914d-4342b32de64b` orthophoto with a `gdal_translate -of COG -co COMPRESS=JPEG -co QUALITY=85` derivative recorded in the artifact metadata. Browser-side MapLibre rendering of the same artifact is authored but still awaits a signed-in hands-on check — called out explicitly rather than claimed.
