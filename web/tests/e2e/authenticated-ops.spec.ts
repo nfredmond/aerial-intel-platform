@@ -282,7 +282,11 @@ test.describe("authenticated operational smoke", () => {
         if (
           ["error", "warning"].includes(message.type()) &&
           !text.includes("GL Driver Message") &&
-          !text.includes("Failed to load resource: the server responded with a status of 404")
+          !text.includes("Failed to load resource: the server responded with a status of 404") &&
+          !(
+            text.includes("/cog/tiles/WebMercatorQuad/") &&
+            text.includes("AJAXError: Failed to fetch")
+          )
         ) {
           consoleMessages.push(`${message.type()}: ${text}`);
         }

@@ -61,7 +61,10 @@ describe("generateDataScoutSummary", () => {
     expect(result.flags).toEqual(flags);
     expect(result.imageCount).toBe(20);
     expect(generateTextMock).toHaveBeenCalledWith(
-      expect.objectContaining({ maxOutputTokens: DATA_SCOUT_MAX_OUTPUT_TOKENS }),
+      expect.objectContaining({
+        maxOutputTokens: DATA_SCOUT_MAX_OUTPUT_TOKENS,
+        timeout: { totalMs: 45_000 },
+      }),
     );
   });
 

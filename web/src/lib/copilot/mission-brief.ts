@@ -1,5 +1,6 @@
 import { generateText } from "ai";
 
+import { getCopilotConfig } from "./config";
 import { validateGrounding } from "./grounding-validator";
 import {
   estimateSpendTenthCents,
@@ -120,12 +121,14 @@ export async function generateMissionBrief(
   const minLength = input.minLength ?? 200;
 
   const prompt = buildMissionBriefPrompt(input);
+  const generationTimeoutMs = getCopilotConfig().generationTimeoutMs;
 
   const { text: rawText, usage } = await generateText({
     model: modelId,
     system: SYSTEM_PROMPT,
     prompt,
     maxOutputTokens: MISSION_BRIEF_MAX_OUTPUT_TOKENS,
+    timeout: { totalMs: generationTimeoutMs },
   });
 
   const inputTokens = usage?.inputTokens ?? 0;

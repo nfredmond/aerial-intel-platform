@@ -1,5 +1,6 @@
 import { generateText } from "ai";
 
+import { getCopilotConfig } from "./config";
 import { validateGrounding } from "./grounding-validator";
 import {
   estimateSpendTenthCents,
@@ -49,7 +50,7 @@ export type ProcessingQaResult =
       outputTokens: number;
     };
 
-const DEFAULT_MODEL: CopilotModelId = "anthropic/claude-opus-4.7";
+const DEFAULT_MODEL: CopilotModelId = "anthropic/claude-haiku-4.5";
 export const PROCESSING_QA_MAX_OUTPUT_TOKENS = 450;
 
 const SYSTEM_PROMPT = `You are a processing-QA troubleshooting assistant for Nat Ford Planning's aerial operations platform. When a NodeODM job fails, struggles, or produces a thin output set, you help a planner figure out what likely went wrong and what to try next.
@@ -113,12 +114,14 @@ export async function generateProcessingQaNote(
   const minLength = input.minLength ?? 120;
 
   const prompt = buildProcessingQaPrompt(input);
+  const generationTimeoutMs = getCopilotConfig().generationTimeoutMs;
 
   const { text: rawText, usage } = await generateText({
     model: modelId,
     system: SYSTEM_PROMPT,
     prompt,
     maxOutputTokens: PROCESSING_QA_MAX_OUTPUT_TOKENS,
+    timeout: { totalMs: generationTimeoutMs },
   });
 
   const inputTokens = usage?.inputTokens ?? 0;

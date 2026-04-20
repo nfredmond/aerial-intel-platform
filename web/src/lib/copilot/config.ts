@@ -3,6 +3,8 @@ export type CopilotConfig = {
   globalEnabled: boolean;
   /** Default monthly cap (tenth-of-cent units) to seed a new `drone_org_ai_quota` row. */
   defaultCapTenthCents: number;
+  /** Hard wall-clock bound for one model call, so server actions fail before the platform timeout. */
+  generationTimeoutMs: number;
   /**
    * AI Gateway credential presence flag. We never return the key itself.
    * True if either `AI_GATEWAY_API_KEY` is set, or the runtime is Vercel
@@ -35,11 +37,15 @@ export function getCopilotConfig(): CopilotConfig {
     process.env.AERIAL_COPILOT_DEFAULT_CAP_TENTH_CENTS,
     50000,
   );
+  const generationTimeoutMs = parsePositiveInt(
+    process.env.AERIAL_COPILOT_GENERATE_TIMEOUT_MS,
+    45_000,
+  );
   const hasApiKey = Boolean(
     normalizeEnvString(process.env.AI_GATEWAY_API_KEY) ??
       normalizeEnvString(process.env.VERCEL_OIDC_TOKEN),
   );
-  return { globalEnabled, defaultCapTenthCents, hasApiKey };
+  return { globalEnabled, defaultCapTenthCents, generationTimeoutMs, hasApiKey };
 }
 
 export type CopilotCallContext = {

@@ -6,7 +6,7 @@
 - Phase 1 mission-control shell — **complete**, now decomposed around shared UI primitives.
 - Phase 2 ingest / preflight / processing — **largely complete**; NodeODM-direct dispatch added this pass alongside the existing webhook adapter.
 - Phase 3 viewing / delivery / collaboration — **near-complete (delivery pillar honest)**: MapLibre-backed planning + coverage maps shipped; install-bundle export shipped; mission-version snapshot + promote shipped; side-by-side version diff shipped; signed-share artifact links shipped (`/s/[token]`); read-only admin console shipped (`/admin`); Playwright public-showcase smoke shipped; authenticated ops smoke is now opt-in; copy-to-storage for real NodeODM outputs shipped (W1-A); artifact comments + approvals shipped (W1-C); TiTiler-backed raster viewer shipped and Preview-smoked via a temporary public TiTiler endpoint. A controlled Nat Ford TiTiler service is still pending before production claim.
-- Phase 4 AI / domain modules — **in progress (Wave 2 copilot landing)**: Aerial Copilot framework + mission-brief (W2-C1) + processing-QA (W2-C2) + data-cleaning scout (W2-C3) shipped, default-off per org, grounded via citation-gated output; processing-QA has live Preview verification through Vercel AI Gateway.
+- Phase 4 AI / domain modules — **in progress (Wave 2 copilot landing)**: Aerial Copilot framework + mission-brief (W2-C1) + processing-QA (W2-C2) + data-cleaning scout (W2-C3) shipped, default-off per org, grounded via citation-gated output; processing-QA has live Preview verification through Vercel AI Gateway and uses a bounded Haiku call for the internal diagnostic path.
 - Phase 5 enterprise / ecosystem — **not started**.
 
 ## Phase 0 — Foundations and architecture spikes

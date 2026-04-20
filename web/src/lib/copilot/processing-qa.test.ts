@@ -43,8 +43,12 @@ describe("generateProcessingQaNote", () => {
     expect(result.totalSentences).toBe(4);
     expect(result.keptSentences).toBe(4);
     expect(result.text.includes("[fact:")).toBe(true);
+    expect(result.modelId).toBe("anthropic/claude-haiku-4.5");
     expect(generateTextMock).toHaveBeenCalledWith(
-      expect.objectContaining({ maxOutputTokens: PROCESSING_QA_MAX_OUTPUT_TOKENS }),
+      expect.objectContaining({
+        maxOutputTokens: PROCESSING_QA_MAX_OUTPUT_TOKENS,
+        timeout: { totalMs: 45_000 },
+      }),
     );
   });
 
@@ -100,7 +104,7 @@ describe("generateProcessingQaNote", () => {
       facts: knownFacts,
     });
 
-    // Opus: 15 + 38 = 53 tenth-cents
-    expect(result.spendTenthCents).toBe(53);
+    // Haiku: 1 + 3 = 4 tenth-cents.
+    expect(result.spendTenthCents).toBe(4);
   });
 });

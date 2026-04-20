@@ -54,7 +54,10 @@ describe("generateMissionBrief", () => {
     expect(result.text.includes("[fact:")).toBe(true);
     expect(result.modelId).toBe("anthropic/claude-opus-4.7");
     expect(generateTextMock).toHaveBeenCalledWith(
-      expect.objectContaining({ maxOutputTokens: MISSION_BRIEF_MAX_OUTPUT_TOKENS }),
+      expect.objectContaining({
+        maxOutputTokens: MISSION_BRIEF_MAX_OUTPUT_TOKENS,
+        timeout: { totalMs: 45_000 },
+      }),
     );
   });
 
