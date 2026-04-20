@@ -1,6 +1,10 @@
 import { canPerformDroneOpsAction } from "@/lib/auth/actions";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 
+import {
+  recordCopilotAuditEventSafely,
+  type CopilotAuditContext,
+} from "./audit";
 import { checkCopilotCallGate, getCopilotConfig } from "./config";
 import {
   estimateSupportAssistantBudgetTenthCents,
@@ -50,27 +54,58 @@ export type SupportAssistantServerResult =
 export async function runSupportAssistantForQuestion(
   question: string,
 ): Promise<SupportAssistantServerResult> {
+  let auditContext: CopilotAuditContext | null = null;
   try {
     const trimmedQuestion = question.trim();
-    if (trimmedQuestion.length < 8) {
-      return { status: "blocked", reason: "empty-question" };
-    }
-
     const access = await getDroneOpsAccess();
     if (!access.isAuthenticated) return { status: "blocked", reason: "not-authenticated" };
-    if (!canPerformDroneOpsAction(access, "copilot.generate")) {
-      return { status: "blocked", reason: "not-authorized" };
-    }
     const orgId = access.org?.id;
     if (!orgId) return { status: "blocked", reason: "not-authorized" };
+    auditContext = {
+      orgId,
+      actorUserId: access.user?.id ?? null,
+      skill: "support-assistant",
+      targetType: "support",
+    };
+    if (!canPerformDroneOpsAction(access, "copilot.generate")) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "blocked",
+        reason: "not-authorized",
+      });
+      return { status: "blocked", reason: "not-authorized" };
+    }
+
+    if (trimmedQuestion.length < 8) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "blocked",
+        reason: "empty-question",
+      });
+      return { status: "blocked", reason: "empty-question" };
+    }
 
     const config = getCopilotConfig();
     const orgEnabled = await readOrgCopilotEnabled(orgId);
     const gate = checkCopilotCallGate({ orgEnabled }, config);
-    if (!gate.allowed) return { status: "blocked", reason: gate.reason };
+    if (!gate.allowed) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "blocked",
+        reason: gate.reason,
+      });
+      return { status: "blocked", reason: gate.reason };
+    }
 
     const facts = selectSupportFacts(trimmedQuestion);
-    if (facts.length === 0) return { status: "blocked", reason: "no-matching-docs" };
+    if (facts.length === 0) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "blocked",
+        reason: "no-matching-docs",
+      });
+      return { status: "blocked", reason: "no-matching-docs" };
+    }
 
     const reservation = await checkQuotaAndReserve({
       orgId,
@@ -80,6 +115,14 @@ export async function runSupportAssistantForQuestion(
       }),
     });
     if (!reservation.allowed) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "blocked",
+        reason: "quota-exhausted",
+        spendTenthCents: reservation.spendTenthCents,
+        capTenthCents: reservation.capTenthCents,
+        remainingTenthCents: reservation.remainingTenthCents,
+      });
       return {
         status: "blocked",
         reason: "quota-exhausted",
@@ -101,6 +144,19 @@ export async function runSupportAssistantForQuestion(
     });
 
     if (result.status === "refused") {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "refused",
+        reason: result.reason,
+        modelId: result.modelId,
+        spendTenthCents: result.spendTenthCents,
+        totalSentences: result.totalSentences,
+        keptSentences: result.keptSentences,
+        droppedSentences: result.droppedSentences,
+        citedFactCount: result.citedFactIds.length,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+      });
       return {
         status: "refused",
         reason: result.reason,
@@ -110,6 +166,19 @@ export async function runSupportAssistantForQuestion(
         spendTenthCents: result.spendTenthCents,
       };
     }
+
+    await recordCopilotAuditEventSafely({
+      ...auditContext,
+      status: "ok",
+      modelId: result.modelId,
+      spendTenthCents: result.spendTenthCents,
+      totalSentences: result.totalSentences,
+      keptSentences: result.keptSentences,
+      droppedSentences: result.droppedSentences,
+      citedFactCount: result.citedFactIds.length,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+    });
 
     return {
       status: "ok",
@@ -124,6 +193,13 @@ export async function runSupportAssistantForQuestion(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown copilot error";
+    if (auditContext) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "error",
+        reason: message,
+      });
+    }
     return { status: "error", message };
   }
 }

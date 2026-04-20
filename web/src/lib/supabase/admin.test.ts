@@ -6,6 +6,7 @@ import {
   insertOrgEvent,
   selectCopilotOrgSettings,
   selectCopilotQuotaRowsForOrg,
+  selectRecentCopilotEventsForOrg,
   selectInvitationByToken,
   selectInvitationsForOrg,
   selectMembershipByOrgUser,
@@ -281,6 +282,34 @@ describe("selectCopilotQuotaRowsForOrg", () => {
     globalThis.fetch = stubFetchOnce(payload, []);
     const rows = await selectCopilotQuotaRowsForOrg("org-1", 3);
     expect(rows).toEqual(payload);
+  });
+});
+
+describe("selectRecentCopilotEventsForOrg", () => {
+  it("filters copilot org events by event type, orders newest first, and clamps the limit", async () => {
+    const calls: FetchCall[] = [];
+    globalThis.fetch = stubFetchOnce([], calls);
+
+    await selectRecentCopilotEventsForOrg("org with space/slash", 9999);
+
+    expect(calls).toHaveLength(1);
+    const { url, init } = calls[0];
+    expect(url).toContain("https://example.supabase.co/rest/v1/drone_org_events?");
+    expect(url).toContain(`org_id=eq.${encodeURIComponent("org with space/slash")}`);
+    expect(url).toContain("event_type=like.copilot.call.*");
+    expect(url).toContain("select=*");
+    expect(url).toContain("order=created_at.desc");
+    expect(url).toContain("limit=100");
+    expect(init?.method).toBe("GET");
+  });
+
+  it("clamps non-positive limits to 1", async () => {
+    const calls: FetchCall[] = [];
+    globalThis.fetch = stubFetchOnce([], calls);
+
+    await selectRecentCopilotEventsForOrg("org-1", 0);
+
+    expect(calls[0].url).toContain("limit=1");
   });
 });
 

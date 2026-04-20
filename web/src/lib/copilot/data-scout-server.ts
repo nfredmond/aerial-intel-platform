@@ -2,6 +2,10 @@ import { canPerformDroneOpsAction } from "@/lib/auth/actions";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import { getDatasetDetail } from "@/lib/missions/detail-data";
 
+import {
+  recordCopilotAuditEventSafely,
+  type CopilotAuditContext,
+} from "./audit";
 import { checkCopilotCallGate, getCopilotConfig } from "./config";
 import {
   estimateDataScoutBudgetTenthCents,
@@ -54,26 +58,67 @@ export type DataScoutServerResult =
 export async function runDataScoutForDataset(
   datasetId: string,
 ): Promise<DataScoutServerResult> {
+  let auditContext: CopilotAuditContext | null = null;
   try {
     const access = await getDroneOpsAccess();
     if (!access.isAuthenticated) return { status: "blocked", reason: "not-authenticated" };
-    if (!canPerformDroneOpsAction(access, "copilot.scout")) {
-      return { status: "blocked", reason: "not-authorized" };
-    }
     const orgId = access.org?.id;
     if (!orgId) return { status: "blocked", reason: "not-authorized" };
+    auditContext = {
+      orgId,
+      actorUserId: access.user?.id ?? null,
+      skill: "data-scout",
+      targetType: "dataset",
+      targetId: datasetId,
+    };
+    if (!canPerformDroneOpsAction(access, "copilot.scout")) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "blocked",
+        reason: "not-authorized",
+      });
+      return { status: "blocked", reason: "not-authorized" };
+    }
 
     const config = getCopilotConfig();
     const orgEnabled = await readOrgCopilotEnabled(orgId);
     const gate = checkCopilotCallGate({ orgEnabled }, config);
-    if (!gate.allowed) return { status: "blocked", reason: gate.reason };
+    if (!gate.allowed) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "blocked",
+        reason: gate.reason,
+      });
+      return { status: "blocked", reason: gate.reason };
+    }
 
     const detail = await getDatasetDetail(access, datasetId);
-    if (!detail) return { status: "blocked", reason: "dataset-not-found" };
+    if (!detail) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "blocked",
+        reason: "dataset-not-found",
+      });
+      return { status: "blocked", reason: "dataset-not-found" };
+    }
 
     const { imageCount, flags, facts } = buildDataScoutInputs(detail);
-    if (facts.length === 0) return { status: "blocked", reason: "no-facts" };
-    if (flags.length === 0) return { status: "blocked", reason: "all-clean" };
+    if (facts.length === 0) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "blocked",
+        reason: "no-facts",
+      });
+      return { status: "blocked", reason: "no-facts" };
+    }
+    if (flags.length === 0) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "blocked",
+        reason: "all-clean",
+      });
+      return { status: "blocked", reason: "all-clean" };
+    }
 
     const reservation = await checkQuotaAndReserve({
       orgId,
@@ -85,6 +130,14 @@ export async function runDataScoutForDataset(
       }),
     });
     if (!reservation.allowed) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "blocked",
+        reason: "quota-exhausted",
+        spendTenthCents: reservation.spendTenthCents,
+        capTenthCents: reservation.capTenthCents,
+        remainingTenthCents: reservation.remainingTenthCents,
+      });
       return {
         status: "blocked",
         reason: "quota-exhausted",
@@ -108,6 +161,19 @@ export async function runDataScoutForDataset(
     });
 
     if (result.status === "refused") {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "refused",
+        reason: result.reason,
+        modelId: result.modelId,
+        spendTenthCents: result.spendTenthCents,
+        totalSentences: result.totalSentences,
+        keptSentences: result.keptSentences,
+        droppedSentences: result.droppedSentences,
+        citedFactCount: result.citedFactIds.length,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+      });
       return {
         status: "refused",
         reason: result.reason,
@@ -118,6 +184,19 @@ export async function runDataScoutForDataset(
         spendTenthCents: result.spendTenthCents,
       };
     }
+
+    await recordCopilotAuditEventSafely({
+      ...auditContext,
+      status: "ok",
+      modelId: result.modelId,
+      spendTenthCents: result.spendTenthCents,
+      totalSentences: result.totalSentences,
+      keptSentences: result.keptSentences,
+      droppedSentences: result.droppedSentences,
+      citedFactCount: result.citedFactIds.length,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+    });
 
     return {
       status: "ok",
@@ -133,6 +212,13 @@ export async function runDataScoutForDataset(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown copilot error";
+    if (auditContext) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "error",
+        reason: message,
+      });
+    }
     return { status: "error", message };
   }
 }

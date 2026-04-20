@@ -2,6 +2,10 @@ import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import { canPerformDroneOpsAction } from "@/lib/auth/actions";
 import { getJobDetail } from "@/lib/missions/detail-data";
 
+import {
+  recordCopilotAuditEventSafely,
+  type CopilotAuditContext,
+} from "./audit";
 import { checkCopilotCallGate, getCopilotConfig } from "./config";
 import {
   estimateProcessingQaBudgetTenthCents,
@@ -48,31 +52,73 @@ export type ProcessingQaServerResult =
 export async function runProcessingQaForJob(
   jobId: string,
 ): Promise<ProcessingQaServerResult> {
+  let auditContext: CopilotAuditContext | null = null;
   try {
     const access = await getDroneOpsAccess();
     if (!access.isAuthenticated) return { status: "blocked", reason: "not-authenticated" };
-    if (!canPerformDroneOpsAction(access, "copilot.generate")) {
-      return { status: "blocked", reason: "not-authorized" };
-    }
     const orgId = access.org?.id;
     if (!orgId) return { status: "blocked", reason: "not-authorized" };
+    auditContext = {
+      orgId,
+      actorUserId: access.user?.id ?? null,
+      skill: "processing-qa",
+      targetType: "job",
+      targetId: jobId,
+    };
+    if (!canPerformDroneOpsAction(access, "copilot.generate")) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "blocked",
+        reason: "not-authorized",
+      });
+      return { status: "blocked", reason: "not-authorized" };
+    }
 
     const config = getCopilotConfig();
     const orgEnabled = await readOrgCopilotEnabled(orgId);
     const gate = checkCopilotCallGate({ orgEnabled }, config);
-    if (!gate.allowed) return { status: "blocked", reason: gate.reason };
+    if (!gate.allowed) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "blocked",
+        reason: gate.reason,
+      });
+      return { status: "blocked", reason: gate.reason };
+    }
 
     const detail = await getJobDetail(access, jobId);
-    if (!detail) return { status: "blocked", reason: "job-not-found" };
+    if (!detail) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "blocked",
+        reason: "job-not-found",
+      });
+      return { status: "blocked", reason: "job-not-found" };
+    }
 
     const facts = buildProcessingQaFacts(detail);
-    if (facts.length === 0) return { status: "blocked", reason: "no-facts" };
+    if (facts.length === 0) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "blocked",
+        reason: "no-facts",
+      });
+      return { status: "blocked", reason: "no-facts" };
+    }
 
     const reservation = await checkQuotaAndReserve({
       orgId,
       budgetTenthCents: estimateProcessingQaBudgetTenthCents({ jobId, facts }),
     });
     if (!reservation.allowed) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "blocked",
+        reason: "quota-exhausted",
+        spendTenthCents: reservation.spendTenthCents,
+        capTenthCents: reservation.capTenthCents,
+        remainingTenthCents: reservation.remainingTenthCents,
+      });
       return {
         status: "blocked",
         reason: "quota-exhausted",
@@ -90,6 +136,19 @@ export async function runProcessingQaForJob(
     });
 
     if (note.status === "refused") {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "refused",
+        reason: note.reason,
+        modelId: note.modelId,
+        spendTenthCents: note.spendTenthCents,
+        totalSentences: note.totalSentences,
+        keptSentences: note.keptSentences,
+        droppedSentences: note.droppedSentences,
+        citedFactCount: note.citedFactIds.length,
+        inputTokens: note.inputTokens,
+        outputTokens: note.outputTokens,
+      });
       return {
         status: "refused",
         reason: note.reason,
@@ -98,6 +157,19 @@ export async function runProcessingQaForJob(
         spendTenthCents: note.spendTenthCents,
       };
     }
+
+    await recordCopilotAuditEventSafely({
+      ...auditContext,
+      status: "ok",
+      modelId: note.modelId,
+      spendTenthCents: note.spendTenthCents,
+      totalSentences: note.totalSentences,
+      keptSentences: note.keptSentences,
+      droppedSentences: note.droppedSentences,
+      citedFactCount: note.citedFactIds.length,
+      inputTokens: note.inputTokens,
+      outputTokens: note.outputTokens,
+    });
 
     return {
       status: "ok",
@@ -111,6 +183,13 @@ export async function runProcessingQaForJob(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown copilot error";
+    if (auditContext) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "error",
+        reason: message,
+      });
+    }
     return { status: "error", message };
   }
 }

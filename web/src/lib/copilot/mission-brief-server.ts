@@ -3,6 +3,10 @@ import { canPerformDroneOpsAction } from "@/lib/auth/actions";
 import { getMissionDetail } from "@/lib/missions/detail-data";
 
 import { checkCopilotCallGate, getCopilotConfig } from "./config";
+import {
+  recordCopilotAuditEventSafely,
+  type CopilotAuditContext,
+} from "./audit";
 import { estimateMissionBriefBudgetTenthCents, generateMissionBrief } from "./mission-brief";
 import { buildMissionBriefFacts } from "./mission-brief-facts";
 import { checkQuotaAndReserve, readOrgCopilotEnabled, recordSpend } from "./quota";
@@ -45,25 +49,59 @@ export type MissionBriefServerResult =
 export async function runMissionBriefForMission(
   missionId: string,
 ): Promise<MissionBriefServerResult> {
+  let auditContext: CopilotAuditContext | null = null;
   try {
     const access = await getDroneOpsAccess();
     if (!access.isAuthenticated) return { status: "blocked", reason: "not-authenticated" };
-    if (!canPerformDroneOpsAction(access, "copilot.generate")) {
-      return { status: "blocked", reason: "not-authorized" };
-    }
     const orgId = access.org?.id;
     if (!orgId) return { status: "blocked", reason: "not-authorized" };
+    auditContext = {
+      orgId,
+      actorUserId: access.user?.id ?? null,
+      skill: "mission-brief",
+      targetType: "mission",
+      targetId: missionId,
+    };
+    if (!canPerformDroneOpsAction(access, "copilot.generate")) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "blocked",
+        reason: "not-authorized",
+      });
+      return { status: "blocked", reason: "not-authorized" };
+    }
 
     const config = getCopilotConfig();
     const orgEnabled = await readOrgCopilotEnabled(orgId);
     const gate = checkCopilotCallGate({ orgEnabled }, config);
-    if (!gate.allowed) return { status: "blocked", reason: gate.reason };
+    if (!gate.allowed) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "blocked",
+        reason: gate.reason,
+      });
+      return { status: "blocked", reason: gate.reason };
+    }
 
     const detail = await getMissionDetail(access, missionId);
-    if (!detail) return { status: "blocked", reason: "mission-not-found" };
+    if (!detail) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "blocked",
+        reason: "mission-not-found",
+      });
+      return { status: "blocked", reason: "mission-not-found" };
+    }
 
     const facts = buildMissionBriefFacts(detail);
-    if (facts.length === 0) return { status: "blocked", reason: "no-facts" };
+    if (facts.length === 0) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "blocked",
+        reason: "no-facts",
+      });
+      return { status: "blocked", reason: "no-facts" };
+    }
 
     const reservation = await checkQuotaAndReserve({
       orgId,
@@ -73,6 +111,14 @@ export async function runMissionBriefForMission(
       }),
     });
     if (!reservation.allowed) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "blocked",
+        reason: "quota-exhausted",
+        spendTenthCents: reservation.spendTenthCents,
+        capTenthCents: reservation.capTenthCents,
+        remainingTenthCents: reservation.remainingTenthCents,
+      });
       return {
         status: "blocked",
         reason: "quota-exhausted",
@@ -94,6 +140,19 @@ export async function runMissionBriefForMission(
     });
 
     if (brief.status === "refused") {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "refused",
+        reason: brief.reason,
+        modelId: brief.modelId,
+        spendTenthCents: brief.spendTenthCents,
+        totalSentences: brief.totalSentences,
+        keptSentences: brief.keptSentences,
+        droppedSentences: brief.droppedSentences,
+        citedFactCount: brief.citedFactIds.length,
+        inputTokens: brief.inputTokens,
+        outputTokens: brief.outputTokens,
+      });
       return {
         status: "refused",
         reason: brief.reason,
@@ -102,6 +161,19 @@ export async function runMissionBriefForMission(
         spendTenthCents: brief.spendTenthCents,
       };
     }
+
+    await recordCopilotAuditEventSafely({
+      ...auditContext,
+      status: "ok",
+      modelId: brief.modelId,
+      spendTenthCents: brief.spendTenthCents,
+      totalSentences: brief.totalSentences,
+      keptSentences: brief.keptSentences,
+      droppedSentences: brief.droppedSentences,
+      citedFactCount: brief.citedFactIds.length,
+      inputTokens: brief.inputTokens,
+      outputTokens: brief.outputTokens,
+    });
 
     return {
       status: "ok",
@@ -115,6 +187,13 @@ export async function runMissionBriefForMission(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown copilot error";
+    if (auditContext) {
+      await recordCopilotAuditEventSafely({
+        ...auditContext,
+        status: "error",
+        reason: message,
+      });
+    }
     return { status: "error", message };
   }
 }

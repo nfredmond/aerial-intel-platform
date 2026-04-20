@@ -659,6 +659,25 @@ export async function insertOrgEvent(input: OrgEventInsert) {
   });
 }
 
+export type OrgEventRow = {
+  id: string;
+  org_id: string;
+  actor_user_id: string | null;
+  event_type: string;
+  payload: Json;
+  created_at: string;
+};
+
+export async function selectRecentCopilotEventsForOrg(orgId: string, limit = 30) {
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 100);
+  return adminRestRequest<OrgEventRow[]>(
+    `drone_org_events?org_id=eq.${encodeURIComponent(
+      orgId,
+    )}&event_type=like.copilot.call.*&select=*&order=created_at.desc&limit=${safeLimit}`,
+    { method: "GET" },
+  );
+}
+
 export type EntitlementAdminRow = {
   id: string;
   org_id: string;

@@ -11,8 +11,10 @@ import { currentPeriodMonthIso } from "@/lib/copilot/quota";
 import {
   selectCopilotOrgSettings,
   selectCopilotQuotaRowsForOrg,
+  selectRecentCopilotEventsForOrg,
   type CopilotOrgSettingsRow,
   type CopilotQuotaRow,
+  type OrgEventRow,
 } from "@/lib/supabase/admin";
 import { formatDateTime, formatRelativeTime } from "@/lib/ui/datetime";
 import { statusPillClassName, type Tone } from "@/lib/ui/tones";
@@ -35,6 +37,111 @@ function spendTone(spend: number, cap: number): Tone {
 
 function enabledTone(enabled: boolean): Tone {
   return enabled ? "success" : "neutral";
+}
+
+type CopilotEventPayload = Record<string, unknown>;
+
+function getEventPayload(payload: OrgEventRow["payload"]): CopilotEventPayload {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return {};
+  }
+  return payload as CopilotEventPayload;
+}
+
+function payloadString(payload: CopilotEventPayload, key: string): string | null {
+  const value = payload[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function payloadNumber(payload: CopilotEventPayload, key: string): number | null {
+  const value = payload[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function eventTone(eventType: string, status: string | null): Tone {
+  const value = status ?? eventType;
+  if (value.includes("failed") || value === "error") return "danger";
+  if (value.includes("refused") || value === "refused") return "warning";
+  if (value.includes("blocked") || value === "blocked") return "neutral";
+  if (value.includes("succeeded") || value === "ok") return "success";
+  return "info";
+}
+
+function formatEventLabel(eventType: string) {
+  return eventType.replace("copilot.call.", "");
+}
+
+function formatSentenceSummary(payload: CopilotEventPayload) {
+  const total = payloadNumber(payload, "totalSentences");
+  if (total === null) return "—";
+  const kept = payloadNumber(payload, "keptSentences");
+  const dropped = payloadNumber(payload, "droppedSentences") ?? 0;
+  const cited = payloadNumber(payload, "citedFactCount");
+  const keptLabel = kept === null ? "?" : String(kept);
+  const citedLabel = cited === null ? "" : `, ${cited} facts`;
+  return `${keptLabel}/${total} kept, ${dropped} dropped${citedLabel}`;
+}
+
+function CopilotEventsPanel({ rows }: { rows: OrgEventRow[] }) {
+  if (rows.length === 0) {
+    return (
+      <p className="muted">
+        No copilot audit events yet. Attempts, refusals, and failed calls will appear here
+        after the next org-scoped copilot request.
+      </p>
+    );
+  }
+
+  return (
+    <div className="admin-table-wrap">
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>Created</th>
+            <th>Event</th>
+            <th>Skill</th>
+            <th>Target</th>
+            <th>Spend</th>
+            <th>Sentences</th>
+            <th>Reason / model</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const payload = getEventPayload(row.payload);
+            const status = payloadString(payload, "status");
+            const skill = payloadString(payload, "skill") ?? "unknown";
+            const targetType = payloadString(payload, "targetType") ?? "support";
+            const targetId = payloadString(payload, "targetId");
+            const reason = payloadString(payload, "reason");
+            const modelId = payloadString(payload, "modelId");
+            const spend = payloadNumber(payload, "spendTenthCents");
+            return (
+              <tr key={row.id}>
+                <td>{formatRelativeTime(row.created_at)}</td>
+                <td>
+                  <span className={statusPillClassName(eventTone(row.event_type, status))}>
+                    {formatEventLabel(row.event_type)}
+                  </span>
+                </td>
+                <td>{skill}</td>
+                <td>
+                  <span>{targetType}</span>
+                  {targetId ? <div className="admin-table__mono">{targetId}</div> : null}
+                </td>
+                <td>{spend === null ? "—" : formatTenthCents(spend)}</td>
+                <td>{formatSentenceSummary(payload)}</td>
+                <td>
+                  {reason ?? "—"}
+                  {modelId ? <div className="muted">{modelId}</div> : null}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 function QuotaHistoryPanel({ rows }: { rows: CopilotQuotaRow[] }) {
@@ -161,9 +268,10 @@ export default async function AdminCopilotPage() {
   const config = getCopilotConfig();
   const currentPeriod = currentPeriodMonthIso();
 
-  const [settings, quotaRows] = await Promise.all([
+  const [settings, quotaRows, copilotEvents] = await Promise.all([
     selectCopilotOrgSettings(orgId).catch(() => null as CopilotOrgSettingsRow | null),
     selectCopilotQuotaRowsForOrg(orgId, 6).catch(() => [] as CopilotQuotaRow[]),
+    selectRecentCopilotEventsForOrg(orgId, 20).catch(() => [] as OrgEventRow[]),
   ]);
 
   const currentRow = quotaRows.find((row) => row.period_month.startsWith(currentPeriod.slice(0, 7)));
@@ -298,10 +406,18 @@ export default async function AdminCopilotPage() {
         </div>
         <QuotaHistoryPanel rows={quotaRows} />
         <p className="muted">
-          Attempts, refusals, and sentence-drop counts are not yet emitted as events — follow-up
-          slice will wire those alongside the dashboard. Spend above is derived directly from the
-          `drone_org_ai_quota` row, updated by `recordSpend` after every call.
+          Spend above is derived directly from the `drone_org_ai_quota` row, updated by
+          `recordSpend` after every metered call. Event rows below are org-scoped audit records in
+          `drone_org_events`.
         </p>
+      </section>
+
+      <section className="surface stack-sm">
+        <div className="stack-xs">
+          <p className="eyebrow">Audit trail</p>
+          <h2>Recent copilot events</h2>
+        </div>
+        <CopilotEventsPanel rows={copilotEvents} />
       </section>
 
       <SupportAssistantPanel

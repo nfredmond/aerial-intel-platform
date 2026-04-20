@@ -423,6 +423,13 @@ test.describe("authenticated operational smoke", () => {
       await expect(supportPanel.getByText(/\[fact:support:/)).toBeVisible({ timeout: 120_000 });
       await expect(supportPanel.getByText(/Cited support sources/)).toBeVisible();
 
+      await page.reload({ waitUntil: "networkidle" });
+      const auditPanel = page.locator("section", { hasText: "Recent copilot events" }).first();
+      await expect(auditPanel).toBeVisible();
+      await expect(auditPanel.getByText("succeeded").first()).toBeVisible();
+      await expect(auditPanel.getByText("support-assistant").first()).toBeVisible();
+      await expect(auditPanel.getByText(/\d+\/\d+ kept, \d+ dropped/).first()).toBeVisible();
+
       expect(consoleMessages).toEqual([]);
     } finally {
       if (ownerContext) await ownerContext.close();
