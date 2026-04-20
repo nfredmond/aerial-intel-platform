@@ -7,7 +7,11 @@ repo artifacts.
 ## What shipped
 
 - Controlled TiTiler service artifacts in `infra/titiler/`.
+- Manual Cloud Run deployment workflow for TiTiler in
+  `.github/workflows/deploy-titiler-cloud-run.yml`.
 - `scripts/smoke_titiler.sh` for tilejson and PNG tile smoke checks.
+- `scripts/deploy_titiler_cloud_run.sh` for local or workflow-backed Cloud Run
+  deploys.
 - `scripts/check_release_readiness.sh` for required env and production TiTiler
   guardrails.
 - `docs/RELEASE_CHECKLIST.md` for production promotion.
@@ -20,6 +24,7 @@ repo artifacts.
 From the repository root:
 
 - `bash -n scripts/smoke_titiler.sh scripts/check_release_readiness.sh` - pass.
+- `bash -n scripts/deploy_titiler_cloud_run.sh` - pass.
 - `docker compose -f infra/titiler/docker-compose.yml config` - pass.
 - `NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service AERIAL_TITILER_URL=https://titiler.example.com AERIAL_RELEASE_TARGET=production scripts/check_release_readiness.sh` - pass.
 - Same readiness command with `AERIAL_TITILER_URL=https://titiler.xyz` and `AERIAL_RELEASE_TARGET=production` - fails as expected.

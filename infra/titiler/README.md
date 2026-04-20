@@ -29,6 +29,30 @@ AERIAL_TITILER_URL=http://localhost:8080 ../../scripts/smoke_titiler.sh
 project id, region, artifact registry path, and CORS origins are environment
 specific.
 
+The preferred deployment path is the manual GitHub Actions workflow:
+
+```text
+Deploy TiTiler Cloud Run
+```
+
+Configure repository variables:
+
+- `GCP_PROJECT_ID`
+- `GCP_REGION`
+- `GCP_ARTIFACT_REPOSITORY`
+- `GCP_CLOUD_RUN_SERVICE`
+- `TITILER_CORS_ORIGINS`
+- `TITILER_BASE_IMAGE` (optional; defaults to `ghcr.io/developmentseed/titiler:latest`)
+
+Configure repository secrets for Workload Identity Federation:
+
+- `GCP_WORKLOAD_IDENTITY_PROVIDER`
+- `GCP_SERVICE_ACCOUNT`
+
+The workflow builds `infra/titiler`, pushes the image to Artifact Registry,
+deploys Cloud Run, and runs `scripts/smoke_titiler.sh` against the deployed
+service URL.
+
 Minimal deployment flow:
 
 ```bash
@@ -50,6 +74,17 @@ gcloud run services add-iam-policy-binding aerial-titiler \
 
 Run `scripts/smoke_titiler.sh` against the Cloud Run URL before setting
 `AERIAL_TITILER_URL` in Vercel.
+
+Local equivalent after `gcloud auth login`:
+
+```bash
+GCP_PROJECT_ID=PROJECT \
+GCP_REGION=REGION \
+GCP_ARTIFACT_REPOSITORY=aerial \
+GCP_CLOUD_RUN_SERVICE=aerial-titiler \
+TITILER_CORS_ORIGINS='https://APP_ORIGIN,https://PREVIEW_ORIGIN' \
+  scripts/deploy_titiler_cloud_run.sh
+```
 
 ## Production requirements
 
