@@ -736,3 +736,37 @@ export async function selectArtifactApprovalsByArtifact(artifactId: string) {
   )}&select=*&order=decided_at.desc`;
   return adminRestRequest<ArtifactApprovalRow[]>(query, { method: "GET" });
 }
+
+export type CopilotQuotaRow = {
+  id: string;
+  org_id: string;
+  period_month: string;
+  spend_tenth_cents: number;
+  cap_tenth_cents: number;
+  last_call_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function selectCopilotQuotaRowsForOrg(orgId: string, limit = 6) {
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 60);
+  const query =
+    `drone_org_ai_quota?org_id=eq.${encodeURIComponent(orgId)}` +
+    `&select=*&order=period_month.desc&limit=${safeLimit}`;
+  return adminRestRequest<CopilotQuotaRow[]>(query, { method: "GET" });
+}
+
+export type CopilotOrgSettingsRow = {
+  org_id: string;
+  copilot_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function selectCopilotOrgSettings(orgId: string) {
+  const query = `drone_org_settings?org_id=eq.${encodeURIComponent(
+    orgId,
+  )}&select=org_id,copilot_enabled,created_at,updated_at`;
+  const rows = await adminRestRequest<CopilotOrgSettingsRow[]>(query, { method: "GET" });
+  return rows[0] ?? null;
+}

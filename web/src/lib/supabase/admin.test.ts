@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  selectCopilotOrgSettings,
+  selectCopilotQuotaRowsForOrg,
   selectNodeOdmJobsForOrg,
   selectShareLinksNearExpiry,
   selectStaleInFlightJobsForOrg,
@@ -216,5 +218,93 @@ describe("selectStaleInFlightJobsForOrg", () => {
     expect(url).toContain("limit=1");
     const cutoffMatch = /updated_at=lt\.([^&]+)/.exec(url);
     expect(decodeURIComponent(cutoffMatch![1])).toBe("2026-04-15T23:59:00.000Z");
+  });
+});
+
+describe("selectCopilotQuotaRowsForOrg", () => {
+  it("orders by period_month desc and clamps the limit for a url-unsafe org id", async () => {
+    const calls: FetchCall[] = [];
+    globalThis.fetch = stubFetchOnce([], calls);
+
+    await selectCopilotQuotaRowsForOrg("org with space/slash", 9999);
+
+    expect(calls).toHaveLength(1);
+    const { url, init } = calls[0];
+    expect(url).toContain("https://example.supabase.co/rest/v1/drone_org_ai_quota?");
+    expect(url).toContain(`org_id=eq.${encodeURIComponent("org with space/slash")}`);
+    expect(url).toContain("order=period_month.desc");
+    expect(url).toContain("limit=60");
+    expect(url).toContain("select=*");
+    expect(init?.method).toBe("GET");
+  });
+
+  it("defaults the limit to 6 when not provided", async () => {
+    const calls: FetchCall[] = [];
+    globalThis.fetch = stubFetchOnce([], calls);
+
+    await selectCopilotQuotaRowsForOrg("org-1");
+
+    expect(calls[0].url).toContain("limit=6");
+  });
+
+  it("clamps non-positive limits to 1", async () => {
+    const calls: FetchCall[] = [];
+    globalThis.fetch = stubFetchOnce([], calls);
+
+    await selectCopilotQuotaRowsForOrg("org-1", 0);
+
+    expect(calls[0].url).toContain("limit=1");
+  });
+
+  it("returns the REST rows unchanged", async () => {
+    const payload = [
+      {
+        id: "row-a",
+        org_id: "org-1",
+        period_month: "2026-04-01",
+        spend_tenth_cents: 125,
+        cap_tenth_cents: 50000,
+        last_call_at: "2026-04-18T00:00:00Z",
+        created_at: "2026-04-01T00:00:00Z",
+        updated_at: "2026-04-18T00:00:00Z",
+      },
+    ];
+    globalThis.fetch = stubFetchOnce(payload, []);
+    const rows = await selectCopilotQuotaRowsForOrg("org-1", 3);
+    expect(rows).toEqual(payload);
+  });
+});
+
+describe("selectCopilotOrgSettings", () => {
+  it("selects the expected columns and encodes the org id", async () => {
+    const calls: FetchCall[] = [];
+    globalThis.fetch = stubFetchOnce([], calls);
+
+    await selectCopilotOrgSettings("org with space/slash");
+
+    expect(calls).toHaveLength(1);
+    const { url, init } = calls[0];
+    expect(url).toContain("https://example.supabase.co/rest/v1/drone_org_settings?");
+    expect(url).toContain(`org_id=eq.${encodeURIComponent("org with space/slash")}`);
+    expect(url).toContain("select=org_id,copilot_enabled,created_at,updated_at");
+    expect(init?.method).toBe("GET");
+  });
+
+  it("returns the first row when one exists", async () => {
+    const row = {
+      org_id: "org-1",
+      copilot_enabled: true,
+      created_at: "2026-04-01T00:00:00Z",
+      updated_at: "2026-04-18T00:00:00Z",
+    };
+    globalThis.fetch = stubFetchOnce([row], []);
+    const result = await selectCopilotOrgSettings("org-1");
+    expect(result).toEqual(row);
+  });
+
+  it("returns null when the org has no settings row yet", async () => {
+    globalThis.fetch = stubFetchOnce([], []);
+    const result = await selectCopilotOrgSettings("org-1");
+    expect(result).toBeNull();
   });
 });
