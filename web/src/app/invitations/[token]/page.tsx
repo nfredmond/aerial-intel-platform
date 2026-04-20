@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 type Params = { token: string };
 
-async function getServiceClient() {
+function getServiceClient() {
   const { url } = getSupabaseEnv();
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceRoleKey) {
@@ -22,12 +22,14 @@ async function getServiceClient() {
   return { url, serviceRoleKey };
 }
 
+const TOKEN_SHAPE = /^[A-Za-z0-9_-]{16,128}$/;
+
 async function upsertMembership(
   orgId: string,
   userId: string,
   role: string,
 ): Promise<void> {
-  const { url, serviceRoleKey } = await getServiceClient();
+  const { url, serviceRoleKey } = getServiceClient();
   const response = await fetch(
     `${url}/rest/v1/drone_memberships?on_conflict=org_id,user_id`,
     {
@@ -94,6 +96,14 @@ export default async function AcceptInvitationPage({
   params: Promise<Params>;
 }) {
   const { token } = await params;
+
+  if (!TOKEN_SHAPE.test(token)) {
+    return (
+      <Frame heading="Invitation not found" variant="error">
+        <p>This invitation link is invalid or has been removed.</p>
+      </Frame>
+    );
+  }
 
   const invitation = await selectInvitationByToken(token).catch(() => null);
   if (!invitation) {

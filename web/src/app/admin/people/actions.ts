@@ -36,17 +36,11 @@ function normalizeRole(value: unknown): InvitableRole | null {
     : null;
 }
 
-function buildInvitationUrl(token: string): string {
-  const base =
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    process.env.NEXT_PUBLIC_VERCEL_URL ??
-    "";
+function buildInvitationUrl(token: string): string | null {
+  const base = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_VERCEL_URL ?? "";
   const trimmed = base.replace(/\/$/, "");
-  const origin = trimmed
-    ? trimmed.startsWith("http")
-      ? trimmed
-      : `https://${trimmed}`
-    : "";
+  if (!trimmed) return null;
+  const origin = trimmed.startsWith("http") ? trimmed : `https://${trimmed}`;
   return `${origin}/invitations/${token}`;
 }
 
@@ -95,10 +89,11 @@ export async function inviteMemberAction(
 
   revalidatePath("/admin/people");
 
+  const invitationUrl = buildInvitationUrl(token);
   return {
     status: "ok",
     message: `Invitation created for ${email}.`,
-    invitationUrl: buildInvitationUrl(token),
+    ...(invitationUrl ? { invitationUrl } : {}),
   };
 }
 
