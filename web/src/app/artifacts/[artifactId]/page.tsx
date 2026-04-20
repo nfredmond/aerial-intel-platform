@@ -4,6 +4,9 @@ import { notFound, redirect } from "next/navigation";
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-button";
+import { ReportSummaryPanel } from "@/components/copilot/report-summary-panel";
+import { RasterViewer } from "@/components/raster-viewer";
+import { canPerformDroneOpsAction } from "@/lib/auth/actions";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import {
   buildArtifactExportPacket,
@@ -16,6 +19,8 @@ import {
   getBenchmarkOutputForArtifact,
   getBenchmarkSummaryView,
 } from "@/lib/benchmark-summary";
+import { getCopilotConfig } from "@/lib/copilot/config";
+import { readOrgCopilotEnabled } from "@/lib/copilot/quota";
 import { getArtifactDetail, getString } from "@/lib/missions/detail-data";
 import { tryCreateSignedDownloadUrl } from "@/lib/storage-delivery";
 import {
@@ -26,14 +31,24 @@ import {
   shareLinkStatus,
 } from "@/lib/sharing";
 import {
+  insertArtifactApproval,
+  insertArtifactComment,
   insertArtifactShareLink,
   insertJobEvent,
+  selectArtifactApprovalsByArtifact,
+  selectArtifactCommentsByArtifact,
   selectArtifactShareLinksByArtifact,
+  updateArtifactComment,
   updateArtifactShareLink,
   updateProcessingOutput,
+  type ArtifactApprovalDecision,
 } from "@/lib/supabase/admin";
+import { buildTitilerTileUrl, fetchTitilerTileJson } from "@/lib/titiler/client";
+import { getTitilerConfig } from "@/lib/titiler/config";
 import { formatDateTime } from "@/lib/ui/datetime";
 import { statusPillClassName, type Tone } from "@/lib/ui/tones";
+
+const COG_RASTER_KINDS = new Set(["orthomosaic", "dsm", "dtm", "dem"]);
 
 function statusClass(status: string) {
   const tone: Tone =
@@ -122,6 +137,36 @@ function getCalloutMessage(action?: string) {
         tone: "success",
         text: "Share link revoked. It will no longer grant access, even with the token.",
       } as const;
+    case "comment-added":
+      return {
+        tone: "success",
+        text: "Comment posted. Reviewers can see the thread on this artifact now.",
+      } as const;
+    case "comment-resolved":
+      return {
+        tone: "success",
+        text: "Comment thread marked resolved.",
+      } as const;
+    case "approved":
+      return {
+        tone: "success",
+        text: "Approval recorded. This artifact is now cleared for export.",
+      } as const;
+    case "changes-requested":
+      return {
+        tone: "success",
+        text: "Changes-requested decision recorded. Export stays blocked until a new approval is entered.",
+      } as const;
+    case "needs-approval":
+      return {
+        tone: "error",
+        text: "Artifact export is gated on at least one reviewer approval. Record one in the Approvals panel first.",
+      } as const;
+    case "comment-empty":
+      return {
+        tone: "error",
+        text: "Cannot post an empty comment.",
+      } as const;
     case "error":
       return {
         tone: "error",
@@ -180,6 +225,14 @@ export default async function ArtifactDetailPage({
 
     if (refreshedDetail.output.status !== "ready") {
       redirect(`/artifacts/${artifactId}?action=not-ready`);
+    }
+
+    if (targetAction === "exported") {
+      const existingApprovals = await selectArtifactApprovalsByArtifact(artifactId).catch(() => []);
+      const latestApproval = existingApprovals[0];
+      if (!latestApproval || latestApproval.decision !== "approved") {
+        redirect(`/artifacts/${artifactId}?action=needs-approval`);
+      }
     }
 
     const currentHandoff = getArtifactHandoff(refreshedDetail.metadata);
@@ -412,6 +465,172 @@ export default async function ArtifactDetailPage({
     redirect(`/artifacts/${artifactId}?action=share-link-revoked`);
   }
 
+  async function postCommentAction(formData: FormData) {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) redirect("/sign-in");
+    if (
+      !refreshedAccess.org?.id ||
+      !refreshedAccess.hasMembership ||
+      !refreshedAccess.hasActiveEntitlement
+    ) {
+      redirect("/dashboard");
+    }
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/artifacts/${artifactId}?action=denied`);
+    }
+
+    const refreshedDetail = await getArtifactDetail(refreshedAccess, artifactId);
+    if (!refreshedDetail) redirect("/missions");
+
+    const rawBody = formData.get("commentBody");
+    const body = typeof rawBody === "string" ? rawBody.trim() : "";
+    if (body.length === 0) {
+      redirect(`/artifacts/${artifactId}?action=comment-empty`);
+    }
+    const rawParent = formData.get("parentId");
+    const parentId = typeof rawParent === "string" && rawParent.trim() ? rawParent.trim() : null;
+
+    try {
+      const comment = await insertArtifactComment({
+        org_id: refreshedAccess.org.id,
+        artifact_id: refreshedDetail.output.id,
+        parent_id: parentId,
+        author_user_id: refreshedAccess.user.id,
+        author_email: refreshedAccess.user.email ?? null,
+        body,
+      });
+
+      if (comment) {
+        await insertJobEvent({
+          org_id: refreshedAccess.org.id,
+          job_id: refreshedDetail.output.job_id,
+          event_type: "artifact.comment.posted",
+          payload: {
+            title: "Artifact comment posted",
+            detail: `${refreshedAccess.user.email ?? "A reviewer"} posted a comment on ${getString(
+              refreshedDetail.metadata.name,
+              refreshedDetail.output.kind.replaceAll("_", " "),
+            )}: ${body.length > 200 ? `${body.slice(0, 200)}…` : body}`,
+            commentId: comment.id,
+          },
+        }).catch(() => undefined);
+      }
+    } catch {
+      redirect(`/artifacts/${artifactId}?action=error`);
+    }
+
+    redirect(`/artifacts/${artifactId}?action=comment-added`);
+  }
+
+  async function resolveCommentAction(formData: FormData) {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) redirect("/sign-in");
+    if (
+      !refreshedAccess.org?.id ||
+      !refreshedAccess.hasMembership ||
+      !refreshedAccess.hasActiveEntitlement
+    ) {
+      redirect("/dashboard");
+    }
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/artifacts/${artifactId}?action=denied`);
+    }
+
+    const rawId = formData.get("commentId");
+    const commentId = typeof rawId === "string" ? rawId.trim() : "";
+    if (!commentId) redirect(`/artifacts/${artifactId}?action=error`);
+
+    const refreshedDetail = await getArtifactDetail(refreshedAccess, artifactId);
+    if (!refreshedDetail) redirect("/missions");
+
+    try {
+      const comment = await updateArtifactComment({
+        id: commentId,
+        orgId: refreshedAccess.org.id,
+        artifactId: refreshedDetail.output.id,
+        patch: { resolved_at: new Date().toISOString() },
+      });
+      if (!comment) redirect(`/artifacts/${artifactId}?action=error`);
+    } catch {
+      redirect(`/artifacts/${artifactId}?action=error`);
+    }
+
+    redirect(`/artifacts/${artifactId}?action=comment-resolved`);
+  }
+
+  async function recordApprovalAction(formData: FormData) {
+    "use server";
+
+    const refreshedAccess = await getDroneOpsAccess();
+    if (!refreshedAccess.user) redirect("/sign-in");
+    if (
+      !refreshedAccess.org?.id ||
+      !refreshedAccess.hasMembership ||
+      !refreshedAccess.hasActiveEntitlement
+    ) {
+      redirect("/dashboard");
+    }
+    if (refreshedAccess.role === "viewer") {
+      redirect(`/artifacts/${artifactId}?action=denied`);
+    }
+
+    const refreshedDetail = await getArtifactDetail(refreshedAccess, artifactId);
+    if (!refreshedDetail) redirect("/missions");
+
+    const rawDecision = formData.get("decision");
+    const decision: ArtifactApprovalDecision =
+      rawDecision === "approved"
+        ? "approved"
+        : rawDecision === "changes_requested"
+          ? "changes_requested"
+          : "approved";
+    const rawNote = formData.get("approvalNote");
+    const note = typeof rawNote === "string" && rawNote.trim() ? rawNote.trim() : null;
+
+    try {
+      const approval = await insertArtifactApproval({
+        org_id: refreshedAccess.org.id,
+        artifact_id: refreshedDetail.output.id,
+        reviewer_user_id: refreshedAccess.user.id,
+        reviewer_email: refreshedAccess.user.email ?? null,
+        decision,
+        note,
+      });
+
+      if (approval) {
+        await insertJobEvent({
+          org_id: refreshedAccess.org.id,
+          job_id: refreshedDetail.output.job_id,
+          event_type:
+            decision === "approved"
+              ? "artifact.approval.approved"
+              : "artifact.approval.changes_requested",
+          payload: {
+            title:
+              decision === "approved"
+                ? "Artifact approved for export"
+                : "Artifact approval: changes requested",
+            detail: `${refreshedAccess.user.email ?? "Reviewer"} recorded decision "${decision}" on ${getString(
+              refreshedDetail.metadata.name,
+              refreshedDetail.output.kind.replaceAll("_", " "),
+            )}${note ? `: ${note}` : "."}`,
+            approvalId: approval.id,
+          },
+        }).catch(() => undefined);
+      }
+    } catch {
+      redirect(`/artifacts/${artifactId}?action=error`);
+    }
+
+    redirect(
+      `/artifacts/${artifactId}?action=${decision === "approved" ? "approved" : "changes-requested"}`,
+    );
+  }
+
   const artifactName = getString(detail.metadata.name, detail.output.kind.replaceAll("_", " "));
   const storagePath = detail.output.storage_path ?? "Storage path pending";
   const benchmarkSummary = getBenchmarkSummaryView(detail.outputSummary.benchmarkSummary ?? detail.outputSummary);
@@ -447,7 +666,56 @@ export default async function ArtifactDetailPage({
     handoffNote: handoff.note,
   });
   const shareLinks = await selectArtifactShareLinksByArtifact(detail.output.id).catch(() => []);
+  const comments = await selectArtifactCommentsByArtifact(detail.output.id).catch(() => []);
+  const approvals = await selectArtifactApprovalsByArtifact(detail.output.id).catch(() => []);
+  const latestApproval = approvals[0] ?? null;
+  const hasApprovedApproval = Boolean(latestApproval && latestApproval.decision === "approved");
   const callout = getCalloutMessage(resolvedSearchParams.action);
+  const copilotConfig = getCopilotConfig();
+  const copilotOrgEnabled = access.org?.id
+    ? await readOrgCopilotEnabled(access.org.id)
+    : false;
+  const copilotUserAllowed = canPerformDroneOpsAction(access, "copilot.generate");
+  const reportSummaryAvailable =
+    copilotConfig.globalEnabled &&
+    copilotConfig.hasApiKey &&
+    copilotOrgEnabled &&
+    copilotUserAllowed;
+  const reportSummaryHint = !copilotConfig.globalEnabled
+    ? "Aerial Copilot is disabled on this deployment."
+    : !copilotConfig.hasApiKey
+      ? "Aerial Copilot is missing server credentials."
+      : !copilotOrgEnabled
+        ? "Aerial Copilot is not enabled for this organization yet."
+        : !copilotUserAllowed
+          ? "Your role does not include copilot.generate."
+          : "Aerial Copilot is ready.";
+
+  const titilerConfig = getTitilerConfig();
+  const isCogArtifact =
+    COG_RASTER_KINDS.has(detail.output.kind) &&
+    detail.output.status === "ready" &&
+    Boolean(detail.output.storage_bucket) &&
+    Boolean(detail.output.storage_path);
+  const rasterCogUrl = isCogArtifact && titilerConfig.configured
+    ? await tryCreateSignedDownloadUrl({
+        bucket: detail.output.storage_bucket,
+        path: detail.output.storage_path,
+        expiresInSeconds: 60 * 60 * 6,
+      })
+    : null;
+  const rasterTileUrlTemplate = rasterCogUrl
+    ? buildTitilerTileUrl({
+        baseUrl: titilerConfig.baseUrl ?? undefined,
+        cogUrl: rasterCogUrl,
+      })
+    : null;
+  const rasterTileJson = rasterCogUrl
+    ? await fetchTitilerTileJson({
+        baseUrl: titilerConfig.baseUrl ?? undefined,
+        cogUrl: rasterCogUrl,
+      }).catch(() => null)
+    : null;
 
   return (
     <main className="app-shell stack-md">
@@ -573,12 +841,22 @@ export default async function ArtifactDetailPage({
               </button>
             </form>
             <form action={updateArtifactState.bind(null, "exported")}>
-              <button type="submit" className="button button-secondary" disabled={access.role === "viewer" || detail.output.status !== "ready"}>
+              <button
+                type="submit"
+                className="button button-secondary"
+                disabled={
+                  access.role === "viewer" ||
+                  detail.output.status !== "ready" ||
+                  !hasApprovedApproval
+                }
+              >
                 Mark exported
               </button>
             </form>
             {detail.output.status !== "ready" ? (
               <p className="muted">Artifact handoff actions unlock once the artifact itself is ready.</p>
+            ) : !hasApprovedApproval ? (
+              <p className="muted">Export is blocked until a reviewer approves this artifact below.</p>
             ) : null}
           </div>
 
@@ -636,6 +914,42 @@ export default async function ArtifactDetailPage({
           </div>
         </aside>
       </section>
+
+      <ReportSummaryPanel
+        artifactId={detail.output.id}
+        artifactName={artifactName}
+        available={reportSummaryAvailable}
+        availabilityHint={reportSummaryHint}
+      />
+
+      {rasterTileUrlTemplate ? (
+        <section className="surface stack-sm">
+          <div className="stack-xs">
+            <p className="eyebrow">Raster preview</p>
+            <h2>{detail.output.kind.replaceAll("_", " ")} overlay</h2>
+            <p className="muted">
+              Streamed from TiTiler. Drag to pan, scroll or pinch to zoom, and adjust opacity to compare against the base map.
+            </p>
+          </div>
+          <RasterViewer
+            tileUrlTemplate={rasterTileUrlTemplate}
+            bounds={rasterTileJson?.bounds ?? null}
+            label={artifactName}
+            attribution="TiTiler · Supabase Storage"
+            ariaLabel={`${detail.output.kind} raster preview for ${artifactName}`}
+          />
+        </section>
+      ) : isCogArtifact && !titilerConfig.configured ? (
+        <section className="surface stack-sm">
+          <div className="stack-xs">
+            <p className="eyebrow">Raster preview</p>
+            <h2>Viewer not configured</h2>
+            <p className="muted">
+              Set <code>AERIAL_TITILER_URL</code> to point at a running TiTiler service to enable the in-page raster viewer for this artifact.
+            </p>
+          </div>
+        </section>
+      ) : null}
 
       <section className="grid-cards">
         <article className="surface stack-sm info-card">
@@ -781,6 +1095,129 @@ export default async function ArtifactDetailPage({
           </div>
         </section>
       ) : null}
+
+      <section className="surface stack-sm">
+        <div className="stack-xs">
+          <p className="eyebrow">Reviewer decisions</p>
+          <h2>Artifact approvals</h2>
+          <p className="muted">
+            At least one &quot;approved&quot; decision is required before this artifact can be exported. Decisions are kept as an audit trail; the latest one on top is what gates the export button.
+          </p>
+        </div>
+
+        {approvals.length === 0 ? (
+          <p className="muted">No approval decisions recorded yet.</p>
+        ) : (
+          <div className="stack-xs">
+            {approvals.map((approval) => {
+              const tone: Tone = approval.decision === "approved" ? "success" : "warning";
+              const label = approval.decision === "approved" ? "Approved" : "Changes requested";
+              return (
+                <article key={approval.id} className="ops-list-card">
+                  <div className="ops-list-card-header">
+                    <strong>
+                      <span className={statusPillClassName(tone)}>{label}</span>{" "}
+                      {approval.reviewer_email ?? "Unknown reviewer"}
+                    </strong>
+                    <span className="muted">{formatDateTime(approval.decided_at)}</span>
+                  </div>
+                  {approval.note ? <p className="muted">{approval.note}</p> : null}
+                </article>
+              );
+            })}
+          </div>
+        )}
+
+        {access.role !== "viewer" ? (
+          <form action={recordApprovalAction} className="stack-sm surface-form-shell">
+            <label className="stack-xs">
+              <span className="muted">Decision</span>
+              <select name="decision" defaultValue="approved">
+                <option value="approved">Approve — cleared for export</option>
+                <option value="changes_requested">Request changes</option>
+              </select>
+            </label>
+            <label className="stack-xs">
+              <span className="muted">Reviewer note (optional)</span>
+              <textarea
+                name="approvalNote"
+                rows={3}
+                placeholder="Context, caveats, or what the reviewer checked."
+                maxLength={1000}
+              />
+            </label>
+            <button type="submit" className="button button-secondary">
+              Record decision
+            </button>
+          </form>
+        ) : null}
+      </section>
+
+      <section className="surface stack-sm">
+        <div className="stack-xs">
+          <p className="eyebrow">Artifact thread</p>
+          <h2>Comments</h2>
+          <p className="muted">
+            Collaborate on review findings, client-safe caveats, and delivery context without leaving the artifact surface.
+          </p>
+        </div>
+
+        {comments.length === 0 ? (
+          <p className="muted">No comments posted yet.</p>
+        ) : (
+          <div className="stack-xs">
+            {comments.map((comment) => {
+              const resolved = Boolean(comment.resolved_at);
+              return (
+                <article
+                  key={comment.id}
+                  className="ops-list-card"
+                  style={resolved ? { opacity: 0.6 } : undefined}
+                >
+                  <div className="ops-list-card-header">
+                    <strong>
+                      {comment.author_email ?? "Unknown"}
+                      {resolved ? (
+                        <span className={statusPillClassName("success")} style={{ marginLeft: "0.5rem" }}>
+                          resolved
+                        </span>
+                      ) : null}
+                    </strong>
+                    <span className="muted">{formatDateTime(comment.created_at)}</span>
+                  </div>
+                  <p>{comment.body}</p>
+                  {!resolved && access.role !== "viewer" ? (
+                    <form action={resolveCommentAction}>
+                      <input type="hidden" name="commentId" value={comment.id} />
+                      <button type="submit" className="button button-secondary">
+                        Mark resolved
+                      </button>
+                    </form>
+                  ) : null}
+                </article>
+              );
+            })}
+          </div>
+        )}
+
+        {access.role !== "viewer" ? (
+          <form action={postCommentAction} className="stack-sm surface-form-shell">
+            <label className="stack-xs">
+              <span className="muted">New comment</span>
+              <textarea
+                name="commentBody"
+                rows={3}
+                placeholder="Share a review note, a caveat, or a delivery follow-up."
+                maxLength={4000}
+                required
+              />
+            </label>
+            <button type="submit" className="button button-primary">
+              Post comment
+            </button>
+          </form>
+        ) : null}
+      </section>
 
       <section className="surface stack-sm">
         <div className="stack-xs">

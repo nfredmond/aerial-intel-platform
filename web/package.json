@@ -19,6 +19,7 @@
     "@turf/boolean-point-in-polygon": "^7.3.4",
     "@turf/center": "^7.3.4",
     "@turf/helpers": "^7.3.4",
+    "ai": "^6.0.168",
     "fflate": "^0.8.2",
     "maplibre-gl": "^5.23.0",
     "next": "16.1.6",

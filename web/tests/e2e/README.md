@@ -6,6 +6,10 @@ Playwright-backed E2E tests for the web app.
 
 - `showcase.spec.ts` — hits the public `/` and `/sign-in` routes. No Supabase
   dependency; safe to run on any build.
+- `authenticated-ops.spec.ts` — opt-in signed-in smoke for the current
+  DroneOps operating slice. It verifies active vs suspended RLS, artifact
+  comment scoping, copilot citations, artifact report summaries, admin support docs, and optionally TiTiler raster tiles.
+  It creates temporary smoke users/comments and removes them in `finally`.
 
 ## What's NOT wired yet
 
@@ -17,8 +21,27 @@ handoff → import a fixture output → confirm artifact) requires:
 2. A seeded test user with an active DroneOps entitlement.
 3. Env vars pointing Playwright + the Next.js server at that project.
 
-Wire those up before writing auth-gated specs — otherwise they'll fail on the
-first `await supabase.auth.getUser()` in `proxy.ts`.
+The authenticated smoke is present but skipped unless explicitly enabled:
+
+```bash
+AERIAL_E2E_AUTH_SMOKE=1 \
+AERIAL_E2E_BASE_URL=https://aerial-preview.example.com \
+AERIAL_E2E_SKIP_SERVER=1 \
+NEXT_PUBLIC_SUPABASE_URL=... \
+NEXT_PUBLIC_SUPABASE_ANON_KEY=... \
+SUPABASE_SERVICE_ROLE_KEY=... \
+AERIAL_E2E_OWNER_EMAIL=test.drone.owner@natfordplanning.test \
+AERIAL_E2E_OWNER_USER_ID=... \
+AERIAL_E2E_ORG_ID=... \
+AERIAL_E2E_RASTER_ARTIFACT_ID=... \
+AERIAL_E2E_SECOND_ARTIFACT_ID=... \
+AERIAL_E2E_SYNTHETIC_JOB_ID=... \
+AERIAL_E2E_EXPECT_RASTER=1 \
+  npm run test:e2e -- authenticated-ops.spec.ts
+```
+
+Only set `AERIAL_E2E_EXPECT_RASTER=1` when the target deployment has an
+externally reachable `AERIAL_TITILER_URL`.
 
 ## Local usage
 

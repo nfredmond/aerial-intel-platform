@@ -138,6 +138,7 @@ describe("dispatch-adapter", () => {
 
     expect(result.ok).toBe(false);
     expect(result.mode).toBe("unconfigured");
+    if (result.ok) throw new Error("expected failure result");
     expect(result.error).toContain("No dispatch adapter endpoint");
   });
 

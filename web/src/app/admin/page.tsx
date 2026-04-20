@@ -5,6 +5,7 @@ import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { canPerformDroneOpsAction } from "@/lib/auth/actions";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
+import { getCopilotConfig } from "@/lib/copilot/config";
 import {
   selectEntitlementsForOrg,
   selectMembershipsForOrg,
@@ -522,6 +523,7 @@ export default async function AdminConsolePage() {
 
   const activeEntitlements = entitlements.filter((row) => row.status === "active").length;
   const activeJobs = jobs.filter((row) => row.status === "pending" || row.status === "running").length;
+  const copilotConfig = getCopilotConfig();
 
   return (
     <main className="app-shell stack-md">
@@ -541,6 +543,14 @@ export default async function AdminConsolePage() {
           <Link href="/missions" className="button button-secondary">
             Missions
           </Link>
+          <Link href="/admin/people" className="button button-secondary">
+            People
+          </Link>
+          {copilotConfig.globalEnabled ? (
+            <Link href="/admin/copilot" className="button button-secondary">
+              Copilot spend
+            </Link>
+          ) : null}
           <SignOutForm label="Sign out" variant="secondary" />
         </div>
       </section>

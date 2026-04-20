@@ -26,6 +26,8 @@ export const DRONE_OPS_ACTIONS = [
   "artifacts.write",
   "artifacts.share",
   "artifacts.export",
+  "artifacts.comment",
+  "artifacts.approve",
   "handoffs.read",
   "handoffs.write",
   "versions.read",
@@ -34,6 +36,10 @@ export const DRONE_OPS_ACTIONS = [
   "admin.memberships",
   "admin.entitlements",
   "admin.support",
+  "copilot.generate",
+  "copilot.scout",
+  "members.invite",
+  "members.suspend",
 ] as const;
 
 export type DroneOpsAction = (typeof DRONE_OPS_ACTIONS)[number];
@@ -59,9 +65,13 @@ const ANALYST_WRITE_ACTIONS: DroneOpsAction[] = [
   "artifacts.write",
   "artifacts.share",
   "artifacts.export",
+  "artifacts.comment",
+  "artifacts.approve",
   "handoffs.write",
   "versions.write",
   "versions.promote",
+  "copilot.generate",
+  "copilot.scout",
 ];
 
 const ADMIN_DESTRUCTIVE_ACTIONS: DroneOpsAction[] = [
@@ -71,6 +81,8 @@ const ADMIN_DESTRUCTIVE_ACTIONS: DroneOpsAction[] = [
   "admin.memberships",
   "admin.entitlements",
   "admin.support",
+  "members.invite",
+  "members.suspend",
 ];
 
 export const DRONE_OPS_ROLE_ACTION_MATRIX: Record<DroneMembershipRole, readonly DroneOpsAction[]> = {

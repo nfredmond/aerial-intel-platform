@@ -56,8 +56,9 @@ export async function getDroneOpsAccess(): Promise<DroneOpsAccessResult> {
 
   const { data: memberships, error: membershipError } = await supabase
     .from("drone_memberships")
-    .select("org_id, user_id, role, created_at")
-    .eq("user_id", user.id);
+    .select("org_id, user_id, role, status, created_at")
+    .eq("user_id", user.id)
+    .eq("status", "active");
 
   if (membershipError) {
     throw membershipError;

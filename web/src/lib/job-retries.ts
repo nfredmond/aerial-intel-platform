@@ -39,7 +39,7 @@ export function buildRetryJobInputSummary(options: {
   inputSummary: Json | null | undefined;
   engine: string;
   previousJobId: string;
-}) {
+}): JsonRecord {
   const inputSummary = asRecord(options.inputSummary);
   const existingName = typeof inputSummary.name === "string" && inputSummary.name.trim().length > 0
     ? inputSummary.name
@@ -49,13 +49,13 @@ export function buildRetryJobInputSummary(options: {
     ...inputSummary,
     name: `${existingName} retry`,
     retryOfJobId: options.previousJobId,
-  } satisfies JsonRecord;
+  };
 }
 
 export function buildRetryJobOutputSummary(options: {
   outputSummary: Json | null | undefined;
   previousJobId: string;
-}) {
+}): JsonRecord {
   const outputSummary = asRecord(options.outputSummary);
 
   return {
@@ -74,7 +74,7 @@ export function buildRetryJobOutputSummary(options: {
       `Retry requested from job ${options.previousJobId}.`,
       "Awaiting worker pickup.",
     ],
-  } satisfies JsonRecord;
+  };
 }
 
 export function buildRetryOutputSeeds(options: {

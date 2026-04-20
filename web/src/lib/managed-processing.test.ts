@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import type { getJobDetail } from "@/lib/missions/detail-data";
+
 import {
   buildManagedProcessingRequestSummary,
   getManagedDispatchAdapterState,
@@ -8,13 +10,15 @@ import {
   isManagedProcessingJobRecord,
 } from "./managed-processing";
 
+type JobDetailResult = NonNullable<Awaited<ReturnType<typeof getJobDetail>>>;
+
 function createDetail(input: {
   status: string;
   stage: string;
   presetId?: string | null;
   source?: string;
   outputs?: Array<{ status: string }>;
-}) {
+}): JobDetailResult {
   return {
     job: {
       id: "job-1",
@@ -61,7 +65,7 @@ function createDetail(input: {
     events: [],
     inputSummary: {},
     outputSummary: {},
-  };
+  } as unknown as JobDetailResult;
 }
 
 describe("managed-processing", () => {

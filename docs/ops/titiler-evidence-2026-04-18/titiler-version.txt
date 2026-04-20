@@ -1,0 +1,2 @@
+2.0.1
+container: /opengeo-titiler@ghcr.io/developmentseed/titiler:latest

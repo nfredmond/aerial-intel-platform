@@ -4,6 +4,10 @@ import { notFound, redirect } from "next/navigation";
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-button";
+import { MissionBriefPanel } from "@/components/copilot/mission-brief-panel";
+import { getCopilotConfig } from "@/lib/copilot/config";
+import { readOrgCopilotEnabled } from "@/lib/copilot/quota";
+import { canPerformDroneOpsAction } from "@/lib/auth/actions";
 import { BrowserZipIntakeForm } from "@/components/browser-zip-intake-form";
 import { GeometryJsonField } from "@/components/geometry-json-field";
 import { GeometryPreviewCard } from "@/components/geometry-preview-card";
@@ -374,6 +378,26 @@ export default async function MissionDetailPage({
   if (!detail) {
     notFound();
   }
+
+  const copilotConfig = getCopilotConfig();
+  const copilotOrgEnabled = access.org?.id
+    ? await readOrgCopilotEnabled(access.org.id)
+    : false;
+  const copilotUserAllowed = canPerformDroneOpsAction(access, "copilot.generate");
+  const copilotAvailable =
+    copilotConfig.globalEnabled &&
+    copilotConfig.hasApiKey &&
+    copilotOrgEnabled &&
+    copilotUserAllowed;
+  const copilotHint = !copilotConfig.globalEnabled
+    ? "Aerial Copilot is disabled on this deployment."
+    : !copilotConfig.hasApiKey
+      ? "Aerial Copilot is missing server credentials."
+      : !copilotOrgEnabled
+        ? "Aerial Copilot is not enabled for this organization yet."
+        : !copilotUserAllowed
+          ? "Your role does not include copilot.generate."
+          : "Aerial Copilot is ready.";
 
   async function attachDataset(formData: FormData) {
     "use server";
@@ -1773,6 +1797,13 @@ export default async function MissionDetailPage({
         title="At-a-glance operational posture"
         subtitle="Visual summary of readiness, GIS quality, terrain posture, overlay review, and best attached dataset coverage."
         metrics={dashboardMetrics}
+      />
+
+      <MissionBriefPanel
+        missionId={detail.mission.id}
+        missionName={detail.mission.name}
+        available={copilotAvailable}
+        availabilityHint={copilotHint}
       />
 
       <section className="detail-grid">

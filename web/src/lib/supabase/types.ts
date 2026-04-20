@@ -7,6 +7,8 @@ export type Json =
   | Json[];
 
 export type DroneMembershipRole = "owner" | "admin" | "analyst" | "viewer";
+export type DroneMembershipStatus = "active" | "suspended";
+export type DroneInvitationStatus = "pending" | "accepted" | "revoked" | "expired";
 export type DroneEntitlementStatus =
   | "active"
   | "past_due"
@@ -30,6 +32,32 @@ export type Database = {
           org_id: string;
           user_id: string;
           role: DroneMembershipRole;
+          status: DroneMembershipStatus;
+          created_at: string;
+        };
+      };
+      drone_invitations: {
+        Row: {
+          id: string;
+          org_id: string;
+          email: string;
+          role: DroneMembershipRole;
+          invited_by: string;
+          status: DroneInvitationStatus;
+          token: string;
+          created_at: string;
+          expires_at: string;
+          accepted_at: string | null;
+          accepted_by: string | null;
+        };
+      };
+      drone_org_events: {
+        Row: {
+          id: string;
+          org_id: string;
+          actor_user_id: string | null;
+          event_type: string;
+          payload: Json;
           created_at: string;
         };
       };
@@ -276,6 +304,42 @@ export type Database = {
           event_type: string;
           payload?: Json;
           created_at?: string;
+        };
+      };
+      drone_org_settings: {
+        Row: {
+          org_id: string;
+          copilot_enabled: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          org_id: string;
+          copilot_enabled?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      drone_org_ai_quota: {
+        Row: {
+          id: string;
+          org_id: string;
+          period_month: string;
+          spend_tenth_cents: number;
+          cap_tenth_cents: number;
+          last_call_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          period_month: string;
+          spend_tenth_cents?: number;
+          cap_tenth_cents?: number;
+          last_call_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
         };
       };
     };

@@ -515,12 +515,165 @@ export type MembershipAdminRow = {
   org_id: string;
   user_id: string;
   role: string;
+  status: "active" | "suspended";
   created_at: string;
+};
+
+export type MembershipInsert = {
+  org_id: string;
+  user_id: string;
+  role: string;
+  status?: "active" | "suspended";
 };
 
 export async function selectMembershipsForOrg(orgId: string) {
   return adminRestRequest<MembershipAdminRow[]>(
     `drone_memberships?org_id=eq.${encodeURIComponent(orgId)}&select=*&order=created_at.asc`,
+    { method: "GET" },
+  );
+}
+
+export async function selectMembershipByOrgUser(orgId: string, userId: string) {
+  const rows = await adminRestRequest<MembershipAdminRow[]>(
+    `drone_memberships?org_id=eq.${encodeURIComponent(
+      orgId,
+    )}&user_id=eq.${encodeURIComponent(userId)}&select=*`,
+    { method: "GET" },
+  );
+  return rows[0] ?? null;
+}
+
+export async function insertMembership(input: MembershipInsert) {
+  const rows = await adminRestRequest<MembershipAdminRow[]>(
+    "drone_memberships?select=*",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return rows[0] ?? null;
+}
+
+export type MembershipStatusPatch = {
+  status: "active" | "suspended";
+};
+
+export async function updateMembershipStatus(
+  orgId: string,
+  userId: string,
+  patch: MembershipStatusPatch,
+) {
+  const rows = await adminRestRequest<MembershipAdminRow[]>(
+    `drone_memberships?org_id=eq.${encodeURIComponent(
+      orgId,
+    )}&user_id=eq.${encodeURIComponent(userId)}&select=*`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    },
+  );
+  return rows[0] ?? null;
+}
+
+export type InvitationRow = {
+  id: string;
+  org_id: string;
+  email: string;
+  role: "owner" | "admin" | "analyst" | "viewer";
+  invited_by: string;
+  status: "pending" | "accepted" | "revoked" | "expired";
+  token: string;
+  created_at: string;
+  expires_at: string;
+  accepted_at: string | null;
+  accepted_by: string | null;
+};
+
+export type InvitationInsert = {
+  org_id: string;
+  email: string;
+  role: "owner" | "admin" | "analyst" | "viewer";
+  invited_by: string;
+  token: string;
+  expires_at?: string;
+};
+
+export async function insertInvitation(input: InvitationInsert) {
+  const rows = await adminRestRequest<InvitationRow[]>(
+    "drone_invitations?select=*",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return rows[0] ?? null;
+}
+
+export async function selectInvitationsForOrg(orgId: string) {
+  return adminRestRequest<InvitationRow[]>(
+    `drone_invitations?org_id=eq.${encodeURIComponent(orgId)}&select=*&order=created_at.desc`,
+    { method: "GET" },
+  );
+}
+
+export async function selectInvitationByToken(token: string) {
+  const rows = await adminRestRequest<InvitationRow[]>(
+    `drone_invitations?token=eq.${encodeURIComponent(token)}&select=*`,
+    { method: "GET" },
+  );
+  return rows[0] ?? null;
+}
+
+export type InvitationStatusPatch = {
+  status: "pending" | "accepted" | "revoked" | "expired";
+  accepted_at?: string | null;
+  accepted_by?: string | null;
+};
+
+export async function updateInvitationStatus(
+  id: string,
+  orgId: string,
+  patch: InvitationStatusPatch,
+) {
+  const rows = await adminRestRequest<InvitationRow[]>(
+    `drone_invitations?id=eq.${encodeURIComponent(id)}&org_id=eq.${encodeURIComponent(orgId)}&select=*`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    },
+  );
+  return rows[0] ?? null;
+}
+
+export type OrgEventInsert = {
+  org_id: string;
+  actor_user_id?: string | null;
+  event_type: string;
+  payload?: Json;
+};
+
+export async function insertOrgEvent(input: OrgEventInsert) {
+  await adminRestRequest("drone_org_events", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export type OrgEventRow = {
+  id: string;
+  org_id: string;
+  actor_user_id: string | null;
+  event_type: string;
+  payload: Json;
+  created_at: string;
+};
+
+export async function selectRecentCopilotEventsForOrg(orgId: string, limit = 30) {
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 500);
+  return adminRestRequest<OrgEventRow[]>(
+    `drone_org_events?org_id=eq.${encodeURIComponent(
+      orgId,
+    )}&event_type=like.copilot.call.*&select=*&order=created_at.desc&limit=${safeLimit}`,
     { method: "GET" },
   );
 }
@@ -637,4 +790,145 @@ export async function selectRecentEventsForOrg(orgId: string, limit = 30) {
     )}&select=*&order=created_at.desc&limit=${safeLimit}`,
     { method: "GET" },
   );
+}
+
+export type ArtifactCommentInsert = {
+  org_id: string;
+  artifact_id: string;
+  parent_id?: string | null;
+  author_user_id?: string | null;
+  author_email?: string | null;
+  body: string;
+};
+
+export type ArtifactCommentPatch = {
+  body?: string;
+  resolved_at?: string | null;
+};
+
+export type ArtifactCommentRow = {
+  id: string;
+  org_id: string;
+  artifact_id: string;
+  parent_id: string | null;
+  author_user_id: string | null;
+  author_email: string | null;
+  body: string;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function insertArtifactComment(input: ArtifactCommentInsert) {
+  const rows = await adminRestRequest<ArtifactCommentRow[]>(
+    "drone_artifact_comments?select=*",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return rows[0] ?? null;
+}
+
+export async function updateArtifactComment(input: {
+  id: string;
+  orgId: string;
+  artifactId: string;
+  patch: ArtifactCommentPatch;
+}) {
+  const rows = await adminRestRequest<ArtifactCommentRow[]>(
+    `drone_artifact_comments?id=eq.${encodeURIComponent(
+      input.id,
+    )}&org_id=eq.${encodeURIComponent(input.orgId)}&artifact_id=eq.${encodeURIComponent(
+      input.artifactId,
+    )}&select=*`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(input.patch),
+    },
+  );
+  return rows[0] ?? null;
+}
+
+export async function selectArtifactCommentsByArtifact(artifactId: string) {
+  const query = `drone_artifact_comments?artifact_id=eq.${encodeURIComponent(
+    artifactId,
+  )}&select=*&order=created_at.asc`;
+  return adminRestRequest<ArtifactCommentRow[]>(query, { method: "GET" });
+}
+
+export type ArtifactApprovalDecision = "approved" | "changes_requested";
+
+export type ArtifactApprovalInsert = {
+  org_id: string;
+  artifact_id: string;
+  reviewer_user_id?: string | null;
+  reviewer_email?: string | null;
+  decision: ArtifactApprovalDecision;
+  note?: string | null;
+};
+
+export type ArtifactApprovalRow = {
+  id: string;
+  org_id: string;
+  artifact_id: string;
+  reviewer_user_id: string | null;
+  reviewer_email: string | null;
+  decision: ArtifactApprovalDecision;
+  note: string | null;
+  decided_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function insertArtifactApproval(input: ArtifactApprovalInsert) {
+  const rows = await adminRestRequest<ArtifactApprovalRow[]>(
+    "drone_artifact_approvals?select=*",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return rows[0] ?? null;
+}
+
+export async function selectArtifactApprovalsByArtifact(artifactId: string) {
+  const query = `drone_artifact_approvals?artifact_id=eq.${encodeURIComponent(
+    artifactId,
+  )}&select=*&order=decided_at.desc`;
+  return adminRestRequest<ArtifactApprovalRow[]>(query, { method: "GET" });
+}
+
+export type CopilotQuotaRow = {
+  id: string;
+  org_id: string;
+  period_month: string;
+  spend_tenth_cents: number;
+  cap_tenth_cents: number;
+  last_call_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function selectCopilotQuotaRowsForOrg(orgId: string, limit = 6) {
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 60);
+  const query =
+    `drone_org_ai_quota?org_id=eq.${encodeURIComponent(orgId)}` +
+    `&select=*&order=period_month.desc&limit=${safeLimit}`;
+  return adminRestRequest<CopilotQuotaRow[]>(query, { method: "GET" });
+}
+
+export type CopilotOrgSettingsRow = {
+  org_id: string;
+  copilot_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function selectCopilotOrgSettings(orgId: string) {
+  const query = `drone_org_settings?org_id=eq.${encodeURIComponent(
+    orgId,
+  )}&select=org_id,copilot_enabled,created_at,updated_at`;
+  const rows = await adminRestRequest<CopilotOrgSettingsRow[]>(query, { method: "GET" });
+  return rows[0] ?? null;
 }
