@@ -2,7 +2,8 @@
 
 TiTiler is the COG-tile server behind the artifact-detail raster preview. The
 Next.js app builds `.../cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=<signed>`
-URLs; TiTiler pulls the COG from Supabase Storage (via a signed URL) and
+URLs and reads `.../cog/WebMercatorQuad/tilejson.json?url=<signed>` for WGS84
+bounds; TiTiler pulls the COG from Supabase Storage (via a signed URL) and
 responds with PNG tiles. The app itself does not need to proxy anything.
 
 ## Environment
@@ -111,6 +112,10 @@ From the artifact page, with TiTiler running:
 4. Check the browser Network tab — tile requests should go to
    `${AERIAL_TITILER_URL}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=<signed>`
    and return 200 with `image/png`.
+5. Bounds should come from
+   `${AERIAL_TITILER_URL}/cog/WebMercatorQuad/tilejson.json?url=<signed>`.
+   Do not pass `/cog/info` bounds into MapLibre; TiTiler returns those in the
+   source CRS for projected COGs, not longitude/latitude.
 
 If tiles fail with 403, the Supabase signed URL expired or the COG wasn't
 written with COG-friendly tiling; fall back to verifying the bytes with

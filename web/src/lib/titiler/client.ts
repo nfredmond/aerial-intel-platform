@@ -74,6 +74,12 @@ export type TitilerInfoResponse = {
   crs?: string;
 };
 
+export type TitilerTileJsonResponse = {
+  bounds?: [number, number, number, number];
+  minzoom?: number;
+  maxzoom?: number;
+};
+
 export async function fetchTitilerInfo(
   options: TitilerInfoUrlOptions & { fetchImpl?: typeof fetch },
 ): Promise<TitilerInfoResponse> {
@@ -88,6 +94,24 @@ export async function fetchTitilerInfo(
   const payload = (await response.json()) as TitilerInfoResponse;
   if (!Array.isArray(payload.bounds) || payload.bounds.length !== 4) {
     throw new Error("TiTiler info response missing bounds array");
+  }
+  return payload;
+}
+
+export async function fetchTitilerTileJson(
+  options: TitilerTileUrlOptions & { fetchImpl?: typeof fetch },
+): Promise<TitilerTileJsonResponse> {
+  const url = buildTitilerTileJsonUrl(options);
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const response = await fetchImpl(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(
+      `TiTiler tilejson request failed: ${response.status} ${response.statusText}`,
+    );
+  }
+  const payload = (await response.json()) as TitilerTileJsonResponse;
+  if (!Array.isArray(payload.bounds) || payload.bounds.length !== 4) {
+    throw new Error("TiTiler tilejson response missing WGS84 bounds array");
   }
   return payload;
 }

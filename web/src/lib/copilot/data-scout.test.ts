@@ -4,7 +4,7 @@ const generateTextMock = vi.hoisted(() => vi.fn());
 
 vi.mock("ai", () => ({ generateText: generateTextMock }));
 
-import { generateDataScoutSummary } from "./data-scout";
+import { DATA_SCOUT_MAX_OUTPUT_TOKENS, generateDataScoutSummary } from "./data-scout";
 
 const knownFacts = [
   { id: "dataset:toledo-20:name", label: "Dataset", value: "Toledo-20 RGB" },
@@ -56,10 +56,13 @@ describe("generateDataScoutSummary", () => {
     expect(result.totalSentences).toBe(5);
     expect(result.keptSentences).toBe(5);
     expect(result.droppedSentences).toBe(0);
-    expect(result.summary.includes("[fact:")).toBe(false);
+    expect(result.summary.includes("[fact:")).toBe(true);
     expect(result.citedFactIds).toContain("scout:toledo-20:missing_gps");
     expect(result.flags).toEqual(flags);
     expect(result.imageCount).toBe(20);
+    expect(generateTextMock).toHaveBeenCalledWith(
+      expect.objectContaining({ maxOutputTokens: DATA_SCOUT_MAX_OUTPUT_TOKENS }),
+    );
   });
 
   it("refuses when more than 30% of sentences cite unknown facts", async () => {

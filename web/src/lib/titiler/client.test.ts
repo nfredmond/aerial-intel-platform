@@ -5,6 +5,7 @@ import {
   buildTitilerTileJsonUrl,
   buildTitilerTileUrl,
   fetchTitilerInfo,
+  fetchTitilerTileJson,
 } from "./client";
 
 const ORIGINAL_TITILER_URL = process.env.AERIAL_TITILER_URL;
@@ -77,8 +78,52 @@ describe("buildTitilerTileJsonUrl", () => {
   });
 });
 
+describe("fetchTitilerTileJson", () => {
+  it("returns WGS84 bounds from tilejson when request succeeds", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => ({
+        bounds: [-83.70017, 41.54845, -83.69737, 41.55086],
+        minzoom: 16,
+        maxzoom: 21,
+      }),
+    } as unknown as Response);
+
+    const result = await fetchTitilerTileJson({
+      baseUrl: "https://tiles.example.com",
+      cogUrl: "https://bucket.example.com/ortho.tif",
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    expect(result.bounds).toEqual([-83.70017, 41.54845, -83.69737, 41.55086]);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      expect.stringContaining("/cog/WebMercatorQuad/tilejson.json?url="),
+      { cache: "no-store" },
+    );
+  });
+
+  it("throws when tilejson lacks WGS84 bounds", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => ({ minzoom: 16, maxzoom: 21 }),
+    } as unknown as Response);
+
+    await expect(
+      fetchTitilerTileJson({
+        baseUrl: "https://tiles.example.com",
+        cogUrl: "https://bucket.example.com/ortho.tif",
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      }),
+    ).rejects.toThrow(/WGS84 bounds/);
+  });
+});
+
 describe("fetchTitilerInfo", () => {
-  it("returns parsed bounds when request succeeds", async () => {
+  it("returns native COG bounds when request succeeds", async () => {
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,

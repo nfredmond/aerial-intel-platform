@@ -1,7 +1,11 @@
 import { generateText } from "ai";
 
 import { validateGrounding } from "./grounding-validator";
-import { estimateSpendTenthCents, type CopilotModelId } from "./pricing";
+import {
+  estimateSpendTenthCents,
+  estimateSpendUpperBoundTenthCents,
+  type CopilotModelId,
+} from "./pricing";
 
 export type ProcessingQaFact = {
   id: string;
@@ -46,6 +50,7 @@ export type ProcessingQaResult =
     };
 
 const DEFAULT_MODEL: CopilotModelId = "anthropic/claude-opus-4.7";
+export const PROCESSING_QA_MAX_OUTPUT_TOKENS = 450;
 
 const SYSTEM_PROMPT = `You are a processing-QA troubleshooting assistant for Nat Ford Planning's aerial operations platform. When a NodeODM job fails, struggles, or produces a thin output set, you help a planner figure out what likely went wrong and what to try next.
 
@@ -75,6 +80,31 @@ function renderFactsBlock(facts: ProcessingQaFact[]): string {
   return `FACTS:\n${facts.map((f) => `- [fact:${f.id}] ${f.label}: ${f.value}`).join("\n")}`;
 }
 
+export function buildProcessingQaPrompt(input: {
+  jobId: string;
+  facts: ProcessingQaFact[];
+}): string {
+  return [
+    `Job: ${input.jobId}`,
+    renderFactsBlock(input.facts),
+    "",
+    "Diagnose the likely failure cause and propose a concrete next action. Every sentence must end with a [fact:<id>] drawn from the FACTS list above.",
+  ].join("\n");
+}
+
+export function estimateProcessingQaBudgetTenthCents(input: {
+  jobId: string;
+  facts: ProcessingQaFact[];
+  modelId?: CopilotModelId;
+}): number {
+  const modelId = input.modelId ?? DEFAULT_MODEL;
+  return estimateSpendUpperBoundTenthCents({
+    modelId,
+    textParts: [SYSTEM_PROMPT, buildProcessingQaPrompt(input)],
+    maxOutputTokens: PROCESSING_QA_MAX_OUTPUT_TOKENS,
+  });
+}
+
 export async function generateProcessingQaNote(
   input: ProcessingQaInput,
 ): Promise<ProcessingQaResult> {
@@ -82,17 +112,13 @@ export async function generateProcessingQaNote(
   const dropThreshold = input.dropThreshold ?? 0.3;
   const minLength = input.minLength ?? 120;
 
-  const prompt = [
-    `Job: ${input.jobId}`,
-    renderFactsBlock(input.facts),
-    "",
-    "Diagnose the likely failure cause and propose a concrete next action. Every sentence must end with a [fact:<id>] drawn from the FACTS list above.",
-  ].join("\n");
+  const prompt = buildProcessingQaPrompt(input);
 
   const { text: rawText, usage } = await generateText({
     model: modelId,
     system: SYSTEM_PROMPT,
     prompt,
+    maxOutputTokens: PROCESSING_QA_MAX_OUTPUT_TOKENS,
   });
 
   const inputTokens = usage?.inputTokens ?? 0;

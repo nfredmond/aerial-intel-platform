@@ -1,7 +1,11 @@
 import { generateText } from "ai";
 
 import { validateGrounding } from "./grounding-validator";
-import { estimateSpendTenthCents, type CopilotModelId } from "./pricing";
+import {
+  estimateSpendTenthCents,
+  estimateSpendUpperBoundTenthCents,
+  type CopilotModelId,
+} from "./pricing";
 
 export type DataScoutFact = {
   id: string;
@@ -65,6 +69,7 @@ export type DataScoutResult =
     };
 
 const DEFAULT_MODEL: CopilotModelId = "anthropic/claude-haiku-4.5";
+export const DATA_SCOUT_MAX_OUTPUT_TOKENS = 300;
 
 const SYSTEM_PROMPT = `You draft short data-quality summaries for Nat Ford Planning's aerial ingest scouting. Your audience is a planner deciding whether a dataset is ready to dispatch to processing.
 
@@ -81,14 +86,13 @@ function renderFactsBlock(facts: DataScoutFact[]): string {
   return `FACTS:\n${lines.join("\n")}`;
 }
 
-export async function generateDataScoutSummary(
-  input: DataScoutInput,
-): Promise<DataScoutResult> {
-  const modelId = input.modelId ?? DEFAULT_MODEL;
-  const dropThreshold = input.dropThreshold ?? 0.3;
-  const minLength = input.minLength ?? 80;
-
-  const prompt = [
+export function buildDataScoutPrompt(input: {
+  datasetName: string;
+  imageCount: number;
+  flags: DataScoutFlag[];
+  facts: DataScoutFact[];
+}): string {
+  return [
     `Dataset: ${input.datasetName}`,
     `Image count: ${input.imageCount}`,
     `Flagged images: ${input.flags.length}`,
@@ -96,11 +100,37 @@ export async function generateDataScoutSummary(
     "",
     "Write the data-scout summary now. Every sentence must end with a [fact:<id>] citation drawn from the FACTS list above.",
   ].join("\n");
+}
+
+export function estimateDataScoutBudgetTenthCents(input: {
+  datasetName: string;
+  imageCount: number;
+  flags: DataScoutFlag[];
+  facts: DataScoutFact[];
+  modelId?: CopilotModelId;
+}): number {
+  const modelId = input.modelId ?? DEFAULT_MODEL;
+  return estimateSpendUpperBoundTenthCents({
+    modelId,
+    textParts: [SYSTEM_PROMPT, buildDataScoutPrompt(input)],
+    maxOutputTokens: DATA_SCOUT_MAX_OUTPUT_TOKENS,
+  });
+}
+
+export async function generateDataScoutSummary(
+  input: DataScoutInput,
+): Promise<DataScoutResult> {
+  const modelId = input.modelId ?? DEFAULT_MODEL;
+  const dropThreshold = input.dropThreshold ?? 0.3;
+  const minLength = input.minLength ?? 80;
+
+  const prompt = buildDataScoutPrompt(input);
 
   const { text: rawText, usage } = await generateText({
     model: modelId,
     system: SYSTEM_PROMPT,
     prompt,
+    maxOutputTokens: DATA_SCOUT_MAX_OUTPUT_TOKENS,
   });
 
   const inputTokens = usage?.inputTokens ?? 0;

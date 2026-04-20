@@ -102,18 +102,17 @@ export type QuotaReserveResult =
 
 /**
  * Reads the current-month row (creating it if missing) and decides whether
- * `estimateTenthCents` fits under the cap. This is a *check*, not a reservation
- * — concurrent calls can race within a single month. For the current product
- * cap ($5 default) and per-call spend (cents) the drift is acceptable. If that
- * assumption changes, migrate to an `atomic_reserve_spend` Postgres RPC that
- * does `UPDATE ... WHERE spend + $1 <= cap RETURNING ...`.
+ * `budgetTenthCents` fits under the cap. Callers must pass a conservative
+ * upper bound for the model call, including max output tokens, so actual spend
+ * cannot exceed the pre-call gate for a single request. This is still a check,
+ * not an atomic reservation; concurrent calls can race within a single month.
  */
 export async function checkQuotaAndReserve(input: {
   orgId: string;
-  estimateTenthCents: number;
+  budgetTenthCents: number;
 }): Promise<QuotaReserveResult> {
   const row = await ensureCurrentQuotaRow(input.orgId);
-  const projected = row.spend_tenth_cents + input.estimateTenthCents;
+  const projected = row.spend_tenth_cents + input.budgetTenthCents;
   const remaining = row.cap_tenth_cents - row.spend_tenth_cents;
   if (projected > row.cap_tenth_cents) {
     return {

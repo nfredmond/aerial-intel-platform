@@ -38,7 +38,7 @@ import {
   updateProcessingOutput,
   type ArtifactApprovalDecision,
 } from "@/lib/supabase/admin";
-import { buildTitilerTileUrl } from "@/lib/titiler/client";
+import { buildTitilerTileUrl, fetchTitilerTileJson } from "@/lib/titiler/client";
 import { getTitilerConfig } from "@/lib/titiler/config";
 import { formatDateTime } from "@/lib/ui/datetime";
 import { statusPillClassName, type Tone } from "@/lib/ui/tones";
@@ -540,8 +540,17 @@ export default async function ArtifactDetailPage({
     const commentId = typeof rawId === "string" ? rawId.trim() : "";
     if (!commentId) redirect(`/artifacts/${artifactId}?action=error`);
 
+    const refreshedDetail = await getArtifactDetail(refreshedAccess, artifactId);
+    if (!refreshedDetail) redirect("/missions");
+
     try {
-      await updateArtifactComment(commentId, { resolved_at: new Date().toISOString() });
+      const comment = await updateArtifactComment({
+        id: commentId,
+        orgId: refreshedAccess.org.id,
+        artifactId: refreshedDetail.output.id,
+        patch: { resolved_at: new Date().toISOString() },
+      });
+      if (!comment) redirect(`/artifacts/${artifactId}?action=error`);
     } catch {
       redirect(`/artifacts/${artifactId}?action=error`);
     }
@@ -677,6 +686,12 @@ export default async function ArtifactDetailPage({
         baseUrl: titilerConfig.baseUrl ?? undefined,
         cogUrl: rasterCogUrl,
       })
+    : null;
+  const rasterTileJson = rasterCogUrl
+    ? await fetchTitilerTileJson({
+        baseUrl: titilerConfig.baseUrl ?? undefined,
+        cogUrl: rasterCogUrl,
+      }).catch(() => null)
     : null;
 
   return (
@@ -888,6 +903,7 @@ export default async function ArtifactDetailPage({
           </div>
           <RasterViewer
             tileUrlTemplate={rasterTileUrlTemplate}
+            bounds={rasterTileJson?.bounds ?? null}
             label={artifactName}
             attribution="TiTiler · Supabase Storage"
             ariaLabel={`${detail.output.kind} raster preview for ${artifactName}`}

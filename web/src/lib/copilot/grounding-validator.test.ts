@@ -12,7 +12,9 @@ describe("validateGrounding", () => {
     expect(result.droppedSentences).toBe(0);
     expect(result.dropFraction).toBe(0);
     expect(result.exceededThreshold).toBe(false);
-    expect(result.text).toBe("The mission covers 4.2 km². Capture date was 2026-04-15.");
+    expect(result.text).toBe(
+      "The mission covers 4.2 km². [fact:mission:abc] Capture date was 2026-04-15. [fact:dataset:xyz]",
+    );
     expect(result.citedFactIds.sort()).toEqual(["dataset:xyz", "mission:abc"]);
   });
 
@@ -34,7 +36,7 @@ describe("validateGrounding", () => {
     expect(result.keptSentences).toBe(1);
     expect(result.droppedSentences).toBe(1);
     expect(result.sentences[1].reason).toBe("unknown-citation");
-    expect(result.text).toBe("Ortho ready at 4cm GSD.");
+    expect(result.text).toBe("Ortho ready at 4cm GSD. [fact:output:ortho-123]");
   });
 
   it("requires every cited id in a sentence to be known (conjunction)", () => {
@@ -80,13 +82,13 @@ describe("validateGrounding", () => {
     expect(result.text).toBe("");
   });
 
-  it("strips citation tokens from the rendered sentence text", () => {
+  it("keeps citation tokens in the rendered sentence text for audit", () => {
     const result = validateGrounding({
       text: "Captured at 400 ft AGL. [fact:mission:m1]",
       knownFactIds: ["mission:m1"],
     });
-    expect(result.text).toBe("Captured at 400 ft AGL.");
-    expect(result.text.includes("[fact:")).toBe(false);
+    expect(result.text).toBe("Captured at 400 ft AGL. [fact:mission:m1]");
+    expect(result.text.includes("[fact:")).toBe(true);
   });
 
   it("splits sentences on . ! ? followed by capitalized start", () => {

@@ -3,9 +3,8 @@ import { canPerformDroneOpsAction } from "@/lib/auth/actions";
 import { getMissionDetail } from "@/lib/missions/detail-data";
 
 import { checkCopilotCallGate, getCopilotConfig } from "./config";
-import { generateMissionBrief } from "./mission-brief";
+import { estimateMissionBriefBudgetTenthCents, generateMissionBrief } from "./mission-brief";
 import { buildMissionBriefFacts } from "./mission-brief-facts";
-import { estimateSpendTenthCents } from "./pricing";
 import { checkQuotaAndReserve, readOrgCopilotEnabled, recordSpend } from "./quota";
 
 export type MissionBriefServerResult =
@@ -43,12 +42,6 @@ export type MissionBriefServerResult =
     }
   | { status: "error"; message: string };
 
-const PRE_CHECK_ESTIMATE_TENTH_CENTS = estimateSpendTenthCents({
-  modelId: "anthropic/claude-opus-4.7",
-  inputTokens: 2000,
-  outputTokens: 500,
-});
-
 export async function runMissionBriefForMission(
   missionId: string,
 ): Promise<MissionBriefServerResult> {
@@ -74,7 +67,10 @@ export async function runMissionBriefForMission(
 
     const reservation = await checkQuotaAndReserve({
       orgId,
-      estimateTenthCents: PRE_CHECK_ESTIMATE_TENTH_CENTS,
+      budgetTenthCents: estimateMissionBriefBudgetTenthCents({
+        missionName: detail.mission.name,
+        facts,
+      }),
     });
     if (!reservation.allowed) {
       return {

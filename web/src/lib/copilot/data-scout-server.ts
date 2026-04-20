@@ -3,9 +3,12 @@ import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import { getDatasetDetail } from "@/lib/missions/detail-data";
 
 import { checkCopilotCallGate, getCopilotConfig } from "./config";
-import { generateDataScoutSummary, type DataScoutFlag } from "./data-scout";
+import {
+  estimateDataScoutBudgetTenthCents,
+  generateDataScoutSummary,
+  type DataScoutFlag,
+} from "./data-scout";
 import { buildDataScoutInputs } from "./data-scout-facts";
-import { estimateSpendTenthCents } from "./pricing";
 import { checkQuotaAndReserve, readOrgCopilotEnabled, recordSpend } from "./quota";
 
 export type DataScoutServerResult =
@@ -48,12 +51,6 @@ export type DataScoutServerResult =
     }
   | { status: "error"; message: string };
 
-const PRE_CHECK_ESTIMATE_TENTH_CENTS = estimateSpendTenthCents({
-  modelId: "anthropic/claude-haiku-4.5",
-  inputTokens: 1500,
-  outputTokens: 200,
-});
-
 export async function runDataScoutForDataset(
   datasetId: string,
 ): Promise<DataScoutServerResult> {
@@ -80,7 +77,12 @@ export async function runDataScoutForDataset(
 
     const reservation = await checkQuotaAndReserve({
       orgId,
-      estimateTenthCents: PRE_CHECK_ESTIMATE_TENTH_CENTS,
+      budgetTenthCents: estimateDataScoutBudgetTenthCents({
+        datasetName: detail.dataset.name,
+        imageCount,
+        flags,
+        facts,
+      }),
     });
     if (!reservation.allowed) {
       return {

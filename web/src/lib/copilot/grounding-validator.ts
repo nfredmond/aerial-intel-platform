@@ -47,7 +47,6 @@ export type GroundingValidationResult = {
   }>;
 };
 
-const CITATION_RUN_PATTERN = /\s*\[fact:[a-zA-Z0-9_\-:.]+\]/g;
 const SINGLE_CITATION_PATTERN = /\[fact:([a-zA-Z0-9_\-:.]+)\]/g;
 
 /**
@@ -60,7 +59,7 @@ const SENTENCE_BOUNDARY =
   /([.!?])((?:\s*\[fact:[a-zA-Z0-9_\-:.]+\])*)(?=\s+[A-Z]|\s*$)/g;
 
 type ParsedSentence = {
-  prose: string;
+  text: string;
   factIds: FactId[];
 };
 
@@ -72,10 +71,6 @@ function extractFactIds(segment: string): FactId[] {
   return ids;
 }
 
-function stripCitations(segment: string): string {
-  return segment.replace(CITATION_RUN_PATTERN, "").trim();
-}
-
 function parseSentences(text: string): ParsedSentence[] {
   const sentences: ParsedSentence[] = [];
   const trimmed = text.trim();
@@ -85,17 +80,17 @@ function parseSentences(text: string): ParsedSentence[] {
   for (const match of trimmed.matchAll(SENTENCE_BOUNDARY)) {
     const end = (match.index ?? 0) + match[0].length;
     const raw = trimmed.slice(cursor, end);
+    const sentenceText = raw.trim();
     const factIds = extractFactIds(raw);
-    const prose = stripCitations(raw);
-    if (prose.length > 0 || factIds.length > 0) {
-      sentences.push({ prose, factIds });
+    if (sentenceText.length > 0 || factIds.length > 0) {
+      sentences.push({ text: sentenceText, factIds });
     }
     cursor = end;
   }
   const tail = trimmed.slice(cursor).trim();
   if (tail.length > 0) {
     sentences.push({
-      prose: stripCitations(tail),
+      text: tail,
       factIds: extractFactIds(tail),
     });
   }
@@ -112,18 +107,18 @@ export function validateGrounding(
   const citedUnion = new Set<FactId>();
   const sentences: GroundingValidationResult["sentences"] = [];
 
-  for (const { prose, factIds } of parsed) {
+  for (const { text, factIds } of parsed) {
     if (factIds.length === 0) {
-      sentences.push({ text: prose, factIds: [], kept: false, reason: "missing-citation" });
+      sentences.push({ text, factIds: [], kept: false, reason: "missing-citation" });
       continue;
     }
     const allKnown = factIds.every((id) => knownSet.has(id));
     if (!allKnown) {
-      sentences.push({ text: prose, factIds, kept: false, reason: "unknown-citation" });
+      sentences.push({ text, factIds, kept: false, reason: "unknown-citation" });
       continue;
     }
     factIds.forEach((id) => citedUnion.add(id));
-    sentences.push({ text: prose, factIds, kept: true });
+    sentences.push({ text, factIds, kept: true });
   }
 
   const total = sentences.length;

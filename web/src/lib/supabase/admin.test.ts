@@ -1,16 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  insertMembership,
   insertInvitation,
   insertOrgEvent,
   selectCopilotOrgSettings,
   selectCopilotQuotaRowsForOrg,
   selectInvitationByToken,
   selectInvitationsForOrg,
+  selectMembershipByOrgUser,
   selectNodeOdmJobsForOrg,
   selectShareLinksNearExpiry,
   selectStaleInFlightJobsForOrg,
   selectTopShareLinksByUsage,
+  updateArtifactComment,
   updateInvitationStatus,
   updateMembershipStatus,
 } from "@/lib/supabase/admin";
@@ -316,6 +319,64 @@ describe("selectCopilotOrgSettings", () => {
 });
 
 describe("updateMembershipStatus", () => {
+  it("selectMembershipByOrgUser GETs the org_id+user_id row", async () => {
+    const calls: FetchCall[] = [];
+    const row = {
+      org_id: "org-1",
+      user_id: "user-1",
+      role: "viewer",
+      status: "active",
+      created_at: "x",
+    };
+    globalThis.fetch = stubFetchOnce([row], calls);
+
+    const result = await selectMembershipByOrgUser("org with space/slash", "user/id?");
+
+    expect(result).toEqual(row);
+    expect(calls).toHaveLength(1);
+    const { url, init } = calls[0];
+    expect(url).toContain(`org_id=eq.${encodeURIComponent("org with space/slash")}`);
+    expect(url).toContain(`user_id=eq.${encodeURIComponent("user/id?")}`);
+    expect(url).toContain("select=*");
+    expect(init?.method).toBe("GET");
+  });
+
+  it("insertMembership POSTs a new membership without merge-duplicates", async () => {
+    const calls: FetchCall[] = [];
+    const row = {
+      org_id: "org-1",
+      user_id: "user-1",
+      role: "viewer",
+      status: "active",
+      created_at: "x",
+    };
+    globalThis.fetch = stubFetchOnce([row], calls);
+
+    const result = await insertMembership({
+      org_id: "org-1",
+      user_id: "user-1",
+      role: "viewer",
+      status: "active",
+    });
+
+    expect(result).toEqual(row);
+    expect(calls).toHaveLength(1);
+    const { url, init } = calls[0];
+    expect(url).toContain("drone_memberships?select=*");
+    expect(init?.method).toBe("POST");
+    expect(String((init?.headers as Record<string, string>).Prefer)).not.toContain(
+      "merge-duplicates",
+    );
+    expect(init?.body).toBe(
+      JSON.stringify({
+        org_id: "org-1",
+        user_id: "user-1",
+        role: "viewer",
+        status: "active",
+      }),
+    );
+  });
+
   it("PATCHes the org_id+user_id row and sends the status payload", async () => {
     const calls: FetchCall[] = [];
     globalThis.fetch = stubFetchOnce(
@@ -465,5 +526,30 @@ describe("insertOrgEvent", () => {
     expect(url).toContain("drone_org_events");
     expect(init?.method).toBe("POST");
     expect(init?.body).toContain('"event_type":"org.member.invited"');
+  });
+});
+
+describe("updateArtifactComment", () => {
+  it("PATCHes comment resolution scoped by id, org_id, and artifact_id", async () => {
+    const calls: FetchCall[] = [];
+    globalThis.fetch = stubFetchOnce([], calls);
+
+    await updateArtifactComment({
+      id: "comment/id?",
+      orgId: "org with space/slash",
+      artifactId: "artifact/id?",
+      patch: { resolved_at: "2026-04-20T00:00:00.000Z" },
+    });
+
+    expect(calls).toHaveLength(1);
+    const { url, init } = calls[0];
+    expect(url).toContain(`id=eq.${encodeURIComponent("comment/id?")}`);
+    expect(url).toContain(`org_id=eq.${encodeURIComponent("org with space/slash")}`);
+    expect(url).toContain(`artifact_id=eq.${encodeURIComponent("artifact/id?")}`);
+    expect(url).toContain("select=*");
+    expect(init?.method).toBe("PATCH");
+    expect(init?.body).toBe(
+      JSON.stringify({ resolved_at: "2026-04-20T00:00:00.000Z" }),
+    );
   });
 });

@@ -4,7 +4,7 @@ const generateTextMock = vi.hoisted(() => vi.fn());
 
 vi.mock("ai", () => ({ generateText: generateTextMock }));
 
-import { generateProcessingQaNote } from "./processing-qa";
+import { generateProcessingQaNote, PROCESSING_QA_MAX_OUTPUT_TOKENS } from "./processing-qa";
 
 const knownFacts = [
   { id: "job:j1:engine", label: "Engine", value: "nodeodm" },
@@ -42,7 +42,10 @@ describe("generateProcessingQaNote", () => {
     if (result.status !== "ok") return;
     expect(result.totalSentences).toBe(4);
     expect(result.keptSentences).toBe(4);
-    expect(result.text.includes("[fact:")).toBe(false);
+    expect(result.text.includes("[fact:")).toBe(true);
+    expect(generateTextMock).toHaveBeenCalledWith(
+      expect.objectContaining({ maxOutputTokens: PROCESSING_QA_MAX_OUTPUT_TOKENS }),
+    );
   });
 
   it("refuses when the model hallucinates unknown fact ids on >30% of sentences", async () => {

@@ -4,7 +4,7 @@ const generateTextMock = vi.hoisted(() => vi.fn());
 
 vi.mock("ai", () => ({ generateText: generateTextMock }));
 
-import { generateMissionBrief } from "./mission-brief";
+import { generateMissionBrief, MISSION_BRIEF_MAX_OUTPUT_TOKENS } from "./mission-brief";
 
 const longBrief = [
   "The Toledo-20 mission mapped an 18.4 hectare parcel for the city's stormwater update. [fact:mission:toledo-20]",
@@ -51,8 +51,11 @@ describe("generateMissionBrief", () => {
     expect(result.citedFactIds.sort()).toEqual(
       ["dataset:toledo-20-rgb", "job:toledo-20-job", "mission:toledo-20", "qa:toledo-20-verdict", "review:toledo-20-first-note"].sort(),
     );
-    expect(result.text.includes("[fact:")).toBe(false);
+    expect(result.text.includes("[fact:")).toBe(true);
     expect(result.modelId).toBe("anthropic/claude-opus-4.7");
+    expect(generateTextMock).toHaveBeenCalledWith(
+      expect.objectContaining({ maxOutputTokens: MISSION_BRIEF_MAX_OUTPUT_TOKENS }),
+    );
   });
 
   it("refuses when the model hallucinates an unknown citation on >30% of sentences", async () => {

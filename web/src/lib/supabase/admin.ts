@@ -519,11 +519,39 @@ export type MembershipAdminRow = {
   created_at: string;
 };
 
+export type MembershipInsert = {
+  org_id: string;
+  user_id: string;
+  role: string;
+  status?: "active" | "suspended";
+};
+
 export async function selectMembershipsForOrg(orgId: string) {
   return adminRestRequest<MembershipAdminRow[]>(
     `drone_memberships?org_id=eq.${encodeURIComponent(orgId)}&select=*&order=created_at.asc`,
     { method: "GET" },
   );
+}
+
+export async function selectMembershipByOrgUser(orgId: string, userId: string) {
+  const rows = await adminRestRequest<MembershipAdminRow[]>(
+    `drone_memberships?org_id=eq.${encodeURIComponent(
+      orgId,
+    )}&user_id=eq.${encodeURIComponent(userId)}&select=*`,
+    { method: "GET" },
+  );
+  return rows[0] ?? null;
+}
+
+export async function insertMembership(input: MembershipInsert) {
+  const rows = await adminRestRequest<MembershipAdminRow[]>(
+    "drone_memberships?select=*",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return rows[0] ?? null;
 }
 
 export type MembershipStatusPatch = {
@@ -783,12 +811,21 @@ export async function insertArtifactComment(input: ArtifactCommentInsert) {
   return rows[0] ?? null;
 }
 
-export async function updateArtifactComment(id: string, patch: ArtifactCommentPatch) {
+export async function updateArtifactComment(input: {
+  id: string;
+  orgId: string;
+  artifactId: string;
+  patch: ArtifactCommentPatch;
+}) {
   const rows = await adminRestRequest<ArtifactCommentRow[]>(
-    `drone_artifact_comments?id=eq.${encodeURIComponent(id)}&select=*`,
+    `drone_artifact_comments?id=eq.${encodeURIComponent(
+      input.id,
+    )}&org_id=eq.${encodeURIComponent(input.orgId)}&artifact_id=eq.${encodeURIComponent(
+      input.artifactId,
+    )}&select=*`,
     {
       method: "PATCH",
-      body: JSON.stringify(patch),
+      body: JSON.stringify(input.patch),
     },
   );
   return rows[0] ?? null;

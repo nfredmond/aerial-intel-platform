@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  estimateInputTokenUpperBound,
   estimateSpendTenthCents,
+  estimateSpendUpperBoundTenthCents,
   formatTenthCentsUsd,
   MODEL_PRICING,
 } from "./pricing";
@@ -67,6 +69,31 @@ describe("estimateSpendTenthCents", () => {
       outputTokens: 1,
     });
     expect(cost).toBe(2);
+  });
+});
+
+describe("estimateInputTokenUpperBound", () => {
+  it("uses UTF-8 bytes plus overhead so the estimate is conservative", () => {
+    expect(estimateInputTokenUpperBound(["abc", "Δ"], 10)).toBe(16);
+  });
+});
+
+describe("estimateSpendUpperBoundTenthCents", () => {
+  it("prices the conservative prompt bytes plus bounded output tokens", () => {
+    const cost = estimateSpendUpperBoundTenthCents({
+      modelId: "anthropic/claude-haiku-4.5",
+      textParts: ["abc"],
+      maxOutputTokens: 200,
+      overheadTokens: 0,
+    });
+
+    expect(cost).toBe(
+      estimateSpendTenthCents({
+        modelId: "anthropic/claude-haiku-4.5",
+        inputTokens: 3,
+        outputTokens: 200,
+      }),
+    );
   });
 });
 

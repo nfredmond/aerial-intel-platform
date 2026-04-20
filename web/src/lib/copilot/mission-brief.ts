@@ -1,7 +1,11 @@
 import { generateText } from "ai";
 
 import { validateGrounding } from "./grounding-validator";
-import { estimateSpendTenthCents, type CopilotModelId } from "./pricing";
+import {
+  estimateSpendTenthCents,
+  estimateSpendUpperBoundTenthCents,
+  type CopilotModelId,
+} from "./pricing";
 
 /**
  * A single fact the skill is allowed to cite. `id` appears in the model's
@@ -58,6 +62,7 @@ export type MissionBriefResult =
     };
 
 const DEFAULT_MODEL: CopilotModelId = "anthropic/claude-opus-4.7";
+export const MISSION_BRIEF_MAX_OUTPUT_TOKENS = 700;
 
 const SYSTEM_PROMPT = `You draft client-ready mission briefs for Nat Ford Planning's aerial operations platform. Write in plain, low-fluff English suited to a planning agency audience.
 
@@ -82,6 +87,31 @@ function renderFactsBlock(facts: MissionBriefFact[]): string {
   return `FACTS:\n${lines.join("\n")}`;
 }
 
+export function buildMissionBriefPrompt(input: {
+  missionName: string;
+  facts: MissionBriefFact[];
+}): string {
+  return [
+    `Mission: ${input.missionName}`,
+    renderFactsBlock(input.facts),
+    "",
+    "Write the mission brief now. Remember: every sentence must end with a [fact:<id>] citation drawn from the FACTS list above.",
+  ].join("\n");
+}
+
+export function estimateMissionBriefBudgetTenthCents(input: {
+  missionName: string;
+  facts: MissionBriefFact[];
+  modelId?: CopilotModelId;
+}): number {
+  const modelId = input.modelId ?? DEFAULT_MODEL;
+  return estimateSpendUpperBoundTenthCents({
+    modelId,
+    textParts: [SYSTEM_PROMPT, buildMissionBriefPrompt(input)],
+    maxOutputTokens: MISSION_BRIEF_MAX_OUTPUT_TOKENS,
+  });
+}
+
 export async function generateMissionBrief(
   input: MissionBriefInput,
 ): Promise<MissionBriefResult> {
@@ -89,17 +119,13 @@ export async function generateMissionBrief(
   const dropThreshold = input.dropThreshold ?? 0.3;
   const minLength = input.minLength ?? 200;
 
-  const prompt = [
-    `Mission: ${input.missionName}`,
-    renderFactsBlock(input.facts),
-    "",
-    "Write the mission brief now. Remember: every sentence must end with a [fact:<id>] citation drawn from the FACTS list above.",
-  ].join("\n");
+  const prompt = buildMissionBriefPrompt(input);
 
   const { text: rawText, usage } = await generateText({
     model: modelId,
     system: SYSTEM_PROMPT,
     prompt,
+    maxOutputTokens: MISSION_BRIEF_MAX_OUTPUT_TOKENS,
   });
 
   const inputTokens = usage?.inputTokens ?? 0;

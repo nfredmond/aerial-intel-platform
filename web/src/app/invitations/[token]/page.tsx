@@ -2,57 +2,19 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import {
+  insertMembership,
   insertOrgEvent,
   selectInvitationByToken,
+  selectMembershipByOrgUser,
   updateInvitationStatus,
 } from "@/lib/supabase/admin";
-import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 type Params = { token: string };
 
-function getServiceClient() {
-  const { url } = getSupabaseEnv();
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!serviceRoleKey) {
-    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
-  }
-  return { url, serviceRoleKey };
-}
-
 const TOKEN_SHAPE = /^[A-Za-z0-9_-]{16,128}$/;
-
-async function upsertMembership(
-  orgId: string,
-  userId: string,
-  role: string,
-): Promise<void> {
-  const { url, serviceRoleKey } = getServiceClient();
-  const response = await fetch(
-    `${url}/rest/v1/drone_memberships?on_conflict=org_id,user_id`,
-    {
-      method: "POST",
-      headers: {
-        apikey: serviceRoleKey,
-        Authorization: `Bearer ${serviceRoleKey}`,
-        "Content-Type": "application/json",
-        Prefer: "resolution=merge-duplicates,return=representation",
-      },
-      body: JSON.stringify({
-        org_id: orgId,
-        user_id: userId,
-        role,
-        status: "active",
-      }),
-    },
-  );
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    throw new Error(`Membership upsert failed (${response.status}): ${detail}`);
-  }
-}
 
 async function isExpired(expiresAt: string): Promise<boolean> {
   const expiry = Date.parse(expiresAt);
@@ -153,7 +115,34 @@ export default async function AcceptInvitationPage({
     );
   }
 
-  await upsertMembership(invitation.org_id, user.id, invitation.role);
+  const existingMembership = await selectMembershipByOrgUser(invitation.org_id, user.id).catch(
+    () => null,
+  );
+  if (existingMembership) {
+    return (
+      <Frame heading="Membership already exists" variant="info">
+        <p>
+          This account already has a membership for this organization. Ask your org admin to make
+          role or status changes explicitly.
+        </p>
+      </Frame>
+    );
+  }
+
+  const membership = await insertMembership({
+    org_id: invitation.org_id,
+    user_id: user.id,
+    role: invitation.role,
+    status: "active",
+  }).catch(() => null);
+  if (!membership) {
+    return (
+      <Frame heading="Invitation could not be accepted" variant="error">
+        <p>Membership could not be created. Ask your org admin to send a fresh invitation.</p>
+      </Frame>
+    );
+  }
+
   await updateInvitationStatus(invitation.id, invitation.org_id, {
     status: "accepted",
     accepted_at: new Date().toISOString(),

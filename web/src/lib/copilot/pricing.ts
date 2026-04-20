@@ -54,6 +54,28 @@ export function estimateSpendTenthCents(input: TokenUsageInput): number {
   return Math.ceil(inputCost) + Math.ceil(outputCost);
 }
 
+export function estimateInputTokenUpperBound(
+  textParts: string[],
+  overheadTokens = 512,
+): number {
+  const text = textParts.join("\n");
+  const bytes = new TextEncoder().encode(text).length;
+  return bytes + overheadTokens;
+}
+
+export function estimateSpendUpperBoundTenthCents(input: {
+  modelId: CopilotModelId;
+  textParts: string[];
+  maxOutputTokens: number;
+  overheadTokens?: number;
+}): number {
+  return estimateSpendTenthCents({
+    modelId: input.modelId,
+    inputTokens: estimateInputTokenUpperBound(input.textParts, input.overheadTokens),
+    outputTokens: input.maxOutputTokens,
+  });
+}
+
 export function formatTenthCentsUsd(tenthCents: number): string {
   const dollars = tenthCents / 1000;
   return `$${dollars.toFixed(3)}`;

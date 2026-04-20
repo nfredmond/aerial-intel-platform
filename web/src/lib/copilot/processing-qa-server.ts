@@ -3,8 +3,10 @@ import { canPerformDroneOpsAction } from "@/lib/auth/actions";
 import { getJobDetail } from "@/lib/missions/detail-data";
 
 import { checkCopilotCallGate, getCopilotConfig } from "./config";
-import { estimateSpendTenthCents } from "./pricing";
-import { generateProcessingQaNote } from "./processing-qa";
+import {
+  estimateProcessingQaBudgetTenthCents,
+  generateProcessingQaNote,
+} from "./processing-qa";
 import { buildProcessingQaFacts } from "./processing-qa-facts";
 import { checkQuotaAndReserve, readOrgCopilotEnabled, recordSpend } from "./quota";
 
@@ -43,12 +45,6 @@ export type ProcessingQaServerResult =
     }
   | { status: "error"; message: string };
 
-const PRE_CHECK_ESTIMATE_TENTH_CENTS = estimateSpendTenthCents({
-  modelId: "anthropic/claude-opus-4.7",
-  inputTokens: 1500,
-  outputTokens: 300,
-});
-
 export async function runProcessingQaForJob(
   jobId: string,
 ): Promise<ProcessingQaServerResult> {
@@ -74,7 +70,7 @@ export async function runProcessingQaForJob(
 
     const reservation = await checkQuotaAndReserve({
       orgId,
-      estimateTenthCents: PRE_CHECK_ESTIMATE_TENTH_CENTS,
+      budgetTenthCents: estimateProcessingQaBudgetTenthCents({ jobId, facts }),
     });
     if (!reservation.allowed) {
       return {
