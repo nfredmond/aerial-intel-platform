@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-04-19 — Wave 2 C-2 exit: processing-QA diagnostic verified end-to-end on Preview
+
+First live copilot run against a Vercel Preview deployment. Seeded a synthetic failed NodeODM job on `nat-ford-drone-lab` (`supabase/seed/2026-04-19-synthetic-failed-job.sql` — job id `11111111-1111-4111-8111-111111111111`, attached to the Downtown corridor mission so Toledo-20's verified-success posture stays clean, `output_summary->>'synthetic' = 'true'` for greppability). Signed in the test owner via admin-generated magic-link OTP → direct `/auth/v1/verify` POST → `supabase.auth.setSession` in the Preview origin, which is a clean passwordless path that bypasses local dev entirely.
+
+The diagnostic output cited every seeded fact — exit code 137, `--feature-quality high` on 20 images, feature-extraction failed at 18%, ingest + preflight green, matching/reconstruction/orthomosaic never started, no orthophoto/DEM/report produced — and inferred the OOM-killer root cause from the seeded `logTail` (`[feature_extraction] OOM killer signaled by host`) plus domain knowledge that exit 137 is `128 + SIGKILL`. Suggested mitigation (`--feature-quality medium`, `--min-num-features 4000`) is framed as a retry suggestion, not a claim of fact. Overlap advice is hedged with "if the lighter preset still fails." No hallucinated root causes. Grounding validator reports `5/5 sentences kept`; spend landed at **$0.070** on `anthropic/claude-opus-4.7` and is recorded in `drone_org_ai_quota` (70 of 50000 tenth-cents). Zero console errors, zero warnings.
+
+Closes #92. Covenant-truthfulness gate held: the skill cited real facts, hedged uncertainty, and the spend accounting round-tripped correctly.
+
 ## 2026-04-19 — Supabase security-advisor disposition
 
 Worked the three items surfaced by `get_advisors(security)` on project `bvrmnesiamadpnysqiqd`. Result is honest, not pretty: one is a real fix carried over from the RLS recursion work, two are not fixable in place on a hosted Supabase DB, one requires a dashboard click.
