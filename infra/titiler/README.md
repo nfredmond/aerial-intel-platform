@@ -82,6 +82,12 @@ gcloud run services add-iam-policy-binding aerial-titiler \
 Run `scripts/smoke_titiler.sh` against the Cloud Run URL before setting
 `AERIAL_TITILER_URL` in Vercel.
 
+After the smoke passes, configure Vercel through the guarded helper:
+
+```bash
+scripts/configure_vercel_titiler_url.sh https://SERVICE_URL --scope natford --environment production
+```
+
 Local equivalent after `gcloud auth login`:
 
 ```bash

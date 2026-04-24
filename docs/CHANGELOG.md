@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-04-24 - Smoke-first Vercel TiTiler URL helper added
+
+Added `scripts/configure_vercel_titiler_url.sh` so the final production raster
+env step is executable once a controlled TiTiler URL exists. The helper rejects
+unsafe production URLs before any write, smokes TiTiler against a public COG,
+then writes `AERIAL_TITILER_URL` to Vercel and reruns the no-secret production
+env-name preflight. It was not run against a placeholder endpoint.
+
 ## 2026-04-24 - Production Vercel cron/cap env names configured
 
 Configured production Vercel env names for `CRON_SECRET` and

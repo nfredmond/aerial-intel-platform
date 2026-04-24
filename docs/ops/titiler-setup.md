@@ -110,6 +110,12 @@ Smoke any controlled endpoint before wiring the app to it:
 AERIAL_TITILER_URL=https://titiler.example.com scripts/smoke_titiler.sh
 ```
 
+Then set the Vercel env var through the smoke-first helper:
+
+```bash
+scripts/configure_vercel_titiler_url.sh https://titiler.example.com --scope natford --environment production
+```
+
 ## Production deployment notes
 
 - Host TiTiler on its own fly.io / ECS / Cloud Run service. Do not co-locate

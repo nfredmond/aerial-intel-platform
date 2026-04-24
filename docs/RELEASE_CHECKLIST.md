@@ -37,7 +37,12 @@ localhost, plain-HTTP TiTiler URLs, or the example Supabase URL.
 
 - Controlled TiTiler service is deployed outside localhost.
 - `scripts/smoke_titiler.sh` passes against the controlled service URL.
-- Vercel production `AERIAL_TITILER_URL` points at the controlled service.
+- Vercel production `AERIAL_TITILER_URL` points at the controlled service:
+
+  ```bash
+  scripts/configure_vercel_titiler_url.sh https://titiler.example.com --scope natford --environment production
+  ```
+
 - A signed-in artifact page loads at least one `200` TiTiler tile.
 
 ## Authenticated smoke
