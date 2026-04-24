@@ -899,6 +899,76 @@ export async function selectArtifactApprovalsByArtifact(artifactId: string) {
   return adminRestRequest<ArtifactApprovalRow[]>(query, { method: "GET" });
 }
 
+export type DeliveryPacketInsert = {
+  id?: string;
+  org_id: string;
+  mission_id: string;
+  title: string;
+  status?: "ready" | "archived";
+  storage_bucket?: string | null;
+  storage_path?: string | null;
+  artifact_ids?: string[];
+  share_link_ids?: string[];
+  created_by?: string | null;
+  created_by_email?: string | null;
+  metadata?: Json;
+};
+
+export type DeliveryPacketRow = {
+  id: string;
+  org_id: string;
+  mission_id: string;
+  title: string;
+  status: "ready" | "archived";
+  storage_bucket: string | null;
+  storage_path: string | null;
+  artifact_ids: string[];
+  share_link_ids: string[];
+  created_by: string | null;
+  created_by_email: string | null;
+  metadata: Json;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function insertDeliveryPacket(input: DeliveryPacketInsert) {
+  const rows = await adminRestRequest<DeliveryPacketRow[]>(
+    "drone_delivery_packets?select=*",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return rows[0] ?? null;
+}
+
+export async function selectDeliveryPacketsForMission(input: {
+  orgId: string;
+  missionId: string;
+  limit?: number;
+}) {
+  const safeLimit = Math.min(Math.max(Math.trunc(input.limit ?? 20), 1), 100);
+  const query =
+    `drone_delivery_packets?org_id=eq.${encodeURIComponent(input.orgId)}` +
+    `&mission_id=eq.${encodeURIComponent(input.missionId)}` +
+    `&select=*&order=created_at.desc&limit=${safeLimit}`;
+  return adminRestRequest<DeliveryPacketRow[]>(query, { method: "GET" });
+}
+
+export async function selectDeliveryPacketForDownload(input: {
+  orgId: string;
+  missionId: string;
+  packetId: string;
+}) {
+  const query =
+    `drone_delivery_packets?org_id=eq.${encodeURIComponent(input.orgId)}` +
+    `&mission_id=eq.${encodeURIComponent(input.missionId)}` +
+    `&id=eq.${encodeURIComponent(input.packetId)}` +
+    "&status=eq.ready&select=*";
+  const rows = await adminRestRequest<DeliveryPacketRow[]>(query, { method: "GET" });
+  return rows[0] ?? null;
+}
+
 export type CopilotQuotaRow = {
   id: string;
   org_id: string;

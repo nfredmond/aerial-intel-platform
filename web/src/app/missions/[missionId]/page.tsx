@@ -37,6 +37,7 @@ import {
   buildMissionReadinessChecklist,
   getMissionReadinessSummary,
 } from "@/lib/mission-readiness";
+import { summarizeDeliveryPacketEligibility } from "@/lib/delivery-packet";
 import {
   buildMissionOverlayChecklist,
   getMissionOverlayPlan,
@@ -82,6 +83,8 @@ import {
   insertJobEvent,
   insertProcessingJob,
   insertProcessingOutputs,
+  selectArtifactApprovalsByArtifact,
+  selectDeliveryPacketsForMission,
   updateIngestSession,
   updateMission,
   updateMissionVersion,
@@ -93,6 +96,7 @@ import {
 } from "@/lib/supabase/admin-storage";
 import { parseZipToImages } from "@/lib/zip-extraction";
 import type { Json } from "@/lib/supabase/types";
+import { createMissionDeliveryPacketAction } from "./delivery-packet-actions";
 
 function getJobPillClassName(status: string) {
   return statusPillClassName(jobStatusTone(status));
@@ -140,7 +144,13 @@ function getCalloutClassName(state: string) {
     return "callout callout-success";
   }
 
-  if (state === "missing-dataset" || state === "missing-name" || state === "missing-version" || state === "already") {
+  if (
+    state === "missing-dataset" ||
+    state === "missing-name" ||
+    state === "missing-version" ||
+    state === "already" ||
+    state === "none-eligible"
+  ) {
     return "callout callout-warning";
   }
 
@@ -201,6 +211,7 @@ function getCalloutMessage(options: {
   approved?: string;
   installed?: string;
   delivered?: string;
+  packet?: string;
   aoi?: string;
   overlay?: string;
   created?: string;
@@ -310,6 +321,16 @@ function getCalloutMessage(options: {
         : "Mission delivery could not be recorded. Check server configuration and try again.";
   }
 
+  if (options.packet) {
+    return options.packet === "created"
+      ? "Delivery packet created. Download it below; included artifact binaries stay behind governed share links."
+      : options.packet === "none-eligible"
+        ? "No packet was created because this mission has no ready artifacts with latest approval marked approved."
+        : options.packet === "denied"
+          ? "Viewer access cannot create delivery packets."
+          : "Delivery packet creation failed. Check server configuration and try again.";
+  }
+
   if (options.aoi) {
     return options.aoi === "1"
       ? "Mission AOI geometry saved. Geometry, coverage, and overlay analysis now use the attached GeoJSON shape."
@@ -359,7 +380,7 @@ export default async function MissionDetailPage({
   searchParams,
 }: {
   params: Promise<{ missionId: string }>;
-  searchParams: Promise<{ queued?: string; attached?: string; ingest?: string; seeded?: string; proving?: string; bundled?: string; approved?: string; installed?: string; delivered?: string; aoi?: string; overlay?: string; created?: string; dataset?: string; extract?: string }>;
+  searchParams: Promise<{ queued?: string; attached?: string; ingest?: string; seeded?: string; proving?: string; bundled?: string; approved?: string; installed?: string; delivered?: string; packet?: string; aoi?: string; overlay?: string; created?: string; dataset?: string; extract?: string }>;
 }) {
   const access = await getDroneOpsAccess();
 
@@ -1690,6 +1711,34 @@ export default async function MissionDetailPage({
         : {},
     ),
   );
+  const readyArtifactCount = detail.outputs.filter((output) => output.status === "ready").length;
+  const latestApprovalDecisionEntries = await Promise.all(
+    detail.outputs.map(async (output) => {
+      const approvals = await selectArtifactApprovalsByArtifact(output.id).catch(() => []);
+      return [output.id, approvals[0]?.decision ?? null] as const;
+    }),
+  );
+  const latestApprovalDecisionByArtifact = new Map(latestApprovalDecisionEntries);
+  const approvedPacketArtifactCount = detail.outputs.filter((output) =>
+    output.status === "ready" &&
+    Boolean(output.storage_path) &&
+    latestApprovalDecisionByArtifact.get(output.id) === "approved",
+  ).length;
+  const deliveryPacketEligibility = summarizeDeliveryPacketEligibility({
+    readyArtifactCount,
+    approvedArtifactCount: approvedPacketArtifactCount,
+    totalArtifactCount: detail.outputs.length,
+  });
+  const deliveryPackets = access.org?.id
+    ? await selectDeliveryPacketsForMission({
+        orgId: access.org.id,
+        missionId: detail.mission.id,
+        limit: 5,
+      }).catch(() => [])
+    : [];
+  const canCreateDeliveryPacket =
+    canPerformDroneOpsAction(access, "artifacts.export") &&
+    deliveryPacketEligibility.approvedArtifactCount > 0;
   const overlayReviewPercent = overlayPlan.recommendations.length > 0
     ? Math.round((reviewedOverlayCount / overlayPlan.recommendations.length) * 100)
     : null;
@@ -1765,6 +1814,7 @@ export default async function MissionDetailPage({
     ?? resolvedSearchParams.approved
     ?? resolvedSearchParams.installed
     ?? resolvedSearchParams.delivered
+    ?? resolvedSearchParams.packet
     ?? resolvedSearchParams.aoi
     ?? resolvedSearchParams.overlay
     ?? resolvedSearchParams.extract;
@@ -2676,7 +2726,7 @@ export default async function MissionDetailPage({
             </div>
             <div className="kv-row">
               <dt>Ready artifacts</dt>
-              <dd>{detail.outputs.filter((output) => output.status === "ready").length}</dd>
+              <dd>{readyArtifactCount}</dd>
             </div>
             <div className="kv-row">
               <dt>Pending review</dt>
@@ -2687,6 +2737,117 @@ export default async function MissionDetailPage({
               <dd>{handoffCounts.sharedCount + handoffCounts.exportedCount}</dd>
             </div>
           </dl>
+        </article>
+
+        <article id="mission-delivery-packets" className="surface stack-sm info-card">
+          <div className="ops-list-card-header">
+            <div className="stack-xs">
+              <p className="eyebrow">Client packet</p>
+              <h2>Delivery packets</h2>
+            </div>
+            <span className={deliveryPacketEligibility.approvedArtifactCount > 0 ? "status-pill status-pill--success" : "status-pill status-pill--warning"}>
+              {deliveryPacketEligibility.approvedArtifactCount} eligible
+            </span>
+          </div>
+
+          <dl className="kv-grid">
+            <div className="kv-row">
+              <dt>Ready artifacts</dt>
+              <dd>{deliveryPacketEligibility.readyArtifactCount}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Approved eligible</dt>
+              <dd>{deliveryPacketEligibility.approvedArtifactCount}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Blocked from packet</dt>
+              <dd>{deliveryPacketEligibility.ineligibleCount}</dd>
+            </div>
+            <div className="kv-row">
+              <dt>Recent packets</dt>
+              <dd>{deliveryPackets.length}</dd>
+            </div>
+          </dl>
+
+          <form action={createMissionDeliveryPacketAction} className="stack-sm surface-form-shell">
+            <input type="hidden" name="missionId" value={detail.mission.id} />
+            <div className="stack-xs">
+              <h3>Create governed ZIP packet</h3>
+              <p className="muted">
+                Includes README, manifest, review notes, and fresh governed links for ready artifacts whose latest approval is approved.
+              </p>
+            </div>
+            <label className="stack-xs">
+              <span>Packet title</span>
+              <input name="packetTitle" type="text" defaultValue={`${detail.mission.name} delivery packet`} required />
+            </label>
+            <label className="stack-xs">
+              <span>Packet note</span>
+              <textarea name="packetNote" rows={2} placeholder="Client scope, transmittal note, or review context."></textarea>
+            </label>
+            <div className="form-grid-2">
+              <label className="stack-xs">
+                <span>Link expiry hours</span>
+                <input name="shareExpiresInHours" type="number" min="1" max="8760" step="1" defaultValue="168" />
+              </label>
+              <label className="stack-xs">
+                <span>Max downloads per link</span>
+                <input name="shareMaxUses" type="number" min="1" max="1000" step="1" defaultValue="10" />
+              </label>
+            </div>
+            <button type="submit" className="button button-primary" disabled={!canCreateDeliveryPacket}>
+              Create delivery packet
+            </button>
+            {deliveryPacketEligibility.approvedArtifactCount === 0 ? (
+              <p className="muted">Approve at least one ready artifact before creating a client delivery packet.</p>
+            ) : null}
+          </form>
+
+          <div className="stack-xs">
+            <h3>Recent packets</h3>
+            {deliveryPackets.length > 0 ? (
+              deliveryPackets.map((packet) => {
+                const metadata = packet.metadata && typeof packet.metadata === "object" && !Array.isArray(packet.metadata)
+                  ? (packet.metadata as Record<string, unknown>)
+                  : {};
+                const artifactCount = typeof metadata.artifactCount === "number"
+                  ? metadata.artifactCount
+                  : packet.artifact_ids.length;
+                const filename = typeof metadata.filename === "string" ? metadata.filename : "delivery packet";
+
+                return (
+                  <article key={packet.id} className="ops-list-card stack-xs">
+                    <div className="ops-list-card-header">
+                      <div className="stack-xs">
+                        <strong>{packet.title}</strong>
+                        <span className="muted">
+                          {artifactCount} artifact link(s) · {formatDateTime(packet.created_at)} · {packet.created_by_email ?? "Unknown creator"}
+                        </span>
+                      </div>
+                      <span className={statusPillClassName(packet.status === "ready" ? "success" : "warning")}>
+                        {packet.status}
+                      </span>
+                    </div>
+                    <div className="header-actions">
+                      <span className="muted">{filename}</span>
+                      {packet.storage_path ? (
+                        <a
+                          href={`/api/missions/${detail.mission.id}/delivery-packets/${packet.id}/download`}
+                          className="button button-secondary"
+                        >
+                          Download ZIP
+                        </a>
+                      ) : (
+                        <span className="muted">Storage missing</span>
+                      )}
+                    </div>
+                  </article>
+                );
+              })
+            ) : (
+              <p className="muted">No delivery packets have been generated for this mission yet.</p>
+            )}
+          </div>
         </article>
       </section>
 

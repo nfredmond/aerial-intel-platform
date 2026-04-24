@@ -4,7 +4,9 @@ import { getArtifactDetail, getString } from "@/lib/missions/detail-data";
 import {
   selectArtifactApprovalsByArtifact,
   selectArtifactCommentsByArtifact,
+  updateProcessingOutput,
 } from "@/lib/supabase/admin";
+import type { Json } from "@/lib/supabase/types";
 
 import {
   recordCopilotAuditEventSafely,
@@ -183,6 +185,22 @@ export async function runReportSummaryForArtifact(
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,
     });
+
+    await updateProcessingOutput(detail.output.id, {
+      metadata: {
+        ...detail.metadata,
+        copilotReportSummary: {
+          summary: result.summary,
+          citedFactIds: result.citedFactIds,
+          totalSentences: result.totalSentences,
+          keptSentences: result.keptSentences,
+          droppedSentences: result.droppedSentences,
+          spendTenthCents: result.spendTenthCents,
+          modelId: result.modelId,
+          generatedAt: new Date().toISOString(),
+        },
+      } as Json,
+    }).catch(() => undefined);
 
     return {
       status: "ok",

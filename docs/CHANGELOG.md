@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-04-24 - Mission delivery packets implemented
+
+Added mission-scoped delivery packets for client handoff without embedding large
+artifact binaries. Packet creation now requires at least one ready artifact whose
+latest approval is approved, generates fresh governed `/s/:token` share links
+with expiry/use limits, stores a ZIP in protected `drone-ops` storage, and lists
+recent packet downloads on the mission page. Copilot report summaries are now
+persisted into artifact metadata after successful generation so packets can reuse
+saved summary text without a new model call. This does not change the TiTiler
+blocker: production raster delivery still requires a Nat Ford controlled TiTiler
+endpoint and `AERIAL_TITILER_URL`.
+
 ## 2026-04-24 - TiTiler ops pipeline drift check added
 
 Added `scripts/check_titiler_ops_pipeline.mjs` to CI so the controlled TiTiler

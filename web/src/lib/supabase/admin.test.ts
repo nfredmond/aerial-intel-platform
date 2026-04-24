@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  insertDeliveryPacket,
   insertMembership,
   insertInvitation,
   insertOrgEvent,
   selectCopilotOrgSettings,
   selectCopilotQuotaRowsForOrg,
+  selectDeliveryPacketForDownload,
+  selectDeliveryPacketsForMission,
   selectRecentCopilotEventsForOrg,
   selectInvitationByToken,
   selectInvitationsForOrg,
@@ -310,6 +313,76 @@ describe("selectRecentCopilotEventsForOrg", () => {
     await selectRecentCopilotEventsForOrg("org-1", 0);
 
     expect(calls[0].url).toContain("limit=1");
+  });
+});
+
+describe("delivery packet admin helpers", () => {
+  it("insertDeliveryPacket POSTs to drone_delivery_packets with packet metadata", async () => {
+    const calls: FetchCall[] = [];
+    globalThis.fetch = stubFetchOnce([{ id: "packet-1" }], calls);
+
+    const result = await insertDeliveryPacket({
+      id: "packet-1",
+      org_id: "org-1",
+      mission_id: "mission-1",
+      title: "Client packet",
+      storage_bucket: "drone-ops",
+      storage_path: "org/missions/mission-1/packet.zip",
+      artifact_ids: ["artifact-1"],
+      share_link_ids: ["share-1"],
+      metadata: { artifactCount: 1 },
+    });
+
+    expect(result).toEqual({ id: "packet-1" });
+    expect(calls).toHaveLength(1);
+    const { url, init } = calls[0];
+    expect(url).toContain("drone_delivery_packets?select=*");
+    expect(init?.method).toBe("POST");
+    expect(init?.body).toContain('"title":"Client packet"');
+    expect(init?.body).toContain('"artifact_ids":["artifact-1"]');
+  });
+
+  it("selectDeliveryPacketsForMission scopes by org and mission, orders newest first, and clamps limit", async () => {
+    const calls: FetchCall[] = [];
+    globalThis.fetch = stubFetchOnce([], calls);
+
+    await selectDeliveryPacketsForMission({
+      orgId: "org with space/slash",
+      missionId: "mission with space/slash",
+      limit: 999,
+    });
+
+    expect(calls).toHaveLength(1);
+    const { url, init } = calls[0];
+    expect(url).toContain("drone_delivery_packets?");
+    expect(url).toContain(`org_id=eq.${encodeURIComponent("org with space/slash")}`);
+    expect(url).toContain(`mission_id=eq.${encodeURIComponent("mission with space/slash")}`);
+    expect(url).toContain("select=*");
+    expect(url).toContain("order=created_at.desc");
+    expect(url).toContain("limit=100");
+    expect(init?.method).toBe("GET");
+  });
+
+  it("selectDeliveryPacketForDownload requires org, mission, packet id, and ready status", async () => {
+    const calls: FetchCall[] = [];
+    const row = { id: "packet-1", status: "ready" };
+    globalThis.fetch = stubFetchOnce([row], calls);
+
+    const result = await selectDeliveryPacketForDownload({
+      orgId: "org-1",
+      missionId: "mission-1",
+      packetId: "packet-1",
+    });
+
+    expect(result).toEqual(row);
+    expect(calls).toHaveLength(1);
+    const { url, init } = calls[0];
+    expect(url).toContain("org_id=eq.org-1");
+    expect(url).toContain("mission_id=eq.mission-1");
+    expect(url).toContain("id=eq.packet-1");
+    expect(url).toContain("status=eq.ready");
+    expect(url).toContain("select=*");
+    expect(init?.method).toBe("GET");
   });
 });
 
