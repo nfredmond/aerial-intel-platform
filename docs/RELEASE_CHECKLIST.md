@@ -36,6 +36,13 @@ localhost, plain-HTTP TiTiler URLs, or the example Supabase URL.
 ## Raster
 
 - Controlled TiTiler service is deployed outside localhost.
+- If deploying via GitHub Actions, dispatch and watch the controlled Cloud Run
+  workflow with:
+
+  ```bash
+  scripts/run_titiler_cloud_run_workflow.sh --repo nfredmond/aerial-intel-platform
+  ```
+
 - `scripts/smoke_titiler.sh` passes against the controlled service URL.
 - Vercel production `AERIAL_TITILER_URL` points at the controlled service:
 

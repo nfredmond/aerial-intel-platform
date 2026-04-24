@@ -103,6 +103,16 @@ The deployable service shape now lives in `infra/titiler/`:
   fails fast on missing prerequisites, then builds, pushes, deploys, and smokes
   the controlled Cloud Run service after the required GCP repository variables
   and Workload Identity secrets are set.
+- `scripts/run_titiler_cloud_run_workflow.sh` is the local operator wrapper:
+  it runs the repository prereq check, dispatches the manual workflow, and
+  watches the run without inspecting or printing secret values.
+
+Once the GitHub Actions variables and secrets exist, deploy the controlled
+service from `main` with:
+
+```bash
+scripts/run_titiler_cloud_run_workflow.sh --repo nfredmond/aerial-intel-platform
+```
 
 Smoke any controlled endpoint before wiring the app to it:
 

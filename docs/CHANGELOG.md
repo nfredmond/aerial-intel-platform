@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-04-24 - TiTiler Cloud Run workflow wrapper added
+
+Added `scripts/run_titiler_cloud_run_workflow.sh`, a one-command wrapper for
+the manual controlled TiTiler Cloud Run deployment. The wrapper checks required
+GitHub Actions variable and secret names, dispatches the workflow, and watches
+the run without reading or printing secret values. It is intentionally blocked
+until the real GCP repository variables and Workload Identity secrets exist.
+
 ## 2026-04-24 - Smoke-first Vercel TiTiler URL helper added
 
 Added `scripts/configure_vercel_titiler_url.sh` so the final production raster
