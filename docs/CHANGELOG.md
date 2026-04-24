@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-04-24 - Production mission-brief smoke passed
+
+Verified the current Production deployment `https://aerial-intel-platform-jqcd9ywgt-natford.vercel.app` with the passwordless admin magic-link OTP sign-in pattern. Mission `3ca2d074-0f00-4adf-b3a4-75f63a964a77` generated a cited mission brief with visible `[fact:*]` tokens, `8/8` sentences kept, `anthropic/claude-opus-4.7`, `74` tenth-cents spend (`$0.074`), no captured browser console/page errors, and a new `drone_org_events` audit row `470419a0-65c8-4aae-906f-60094a32d5cd` (`copilot.call.succeeded`, `skill=mission-brief`, `status=ok`). Evidence: `docs/ops/2026-04-24-production-copilot-smoke.md`.
+
 ## 2026-04-24 - Supabase leaked-password protection enabled
 
 Closed #106 on project `bvrmnesiamadpnysqiqd`: enabled Supabase Auth leaked-password protection by setting `password_hibp_enabled=true` through the Management API, then reran:

@@ -22,6 +22,12 @@ Enables Supabase Auth's HaveIBeenPwned check on password signups / changes. Not 
 
 **Action taken:** enabled on 2026-04-24 by patching the Supabase Management API Auth config with `password_hibp_enabled=true`, then reran `supabase db advisors --linked --type security --output json --workdir . --agent=no`. The `auth_leaked_password_protection` advisor row no longer appears.
 
+**Guardrail:** do not use `supabase config push` for one-off hosted Auth
+settings unless the repo has a production-safe `supabase/config.toml` reviewed
+for the target project. That command pushes the whole local Auth config, not
+only the field being investigated. Prefer the Management API for narrowly
+scoped hosted Auth changes.
+
 ## What did get fixed on 2026-04-19
 
 `supabase/migrations/20260420000002_fix_drone_memberships_rls_recursion.sql` replaced the self-referencing `members_can_read_memberships` policy with `users_read_own_memberships (user_id = auth.uid())`. That wasn't one of the advisor lints, but it was the actual root cause of the 42P17 "infinite recursion detected in policy" errors at sign-in after Codex applied the missing staging migrations. Cross-member reads (admin UI, invitation accept) go through service-role `adminRestRequest`, which bypasses RLS, so no app change was needed alongside the policy rewrite.
