@@ -16,11 +16,11 @@ A real relocation needs either a Supabase-platform migration (dump → restore i
 
 **Action taken:** none. Dismiss in the dashboard. Reconsider only if we ever stand up a new Supabase project from scratch — at that point, `CREATE EXTENSION postgis SCHEMA extensions` on day one avoids the whole problem.
 
-## 3. `auth_leaked_password_protection` — WARN, one-click fix
+## 3. `auth_leaked_password_protection` — closed 2026-04-24
 
 Enables Supabase Auth's HaveIBeenPwned check on password signups / changes. Not exposed via MCP; must be toggled in the dashboard.
 
-**Action required:** go to https://supabase.com/dashboard/project/bvrmnesiamadpnysqiqd/auth/providers, scroll to **Email → Password Protection**, enable **Prevent use of compromised passwords**. Worth doing before inviting the first external user through `/admin/people`.
+**Action taken:** enabled on 2026-04-24 by patching the Supabase Management API Auth config with `password_hibp_enabled=true`, then reran `supabase db advisors --linked --type security --output json --workdir . --agent=no`. The `auth_leaked_password_protection` advisor row no longer appears.
 
 ## What did get fixed on 2026-04-19
 

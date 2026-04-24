@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-04-24 - Supabase leaked-password protection enabled
+
+Closed #106 on project `bvrmnesiamadpnysqiqd`: enabled Supabase Auth leaked-password protection by setting `password_hibp_enabled=true` through the Management API, then reran:
+
+```bash
+supabase db advisors --linked --type security --output json --workdir . --agent=no
+```
+
+Result: `auth_leaked_password_protection` no longer appears. The only remaining security advisor rows are the expected PostGIS findings already dispositioned in `docs/ops/2026-04-19-supabase-advisor-state.md`: `rls_disabled_in_public` on `public.spatial_ref_sys` and `extension_in_public` for `postgis`.
+
+Operational note: an attempted CLI `supabase config push` briefly applied local default Auth settings. Before verification, the remote Auth config was restored to the prior production site URL, redirect allow-list, TOTP MFA enabled state, email-confirmation posture, 60-second email frequency, and 8-character OTP length, with only `password_hibp_enabled` changed to `true`.
+
 ## 2026-04-24 - Wave 2.5 exit verification reconciled
 
 Closed the remaining evidence loop against the current `main` state rather than the stale 2026-04-20 handoff snapshot. The repo was already clean with W2-C2 seed/changelog and MCP transport metadata committed, and copilot audit events were already shipped via `drone_org_events`.
@@ -9,7 +21,7 @@ Closed the remaining evidence loop against the current `main` state rather than 
 - **Grounding challenge:** support assistant ignored a prompt-side "surveyed on Mars" injection, returned only grounded TiTiler/raster facts, kept `2/2` sentences, and inserted a `copilot.call.succeeded` `support-assistant` audit row. This proves resistance to that prompt, not a refusal branch.
 - **Cap exhaustion:** with explicit chat approval, the April quota row was temporarily set to cap, one mission-brief call refused pre-call with the visible `$50.000 of $50.000` quota message, and `/admin/copilot` recorded `copilot.call.blocked` with `reason=quota-exhausted`; the row was restored to `698` tenth-cents afterward.
 
-Truthfulness note: the latest listed Preview `aklvm4c7y` was not used as the exit proof target because it rendered mission-brief text without visible `[fact:*]` citations and did not insert a current audit row, despite updating spend. A later linked Security Advisor check showed `auth_leaked_password_protection` still present as a WARN, so #106 remains open until the Supabase dashboard toggle is enabled and rechecked.
+Truthfulness note: the latest listed Preview `aklvm4c7y` was not used as the exit proof target because it rendered mission-brief text without visible `[fact:*]` citations and did not insert a current audit row, despite updating spend. A linked Security Advisor check during the Wave 2.5 reconciliation showed `auth_leaked_password_protection` still present as a WARN; it was closed later on 2026-04-24 in the entry above.
 
 ## 2026-04-19 — Wave 2 C-2 exit: processing-QA diagnostic verified end-to-end on Preview
 
@@ -25,7 +37,7 @@ Worked the three items surfaced by `get_advisors(security)` on project `bvrmnesi
 
 - **`rls_disabled_in_public` on `public.spatial_ref_sys` (ERROR)** — `ALTER TABLE public.spatial_ref_sys ENABLE ROW LEVEL SECURITY` errors with `42501: must be owner of table spatial_ref_sys` because the table belongs to the PostGIS extension; forcing it through would break every geometry query. Dismissed as false positive.
 - **`extension_in_public` for `postgis` (WARN)** — `ALTER EXTENSION postgis SET SCHEMA extensions` errors with `0A000: extension "postgis" does not support SET SCHEMA` (PostGIS declares itself non-relocatable). The only in-place alternative is `DROP EXTENSION postgis CASCADE; CREATE EXTENSION postgis SCHEMA extensions`, which would cascade through every `geometry` column in `drone_datasets`, `drone_missions`, and `drone_sites` and destroy data. Not worth it for an advisory warning. Dismissed.
-- **`auth_leaked_password_protection` (WARN)** — enables HaveIBeenPwned check for Supabase Auth signups. Not reachable through the Supabase MCP surface (no Auth-config tool); dashboard toggle only. Flagged in `docs/ops/2026-04-19-supabase-advisor-state.md` with the exact click path.
+- **`auth_leaked_password_protection` (WARN)** — enables HaveIBeenPwned check for Supabase Auth signups. Not reachable through the Supabase MCP surface (no Auth-config tool); originally flagged in `docs/ops/2026-04-19-supabase-advisor-state.md` with the dashboard click path. Closed on 2026-04-24 through the Management API and verified with the linked Security Advisor.
 
 Added a risk-register row capturing the PostGIS-in-public posture and the conditions under which it could be revisited (new Supabase project from scratch with `CREATE EXTENSION postgis SCHEMA extensions` on day one). Added `docs/ops/2026-04-19-supabase-advisor-state.md` so the next audit doesn't repeat the diagnosis.
 
