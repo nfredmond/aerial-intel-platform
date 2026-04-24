@@ -30,6 +30,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Check deploy prerequisites
+        env:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+        run: scripts/check_titiler_deploy_prereqs.sh --env
+
       - name: Resolve image tag
         run: |
           set -euo pipefail

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-04-24 - Controlled TiTiler deploy preflight added
+
+Added `scripts/check_titiler_deploy_prereqs.sh` and wired it into the manual
+`Deploy TiTiler Cloud Run` workflow so the controlled raster-plane deployment
+fails fast with exact missing GitHub Actions variable/secret names before Google
+auth or Cloud Run deploy begins. Current ops finding: production Vercel still
+has no `AERIAL_TITILER_URL`; the only TiTiler env var is the old branch-scoped
+Preview setting, so production raster delivery remains intentionally unclaimed.
+
 ## 2026-04-24 - `aklvm4c7y` Preview mismatch explained
 
 Closed the residual Wave 2.5 Preview question without spending another copilot call. Vercel metadata shows `https://aerial-intel-platform-aklvm4c7y-natford.vercel.app` was built from non-main branch `bart/2026-04-21-main-reconcile` at `b6b02df41a45e3c1d89e94ec8d29114df59b7472`, not from current `main`. That build predates the audit-event layer and used the older grounding validator that stripped `[fact:*]` tokens from kept sentence text before rendering. Disposition: stale/non-main Preview, not a current Production regression. Evidence: `docs/ops/2026-04-24-aklvm4c7y-preview-disposition.md`.

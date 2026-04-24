@@ -35,6 +35,12 @@ The preferred deployment path is the manual GitHub Actions workflow:
 Deploy TiTiler Cloud Run
 ```
 
+Before dispatching it, run:
+
+```bash
+scripts/check_titiler_deploy_prereqs.sh
+```
+
 Configure repository variables:
 
 - `GCP_PROJECT_ID`
@@ -51,7 +57,8 @@ Configure repository secrets for Workload Identity Federation:
 
 The workflow builds `infra/titiler`, pushes the image to Artifact Registry,
 deploys Cloud Run, and runs `scripts/smoke_titiler.sh` against the deployed
-service URL.
+service URL. The workflow runs the same prereq check before Google auth, so a
+missing repository variable or secret fails fast with the exact missing name.
 
 Minimal deployment flow:
 

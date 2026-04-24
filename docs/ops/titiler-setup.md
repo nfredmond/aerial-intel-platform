@@ -96,9 +96,13 @@ The deployable service shape now lives in `infra/titiler/`:
 - `docker-compose.yml` runs the same shape locally.
 - `cloud-run.service.yaml.example` captures the Cloud Run container settings,
   resource floor, and CORS envs to fill for a Nat Ford deployment.
+- `scripts/check_titiler_deploy_prereqs.sh` checks the GitHub Actions variable
+  and secret names required by the controlled Cloud Run deployment. It does not
+  inspect or print secret values.
 - `.github/workflows/deploy-titiler-cloud-run.yml` is a manual workflow that
-  builds, pushes, deploys, and smokes the controlled Cloud Run service after the
-  required GCP repository variables and Workload Identity secrets are set.
+  fails fast on missing prerequisites, then builds, pushes, deploys, and smokes
+  the controlled Cloud Run service after the required GCP repository variables
+  and Workload Identity secrets are set.
 
 Smoke any controlled endpoint before wiring the app to it:
 

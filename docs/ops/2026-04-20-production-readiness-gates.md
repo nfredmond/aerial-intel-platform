@@ -9,6 +9,8 @@ repo artifacts.
 - Controlled TiTiler service artifacts in `infra/titiler/`.
 - Manual Cloud Run deployment workflow for TiTiler in
   `.github/workflows/deploy-titiler-cloud-run.yml`.
+- `scripts/check_titiler_deploy_prereqs.sh` for a no-secret preflight of the
+  GitHub Actions variables and secrets required by the TiTiler deploy workflow.
 - `scripts/smoke_titiler.sh` for tilejson and PNG tile smoke checks.
 - `scripts/deploy_titiler_cloud_run.sh` for local or workflow-backed Cloud Run
   deploys.
@@ -25,8 +27,7 @@ repo artifacts.
 
 From the repository root:
 
-- `bash -n scripts/smoke_titiler.sh scripts/check_release_readiness.sh` - pass.
-- `bash -n scripts/deploy_titiler_cloud_run.sh` - pass.
+- `for script in scripts/smoke_titiler.sh scripts/check_release_readiness.sh scripts/check_titiler_deploy_prereqs.sh scripts/deploy_titiler_cloud_run.sh; do bash -n "$script"; done` - pass.
 - `node --check scripts/provision_e2e_supabase_fixtures.mjs` - pass.
 - `node scripts/provision_e2e_supabase_fixtures.mjs --help` - pass.
 - `docker compose -f infra/titiler/docker-compose.yml config` - pass.
