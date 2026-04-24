@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-04-24 - TiTiler ops pipeline drift check added
+
+Added `scripts/check_titiler_ops_pipeline.mjs` to CI so the controlled TiTiler
+Cloud Run workflow, local dispatch wrapper, and deploy-prereq script stay in
+sync. The check fails docs validation if the workflow stops mapping a required
+GCP variable/secret, skips the prereq check, or the local wrapper stops checking
+repo prerequisites before dispatch.
+
 ## 2026-04-24 - TiTiler deploy prereq value checks added
 
 Tightened `scripts/check_titiler_deploy_prereqs.sh` so the controlled Cloud Run

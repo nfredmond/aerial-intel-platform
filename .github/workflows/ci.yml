@@ -28,6 +28,7 @@ jobs:
           for script in scripts/*.sh; do bash -n "$script"; done
           for script in scripts/*.mjs; do node --check "$script"; done
           node scripts/check_vercel_crons.mjs
+          node scripts/check_titiler_ops_pipeline.mjs
           echo "Core docs present."
 
   web-quality:
