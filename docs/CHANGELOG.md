@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-04-24 - `aklvm4c7y` Preview mismatch explained
+
+Closed the residual Wave 2.5 Preview question without spending another copilot call. Vercel metadata shows `https://aerial-intel-platform-aklvm4c7y-natford.vercel.app` was built from non-main branch `bart/2026-04-21-main-reconcile` at `b6b02df41a45e3c1d89e94ec8d29114df59b7472`, not from current `main`. That build predates the audit-event layer and used the older grounding validator that stripped `[fact:*]` tokens from kept sentence text before rendering. Disposition: stale/non-main Preview, not a current Production regression. Evidence: `docs/ops/2026-04-24-aklvm4c7y-preview-disposition.md`.
+
 ## 2026-04-24 - Production mission-brief smoke passed
 
 Verified the current Production deployment `https://aerial-intel-platform-jqcd9ywgt-natford.vercel.app` with the passwordless admin magic-link OTP sign-in pattern. Mission `3ca2d074-0f00-4adf-b3a4-75f63a964a77` generated a cited mission brief with visible `[fact:*]` tokens, `8/8` sentences kept, `anthropic/claude-opus-4.7`, `74` tenth-cents spend (`$0.074`), no captured browser console/page errors, and a new `drone_org_events` audit row `470419a0-65c8-4aae-906f-60094a32d5cd` (`copilot.call.succeeded`, `skill=mission-brief`, `status=ok`). Evidence: `docs/ops/2026-04-24-production-copilot-smoke.md`.
