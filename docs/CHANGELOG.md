@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-04-24 - Production Vercel cron/cap env names configured
+
+Configured production Vercel env names for `CRON_SECRET` and
+`AERIAL_COPILOT_DEFAULT_CAP_TENTH_CENTS=50000`, then redeployed Production so
+the runtime receives them. First redeploy attempt failed because the stdin-added
+`CRON_SECRET` carried trailing whitespace; it was overwritten through Vercel's
+non-stdin value path and the replacement deployment
+`https://aerial-intel-platform-abigvfvhv-natford.vercel.app` is `READY`.
+No secret value was printed. The no-secret env-name preflight now reports only
+`AERIAL_TITILER_URL` missing, so production raster delivery remains blocked on a
+controlled TiTiler endpoint.
+
 ## 2026-04-24 - Vercel production env-name preflight added
 
 Added `scripts/check_vercel_production_env_names.mjs`, a no-secret Vercel CLI
