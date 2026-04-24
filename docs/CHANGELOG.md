@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-04-24 - Production delivery-packet smoke passed
+
+Verified mission delivery packets on Production deployment
+`https://aerial-intel-platform-5beil1r56-natford.vercel.app` with the
+passwordless Supabase admin magic-link OTP browser auth pattern. Mission
+`3ca2d074-0f00-4adf-b3a4-75f63a964a77` produced packet
+`024687be-1e8c-491a-a744-e7a04ef5c494` after approval
+`d44e6cc2-b373-41bc-a31f-68a41ecb1de5` for Toledo-20 artifact
+`6c413396-7475-4010-a1fe-b90cbc22977a`. The protected packet ZIP was stored at
+`nat-ford-drone-lab/missions/3ca2d074-0f00-4adf-b3a4-75f63a964a77/delivery-packets/024687be-1e8c-491a-a744-e7a04ef5c494/toledo-20-delivery-packet-smoke-2026-04-24-20260424192917.zip`,
+downloaded at `3417` bytes, and contained the delivery-boundary README,
+manifest schema `aerial-intel.delivery-packet.v1`, artifact links CSV, and
+review summary. Governed share link `080fd000-4674-4c66-915a-7f52bf89bac5`
+served the COG artifact through the public share page; `use_count` reached `1`
+and the downloaded artifact was `7845244` bytes. This verifies packet/share
+delivery only. Production MapLibre raster delivery remains blocked until a Nat
+Ford controlled TiTiler endpoint is deployed, smoked, configured as
+`AERIAL_TITILER_URL`, redeployed, and verified in a signed-in browser.
+
 ## 2026-04-24 - Mission delivery packets implemented
 
 Added mission-scoped delivery packets for client handoff without embedding large
