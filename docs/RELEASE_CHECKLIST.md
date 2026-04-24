@@ -44,6 +44,17 @@ localhost, plain-HTTP TiTiler URLs, or the example Supabase URL.
   scripts/bootstrap_titiler_gcp_wif.sh --repo nfredmond/aerial-intel-platform
   ```
 
+- If `gcloud` is missing, install it locally through the checksum-required
+  helper. Use the current official Google Cloud CLI Linux archive SHA256 for
+  the exact archive being installed from
+  <https://cloud.google.com/sdk/docs/install>:
+
+  ```bash
+  scripts/install_gcloud_cli_verified.sh --sha256 <official-sha256> --yes
+  export PATH="$HOME/.local/share/google-cloud-sdk/bin:$PATH"
+  gcloud --version
+  ```
+
 - If the GCP resources already exist, configure the repository prerequisites
   from a local terminal with:
 

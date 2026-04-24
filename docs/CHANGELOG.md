@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-04-24 - Gcloud checksum posture and Phase 3 bootstrap check added
+
+Documented and resolved the local `gcloud` install blocker without running any
+GCP writes: `gcloud` was missing from this dev host, then installed locally as
+Google Cloud CLI `565.0.0` using Google's official Linux x86_64 archive and the
+published SHA256
+`f52ac03660684aed058898beb03506dc9387e299501b3ecba05309f0b4fb48ea`. The
+TiTiler bootstrap helper remains correctly blocked until `gcloud` is
+authenticated locally. Added
+`scripts/install_gcloud_cli_verified.sh`, a non-root installer that requires an
+official SHA256 for the exact Google Cloud CLI Linux archive and refuses
+unchecked downloads. Added `scripts/check_phase3_live_stub_bootstrap.mjs` plus
+`docs/ops/2026-04-24-phase-3-live-stub-bootstrap.md` so the live-stub blocker is
+now exact and testable without printing secrets: local env needs Supabase URL,
+anon key, service-role key, `CRON_SECRET`, and `AERIAL_NODEODM_MODE=stub`.
+
 ## 2026-04-24 - TiTiler GCP bootstrap helper added
 
 Added `scripts/bootstrap_titiler_gcp_wif.sh` for the controlled TiTiler Cloud

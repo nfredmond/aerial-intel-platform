@@ -125,6 +125,20 @@ yet, bootstrap them from a local terminal with an authenticated `gcloud` session
 scripts/bootstrap_titiler_gcp_wif.sh --repo nfredmond/aerial-intel-platform
 ```
 
+If `gcloud` is missing on the dev host, install it through the checksum-gated
+local helper first. Copy the current SHA256 from Google's official Google Cloud
+CLI install/download page for the selected Linux archive
+(<https://cloud.google.com/sdk/docs/install>); do not use an unchecked archive
+or `curl | bash` pattern.
+
+```bash
+scripts/install_gcloud_cli_verified.sh \
+  --sha256 <official-sha256-for-the-selected-linux-archive> \
+  --yes
+export PATH="$HOME/.local/share/google-cloud-sdk/bin:$PATH"
+gcloud --version
+```
+
 If those GCP resources already exist, configure only the GitHub Actions
 prerequisites from a local terminal after the real Nat Ford GCP project, region,
 repository, Cloud Run service, CORS origins, Workload Identity Provider, and
