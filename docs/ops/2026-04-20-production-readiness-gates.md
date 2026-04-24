@@ -27,11 +27,11 @@ repo artifacts.
 
 From the repository root:
 
-- `for script in scripts/smoke_titiler.sh scripts/check_release_readiness.sh scripts/check_titiler_deploy_prereqs.sh scripts/deploy_titiler_cloud_run.sh; do bash -n "$script"; done` - pass.
+- `for script in scripts/*.sh; do bash -n "$script"; done` - pass.
 - `node --check scripts/provision_e2e_supabase_fixtures.mjs` - pass.
 - `node scripts/provision_e2e_supabase_fixtures.mjs --help` - pass.
 - `docker compose -f infra/titiler/docker-compose.yml config` - pass.
-- `NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service AERIAL_TITILER_URL=https://titiler.example.com AERIAL_RELEASE_TARGET=production scripts/check_release_readiness.sh` - pass.
+- `NEXT_PUBLIC_SUPABASE_URL=https://project-ref.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=anon SUPABASE_SERVICE_ROLE_KEY=service CRON_SECRET=secret AERIAL_TITILER_URL=https://titiler.example.com AERIAL_COPILOT_ENABLED=false AERIAL_COPILOT_DEFAULT_CAP_TENTH_CENTS=50000 AERIAL_RELEASE_TARGET=production scripts/check_release_readiness.sh` - pass.
 - Same readiness command with `AERIAL_TITILER_URL=https://titiler.xyz` and `AERIAL_RELEASE_TARGET=production` - fails as expected.
 - `AERIAL_TITILER_URL=https://titiler.xyz scripts/smoke_titiler.sh` - pass, script validation only against public demo endpoint.
 

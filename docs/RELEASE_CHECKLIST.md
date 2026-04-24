@@ -26,7 +26,9 @@ Run:
 AERIAL_RELEASE_TARGET=production scripts/check_release_readiness.sh
 ```
 
-Production must not use `https://titiler.xyz` or any localhost TiTiler URL.
+The script checks the required environment names above, validates the copilot
+flag/cap shape, and rejects production use of `https://titiler.xyz`, localhost,
+plain-HTTP TiTiler URLs, or the example Supabase URL.
 
 ## Raster
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-04-24 - Release readiness env gate tightened
+
+Tightened `scripts/check_release_readiness.sh` so it matches the production
+release checklist: `CRON_SECRET`, `AERIAL_COPILOT_ENABLED`, and
+`AERIAL_COPILOT_DEFAULT_CAP_TENTH_CENTS` are now explicit checks, copilot flags
+and caps are validated, and production rejects the example Supabase URL plus
+demo/local/plain-HTTP TiTiler endpoints. CI now syntax-checks every shell script
+in `scripts/`. Current Vercel production env-name posture still lacks
+`CRON_SECRET`, `AERIAL_TITILER_URL`, and
+`AERIAL_COPILOT_DEFAULT_CAP_TENTH_CENTS`, so the production raster/release gate
+remains intentionally blocked.
+
 ## 2026-04-24 - Authenticated smoke safety preflight added
 
 Added `scripts/check_auth_smoke_prereqs.mjs` and wired it into the opt-in
