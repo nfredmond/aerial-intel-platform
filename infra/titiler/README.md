@@ -58,7 +58,8 @@ Configure repository secrets for Workload Identity Federation:
 The workflow builds `infra/titiler`, pushes the image to Artifact Registry,
 deploys Cloud Run, and runs `scripts/smoke_titiler.sh` against the deployed
 service URL. The workflow runs the same prereq check before Google auth, so a
-missing repository variable or secret fails fast with the exact missing name.
+missing repository variable/secret or invalid non-secret variable value fails
+fast before any deploy step.
 
 Minimal deployment flow:
 
@@ -102,7 +103,9 @@ TITILER_CORS_ORIGINS='https://APP_ORIGIN,https://PREVIEW_ORIGIN' \
 ## Production requirements
 
 - Use a Nat Ford controlled domain, for example `https://titiler.natfordplanning.com`.
-- Restrict `CORS_ORIGINS` to the production app origin and Preview origin pattern.
+- Restrict `CORS_ORIGINS` to exact HTTPS origins for the production app and any
+  intentional preview aliases. Wildcards, localhost, paths, and query strings
+  fail the deploy prereq check.
 - Put Cloudflare, Cloud CDN, or another cache in front before heavy customer use.
 - Pin `TITILER_IMAGE` to a tested digest or tag before production promotion.
 - Keep TiTiler independent from NodeODM; raster serving is latency-sensitive while

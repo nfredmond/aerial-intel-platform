@@ -97,8 +97,9 @@ The deployable service shape now lives in `infra/titiler/`:
 - `cloud-run.service.yaml.example` captures the Cloud Run container settings,
   resource floor, and CORS envs to fill for a Nat Ford deployment.
 - `scripts/check_titiler_deploy_prereqs.sh` checks the GitHub Actions variable
-  and secret names required by the controlled Cloud Run deployment. It does not
-  inspect or print secret values.
+  and secret names required by the controlled Cloud Run deployment. It also
+  validates non-secret variable values such as GCP ids and exact HTTPS CORS
+  origins. It does not inspect or print secret values.
 - `.github/workflows/deploy-titiler-cloud-run.yml` is a manual workflow that
   fails fast on missing prerequisites, then builds, pushes, deploys, and smokes
   the controlled Cloud Run service after the required GCP repository variables
@@ -136,7 +137,8 @@ scripts/configure_vercel_titiler_url.sh https://titiler.example.com --scope natf
 - The app passes the COG via short-lived Supabase signed URLs (6 h TTL). Users
   reloading the artifact page after the TTL expires get a new URL automatically.
   Nothing in TiTiler needs Supabase credentials.
-- Lock `CORS_ORIGINS` to the deployed Next.js origin + any preview domains.
+- Lock `CORS_ORIGINS` to exact deployed Next.js origins. Do not use wildcard,
+  localhost, path, or query-string origins for the controlled service.
 - Before production promotion, run
   `AERIAL_RELEASE_TARGET=production scripts/check_release_readiness.sh` and
   confirm it does not reject the configured TiTiler URL.

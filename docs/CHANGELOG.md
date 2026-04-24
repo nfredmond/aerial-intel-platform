@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-04-24 - TiTiler deploy prereq value checks added
+
+Tightened `scripts/check_titiler_deploy_prereqs.sh` so the controlled Cloud Run
+deploy now validates non-secret GitHub Actions variable values, not just names.
+The preflight rejects malformed GCP ids/regions/service names, outer
+whitespace, wildcard CORS, localhost CORS, and non-origin CORS values before
+Google auth or deploy steps run. Secret values remain name-only.
+
 ## 2026-04-24 - TiTiler Cloud Run workflow wrapper added
 
 Added `scripts/run_titiler_cloud_run_workflow.sh`, a one-command wrapper for
