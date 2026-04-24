@@ -50,11 +50,15 @@ AERIAL_E2E_RASTER_ARTIFACT_ID=... \
 AERIAL_E2E_SECOND_ARTIFACT_ID=... \
 AERIAL_E2E_SYNTHETIC_JOB_ID=... \
 AERIAL_E2E_EXPECT_RASTER=1 \
+AERIAL_E2E_CONFIRMED_DEDICATED_PROJECT=1 \
   npm run test:e2e -- authenticated-ops.spec.ts
 ```
 
 Only set `AERIAL_E2E_EXPECT_RASTER=1` when the target deployment has an
-externally reachable `AERIAL_TITILER_URL`.
+externally reachable `AERIAL_TITILER_URL`. Only set
+`AERIAL_E2E_CONFIRMED_DEDICATED_PROJECT=1` after confirming the Supabase
+credentials point at a dedicated test project; the smoke creates temporary
+users/comments through the service-role key.
 
 ## Local usage
 
@@ -82,5 +86,5 @@ PR CI stays fast with lint + vitest + build.
 The authenticated operational smoke is wired as a separate `web-auth-smoke`
 job and remains disabled unless the repository variable
 `AERIAL_E2E_AUTH_SMOKE_ENABLED=1` is set. Configure the dedicated Supabase
-project variables and secrets in `docs/ops/test-supabase-project.md` before
-enabling it.
+project variables and secrets in `docs/ops/test-supabase-project.md`, then run
+`node scripts/check_auth_smoke_prereqs.mjs`, before enabling it.

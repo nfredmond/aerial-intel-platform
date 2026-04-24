@@ -62,6 +62,8 @@ project, not the shared dev project and not production.
    - `AERIAL_E2E_SECOND_ARTIFACT_ID`
    - `AERIAL_E2E_SYNTHETIC_JOB_ID`
    - `AERIAL_E2E_EXPECT_RASTER`
+   - `AERIAL_E2E_CONFIRMED_DEDICATED_PROJECT` (`1` only after confirming the
+     secrets below point at the dedicated test project)
 
 6. Store these as repository secrets:
 
@@ -69,7 +71,13 @@ project, not the shared dev project and not production.
    - `AERIAL_E2E_SUPABASE_ANON_KEY`
    - `AERIAL_E2E_SUPABASE_SERVICE_ROLE_KEY`
 
-7. Set repository variable `AERIAL_E2E_AUTH_SMOKE_ENABLED=1` only after the
+7. Run the prereq check locally:
+
+   ```bash
+   node scripts/check_auth_smoke_prereqs.mjs
+   ```
+
+8. Set repository variable `AERIAL_E2E_AUTH_SMOKE_ENABLED=1` only after the
    test project and Preview URL are stable.
 
 ## Script outputs
@@ -100,4 +108,7 @@ vars.AERIAL_E2E_AUTH_SMOKE_ENABLED == '1'
 ```
 
 This keeps PR CI fast and prevents accidental live-dev/prod fixture use. If the
-variable is unset, the authenticated smoke does not run.
+variable is unset, the authenticated smoke does not run. When enabled, CI runs
+`scripts/check_auth_smoke_prereqs.mjs` before installing dependencies so a
+production alias or missing dedicated-project confirmation fails before any
+service-role fixture writes.

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-04-24 - Authenticated smoke safety preflight added
+
+Added `scripts/check_auth_smoke_prereqs.mjs` and wired it into the opt-in
+`web-auth-smoke` CI job before dependency installation. The preflight requires
+all fixture IDs and Supabase credentials, rejects the production alias as the
+authenticated-smoke base URL, and requires
+`AERIAL_E2E_CONFIRMED_DEDICATED_PROJECT=1` so service-role fixture writes are
+not enabled by a single variable flip. Current repo posture remains disabled:
+`AERIAL_E2E_AUTH_SMOKE_ENABLED=0`.
+
 ## 2026-04-24 - Vercel cron config reconciled
 
 Reconciled root `vercel.json` and `web/vercel.json` so both schedule the same

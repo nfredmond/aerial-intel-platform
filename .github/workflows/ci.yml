@@ -25,6 +25,8 @@ jobs:
           test -f docs/OPERATIONS.md
           test -f docs/RISK_REGISTER.md
           test -f docs/CHANGELOG.md
+          node --check scripts/check_auth_smoke_prereqs.mjs
+          node --check scripts/check_vercel_crons.mjs
           node scripts/check_vercel_crons.mjs
           echo "Core docs present."
 
@@ -105,11 +107,15 @@ jobs:
       AERIAL_E2E_SECOND_ARTIFACT_ID: ${{ vars.AERIAL_E2E_SECOND_ARTIFACT_ID }}
       AERIAL_E2E_SYNTHETIC_JOB_ID: ${{ vars.AERIAL_E2E_SYNTHETIC_JOB_ID }}
       AERIAL_E2E_EXPECT_RASTER: ${{ vars.AERIAL_E2E_EXPECT_RASTER }}
+      AERIAL_E2E_CONFIRMED_DEDICATED_PROJECT: ${{ vars.AERIAL_E2E_CONFIRMED_DEDICATED_PROJECT }}
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.AERIAL_E2E_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.AERIAL_E2E_SUPABASE_ANON_KEY }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.AERIAL_E2E_SUPABASE_SERVICE_ROLE_KEY }}
     steps:
       - uses: actions/checkout@v5
+      - name: Check authenticated smoke prerequisites
+        working-directory: .
+        run: node scripts/check_auth_smoke_prereqs.mjs
       - uses: actions/setup-node@v5
         with:
           node-version: 22
