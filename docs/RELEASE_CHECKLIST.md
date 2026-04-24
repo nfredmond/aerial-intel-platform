@@ -36,8 +36,14 @@ localhost, plain-HTTP TiTiler URLs, or the example Supabase URL.
 ## Raster
 
 - Controlled TiTiler service is deployed outside localhost.
-- If deploying via GitHub Actions, dispatch and watch the controlled Cloud Run
-  workflow with:
+- If deploying via GitHub Actions, configure the repository prerequisites from a
+  local terminal with:
+
+  ```bash
+  scripts/configure_titiler_github_actions_prereqs.sh --repo nfredmond/aerial-intel-platform
+  ```
+
+- Then dispatch and watch the controlled Cloud Run workflow with:
 
   ```bash
   scripts/run_titiler_cloud_run_workflow.sh --repo nfredmond/aerial-intel-platform

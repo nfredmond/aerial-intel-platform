@@ -41,6 +41,13 @@ Before dispatching it, run:
 scripts/check_titiler_deploy_prereqs.sh
 ```
 
+To configure the required repository variables and secrets without putting
+secret values in chat or shell history, use the local prompt helper:
+
+```bash
+scripts/configure_titiler_github_actions_prereqs.sh --repo nfredmond/aerial-intel-platform
+```
+
 Configure repository variables:
 
 - `GCP_PROJECT_ID`

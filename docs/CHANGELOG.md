@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-04-24 - TiTiler GitHub Actions setup helper added
+
+Added `scripts/configure_titiler_github_actions_prereqs.sh`, a local prompt
+helper for the controlled TiTiler Cloud Run blocker. It collects the required
+GitHub Actions variables and Workload Identity secrets on the operator's
+machine, validates non-secret values with the same deploy prereq checker before
+any write, and sends secret values to `gh secret set` through stdin instead of
+chat or command-line arguments. The helper does not invent GCP values or deploy
+TiTiler; it prepares the repository so the existing Cloud Run workflow wrapper
+can run once the real Nat Ford GCP configuration is known.
+
 ## 2026-04-24 - Production delivery-packet smoke passed
 
 Verified mission delivery packets on Production deployment

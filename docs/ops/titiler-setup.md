@@ -100,6 +100,10 @@ The deployable service shape now lives in `infra/titiler/`:
   and secret names required by the controlled Cloud Run deployment. It also
   validates non-secret variable values such as GCP ids and exact HTTPS CORS
   origins. It does not inspect or print secret values.
+- `scripts/configure_titiler_github_actions_prereqs.sh` prompts locally for the
+  required GitHub Actions variables and secrets, validates non-secret values
+  before any write, and stores secrets through `gh secret set` without putting
+  secret values in chat or command-line arguments.
 - `.github/workflows/deploy-titiler-cloud-run.yml` is a manual workflow that
   fails fast on missing prerequisites, then builds, pushes, deploys, and smokes
   the controlled Cloud Run service after the required GCP repository variables
@@ -107,6 +111,14 @@ The deployable service shape now lives in `infra/titiler/`:
 - `scripts/run_titiler_cloud_run_workflow.sh` is the local operator wrapper:
   it runs the repository prereq check, dispatches the manual workflow, and
   watches the run without inspecting or printing secret values.
+
+Configure the GitHub Actions prerequisites from a local terminal only after the
+real Nat Ford GCP project, region, repository, Cloud Run service, CORS origins,
+Workload Identity Provider, and service account values are known:
+
+```bash
+scripts/configure_titiler_github_actions_prereqs.sh --repo nfredmond/aerial-intel-platform
+```
 
 Once the GitHub Actions variables and secrets exist, deploy the controlled
 service from `main` with:
