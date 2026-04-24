@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-04-24 - Vercel production env-name preflight added
+
+Added `scripts/check_vercel_production_env_names.mjs`, a no-secret Vercel CLI
+preflight that checks required production environment variable names without
+requesting or printing values. CI now syntax-checks every `.mjs` script in
+`scripts/`. Current live output against `natford/aerial-intel-platform`
+correctly reports missing `CRON_SECRET`, `AERIAL_TITILER_URL`, and
+`AERIAL_COPILOT_DEFAULT_CAP_TENTH_CENTS`, matching the release-readiness
+blockers.
+
 ## 2026-04-24 - Release readiness env gate tightened
 
 Tightened `scripts/check_release_readiness.sh` so it matches the production

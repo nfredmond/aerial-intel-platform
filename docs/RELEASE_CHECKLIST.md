@@ -23,12 +23,15 @@ Use this checklist before promoting Aerial Operations OS to production.
 Run:
 
 ```bash
+node scripts/check_vercel_production_env_names.mjs --scope natford
 AERIAL_RELEASE_TARGET=production scripts/check_release_readiness.sh
 ```
 
-The script checks the required environment names above, validates the copilot
-flag/cap shape, and rejects production use of `https://titiler.xyz`, localhost,
-plain-HTTP TiTiler URLs, or the example Supabase URL.
+The Vercel env-name check reads only variable names from the linked Vercel
+project; it does not request or print secret values. The readiness script checks
+the required environment values once the production env is loaded, validates the
+copilot flag/cap shape, and rejects production use of `https://titiler.xyz`,
+localhost, plain-HTTP TiTiler URLs, or the example Supabase URL.
 
 ## Raster
 

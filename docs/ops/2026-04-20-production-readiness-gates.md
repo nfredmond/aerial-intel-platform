@@ -28,6 +28,7 @@ repo artifacts.
 From the repository root:
 
 - `for script in scripts/*.sh; do bash -n "$script"; done` - pass.
+- `for script in scripts/*.mjs; do node --check "$script"; done` - pass.
 - `node --check scripts/provision_e2e_supabase_fixtures.mjs` - pass.
 - `node scripts/provision_e2e_supabase_fixtures.mjs --help` - pass.
 - `docker compose -f infra/titiler/docker-compose.yml config` - pass.
@@ -48,6 +49,8 @@ From `web/`:
 - Deploy the controlled TiTiler container to Nat Ford infrastructure.
 - Configure `AERIAL_TITILER_URL` in Vercel Preview and production to the
   controlled service URL.
+- Run `node scripts/check_vercel_production_env_names.mjs --scope natford` and
+  confirm no production env names are missing.
 - Create the dedicated Supabase E2E project, apply migrations, and run
   `scripts/provision_e2e_supabase_fixtures.mjs` to generate the GitHub Actions
   variables and secrets listed in `docs/ops/test-supabase-project.md`.

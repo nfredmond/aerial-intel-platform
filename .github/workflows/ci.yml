@@ -26,8 +26,7 @@ jobs:
           test -f docs/RISK_REGISTER.md
           test -f docs/CHANGELOG.md
           for script in scripts/*.sh; do bash -n "$script"; done
-          node --check scripts/check_auth_smoke_prereqs.mjs
-          node --check scripts/check_vercel_crons.mjs
+          for script in scripts/*.mjs; do node --check "$script"; done
           node scripts/check_vercel_crons.mjs
           echo "Core docs present."
 

@@ -9,14 +9,16 @@
 Use `docs/RELEASE_CHECKLIST.md` before production promotion. At minimum:
 
 ```bash
+node scripts/check_vercel_production_env_names.mjs --scope natford
 AERIAL_RELEASE_TARGET=production scripts/check_release_readiness.sh
 AERIAL_TITILER_URL=https://titiler.example.com scripts/smoke_titiler.sh
 ```
 
-Run the readiness command with the production environment loaded. Production
-raster delivery requires a controlled TiTiler service. The deployable container
-and Cloud Run example live in `infra/titiler/`; `https://titiler.xyz` is
-Preview-only evidence and must not be used as a production claim.
+Run the env-name check before loading secrets, then run the readiness command
+with the production environment loaded. Production raster delivery requires a
+controlled TiTiler service. The deployable container and Cloud Run example live
+in `infra/titiler/`; `https://titiler.xyz` is Preview-only evidence and must not
+be used as a production claim.
 
 Vercel cron config is duplicated at repo root and `web/vercel.json` because the
 project root directory is `web` while repo-level tooling still reads root files.
