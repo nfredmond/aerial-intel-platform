@@ -41,6 +41,13 @@ Before dispatching it, run:
 scripts/check_titiler_deploy_prereqs.sh
 ```
 
+If the GCP Workload Identity Federation resources do not exist yet, bootstrap
+the controlled GCP side first from an authenticated local `gcloud` session:
+
+```bash
+scripts/bootstrap_titiler_gcp_wif.sh --repo nfredmond/aerial-intel-platform
+```
+
 To configure the required repository variables and secrets without putting
 secret values in chat or shell history, use the local prompt helper:
 

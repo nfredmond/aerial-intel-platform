@@ -2,11 +2,13 @@
 import { readFileSync } from "node:fs";
 
 const prereqPath = "scripts/check_titiler_deploy_prereqs.sh";
+const bootstrapPath = "scripts/bootstrap_titiler_gcp_wif.sh";
 const setupPath = "scripts/configure_titiler_github_actions_prereqs.sh";
 const wrapperPath = "scripts/run_titiler_cloud_run_workflow.sh";
 const workflowPath = ".github/workflows/deploy-titiler-cloud-run.yml";
 
 const prereq = readFileSync(prereqPath, "utf8");
+const bootstrap = readFileSync(bootstrapPath, "utf8");
 const setup = readFileSync(setupPath, "utf8");
 const wrapper = readFileSync(wrapperPath, "utf8");
 const workflow = readFileSync(workflowPath, "utf8");
@@ -38,6 +40,10 @@ for (const name of requiredVars) {
   if (!setup.includes(name)) {
     failures.push(`${setupPath}: missing prompt/write handling for variable ${name}`);
   }
+
+  if (!bootstrap.includes(name)) {
+    failures.push(`${bootstrapPath}: missing prompt/write handling for variable ${name}`);
+  }
 }
 
 for (const name of requiredSecrets) {
@@ -47,6 +53,10 @@ for (const name of requiredSecrets) {
 
   if (!setup.includes(name)) {
     failures.push(`${setupPath}: missing prompt/write handling for secret ${name}`);
+  }
+
+  if (!bootstrap.includes(name)) {
+    failures.push(`${bootstrapPath}: missing write handling for secret ${name}`);
   }
 }
 
@@ -58,12 +68,28 @@ if (!setup.includes("scripts/check_titiler_deploy_prereqs.sh --env")) {
   failures.push(`${setupPath}: must validate prompted values in --env mode before GitHub writes`);
 }
 
+if (!bootstrap.includes("scripts/check_titiler_deploy_prereqs.sh --env")) {
+  failures.push(`${bootstrapPath}: must validate prompted values in --env mode before GCP/GitHub writes`);
+}
+
 if (!setup.includes('gh variable set "$name" --repo "$REPO"')) {
   failures.push(`${setupPath}: must write GitHub variables through gh`);
 }
 
+if (!bootstrap.includes('gh variable set "$name" --repo "$REPO"')) {
+  failures.push(`${bootstrapPath}: must write GitHub variables through gh`);
+}
+
 if (!setup.includes('gh secret set "$name" --repo "$REPO"')) {
   failures.push(`${setupPath}: must write GitHub secrets through gh`);
+}
+
+if (!bootstrap.includes('gh secret set "$name" --repo "$REPO"')) {
+  failures.push(`${bootstrapPath}: must write GitHub secrets through gh`);
+}
+
+if (!bootstrap.includes("gcloud iam workload-identity-pools providers create-oidc")) {
+  failures.push(`${bootstrapPath}: must create the GitHub OIDC Workload Identity provider`);
 }
 
 if (!wrapper.includes(`WORKFLOW="deploy-titiler-cloud-run.yml"`)) {

@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-04-24 - TiTiler GCP bootstrap helper added
+
+Added `scripts/bootstrap_titiler_gcp_wif.sh` for the controlled TiTiler Cloud
+Run blocker. The helper requires a locally authenticated `gcloud` session,
+prompts for the real Nat Ford GCP project/region/repository/service/CORS
+values, creates or reuses the Artifact Registry repository, deployer service
+account, GitHub OIDC Workload Identity pool/provider, and deploy IAM bindings,
+then writes the matching GitHub Actions variables and secret-designated values
+through `gh` without accepting secrets as flags or printing them. This does not
+deploy TiTiler by itself; it creates the missing GCP/GitHub prerequisite layer
+needed before `scripts/run_titiler_cloud_run_workflow.sh` can run.
+
 ## 2026-04-24 - TiTiler GitHub Actions setup helper added
 
 Added `scripts/configure_titiler_github_actions_prereqs.sh`, a local prompt

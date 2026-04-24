@@ -100,6 +100,12 @@ The deployable service shape now lives in `infra/titiler/`:
   and secret names required by the controlled Cloud Run deployment. It also
   validates non-secret variable values such as GCP ids and exact HTTPS CORS
   origins. It does not inspect or print secret values.
+- `scripts/bootstrap_titiler_gcp_wif.sh` prompts locally for the Nat Ford GCP
+  project values, creates/reuses the Artifact Registry repository, deployer
+  service account, Workload Identity Federation pool/provider, and deploy IAM
+  bindings, then writes the required GitHub Actions variables and
+  secret-designated values without putting them in chat or command-line
+  arguments.
 - `scripts/configure_titiler_github_actions_prereqs.sh` prompts locally for the
   required GitHub Actions variables and secrets, validates non-secret values
   before any write, and stores secrets through `gh secret set` without putting
@@ -112,9 +118,17 @@ The deployable service shape now lives in `infra/titiler/`:
   it runs the repository prereq check, dispatches the manual workflow, and
   watches the run without inspecting or printing secret values.
 
-Configure the GitHub Actions prerequisites from a local terminal only after the
-real Nat Ford GCP project, region, repository, Cloud Run service, CORS origins,
-Workload Identity Provider, and service account values are known:
+If the Nat Ford GCP Workload Identity and deployer service account do not exist
+yet, bootstrap them from a local terminal with an authenticated `gcloud` session:
+
+```bash
+scripts/bootstrap_titiler_gcp_wif.sh --repo nfredmond/aerial-intel-platform
+```
+
+If those GCP resources already exist, configure only the GitHub Actions
+prerequisites from a local terminal after the real Nat Ford GCP project, region,
+repository, Cloud Run service, CORS origins, Workload Identity Provider, and
+service account values are known:
 
 ```bash
 scripts/configure_titiler_github_actions_prereqs.sh --repo nfredmond/aerial-intel-platform

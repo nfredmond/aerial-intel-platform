@@ -36,8 +36,16 @@ localhost, plain-HTTP TiTiler URLs, or the example Supabase URL.
 ## Raster
 
 - Controlled TiTiler service is deployed outside localhost.
-- If deploying via GitHub Actions, configure the repository prerequisites from a
-  local terminal with:
+- If deploying via GitHub Actions and the Nat Ford GCP Workload Identity
+  resources do not exist yet, bootstrap them from an authenticated local
+  `gcloud` session with:
+
+  ```bash
+  scripts/bootstrap_titiler_gcp_wif.sh --repo nfredmond/aerial-intel-platform
+  ```
+
+- If the GCP resources already exist, configure the repository prerequisites
+  from a local terminal with:
 
   ```bash
   scripts/configure_titiler_github_actions_prereqs.sh --repo nfredmond/aerial-intel-platform
