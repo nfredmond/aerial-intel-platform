@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-04-24 - Wave 2.5 exit verification reconciled
+
+Closed the remaining evidence loop against the current `main` state rather than the stale 2026-04-20 handoff snapshot. The repo was already clean with W2-C2 seed/changelog and MCP transport metadata committed, and copilot audit events were already shipped via `drone_org_events`.
+
+- **Wave 1 raster:** localhost render check passed for Toledo-20 artifact `6c413396-7475-4010-a1fe-b90cbc22977a` with TiTiler `2.0.1` on `127.0.0.1:8000` and Next on `localhost:3000`. MapLibre canvas rendered, "Viewer not configured" was absent, multiple TiTiler tiles returned `200`, and no blocking console/page errors were captured.
+- **Wave 2 C-1 happy path:** audit-capable Preview `https://aerial-intel-platform-2rrb9z3pp-natford.vercel.app` generated a cited mission brief for mission `3ca2d074-0f00-4adf-b3a4-75f63a964a77` with `6/7` sentences kept, `anthropic/claude-opus-4.7`, `74` tenth-cents spend, and a `copilot.call.succeeded` `mission-brief` audit row.
+- **Grounding challenge:** support assistant ignored a prompt-side "surveyed on Mars" injection, returned only grounded TiTiler/raster facts, kept `2/2` sentences, and inserted a `copilot.call.succeeded` `support-assistant` audit row. This proves resistance to that prompt, not a refusal branch.
+- **Cap exhaustion:** with explicit chat approval, the April quota row was temporarily set to cap, one mission-brief call refused pre-call with the visible `$50.000 of $50.000` quota message, and `/admin/copilot` recorded `copilot.call.blocked` with `reason=quota-exhausted`; the row was restored to `698` tenth-cents afterward.
+
+Truthfulness note: the latest listed Preview `aklvm4c7y` was not used as the exit proof target because it rendered mission-brief text without visible `[fact:*]` citations and did not insert a current audit row, despite updating spend. Supabase leaked-password protection was user-reported enabled but not independently advisor-verified from this shell.
+
 ## 2026-04-19 — Wave 2 C-2 exit: processing-QA diagnostic verified end-to-end on Preview
 
 First live copilot run against a Vercel Preview deployment. Seeded a synthetic failed NodeODM job on `nat-ford-drone-lab` (`supabase/seed/2026-04-19-synthetic-failed-job.sql` — job id `11111111-1111-4111-8111-111111111111`, attached to the Downtown corridor mission so Toledo-20's verified-success posture stays clean, `output_summary->>'synthetic' = 'true'` for greppability). Signed in the test owner via admin-generated magic-link OTP → direct `/auth/v1/verify` POST → `supabase.auth.setSession` in the Preview origin, which is a clean passwordless path that bypasses local dev entirely.
