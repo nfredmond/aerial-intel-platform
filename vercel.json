@@ -5,6 +5,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/internal/nodeodm-upload",
+      "schedule": "2-59/5 * * * *"
+    },
+    {
       "path": "/api/internal/nodeodm-poll",
       "schedule": "*/5 * * * *"
     }

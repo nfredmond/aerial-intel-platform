@@ -25,6 +25,7 @@ jobs:
           test -f docs/OPERATIONS.md
           test -f docs/RISK_REGISTER.md
           test -f docs/CHANGELOG.md
+          node scripts/check_vercel_crons.mjs
           echo "Core docs present."
 
   web-quality:

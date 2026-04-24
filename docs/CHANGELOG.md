@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-04-24 - Vercel cron config reconciled
+
+Reconciled root `vercel.json` and `web/vercel.json` so both schedule the same
+three internal routes: proving heartbeat, NodeODM upload, and NodeODM poll.
+Added `scripts/check_vercel_crons.mjs` to CI's validate-docs job so future
+cron drift fails before deploy. Also corrected `web/.env.example` to list all
+three cron routes and to state that `50000` tenth-cents equals `$50`.
+
 ## 2026-04-24 - Controlled TiTiler deploy preflight added
 
 Added `scripts/check_titiler_deploy_prereqs.sh` and wired it into the manual

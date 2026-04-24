@@ -17,6 +17,16 @@ Production raster delivery requires a controlled TiTiler service. The deployable
 container and Cloud Run example live in `infra/titiler/`; `https://titiler.xyz`
 is Preview-only evidence and must not be used as a production claim.
 
+Vercel cron config is duplicated at repo root and `web/vercel.json` because the
+project root directory is `web` while repo-level tooling still reads root files.
+Both files must schedule the same internal routes:
+
+- `/api/internal/proving-heartbeat` every minute.
+- `/api/internal/nodeodm-upload` every five minutes, offset by two minutes.
+- `/api/internal/nodeodm-poll` every five minutes.
+
+Run `node scripts/check_vercel_crons.mjs` after editing either file.
+
 ## Managed processing dispatch handoff (current truthful v1 lane)
 
 Use this when a mission has a `managed-processing-v1` job and operator intake review is complete.
