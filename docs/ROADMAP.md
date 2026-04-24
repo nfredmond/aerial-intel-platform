@@ -1,12 +1,12 @@
 # Roadmap
 
-**Status as of 2026-04-16 (modernization pass):**
+**Status as of 2026-04-24 (Wave 2.5 exit):**
 
 - Phase 0 foundations — **complete**.
 - Phase 1 mission-control shell — **complete**, now decomposed around shared UI primitives.
 - Phase 2 ingest / preflight / processing — **largely complete**; NodeODM-direct dispatch added this pass alongside the existing webhook adapter.
-- Phase 3 viewing / delivery / collaboration — **near-complete (delivery pillar honest)**: MapLibre-backed planning + coverage maps shipped; install-bundle export shipped; mission-version snapshot + promote shipped; side-by-side version diff shipped; signed-share artifact links shipped (`/s/[token]`); read-only admin console shipped (`/admin`); Playwright public-showcase smoke shipped; authenticated ops smoke is now opt-in; copy-to-storage for real NodeODM outputs shipped (W1-A); artifact comments + approvals shipped (W1-C); TiTiler-backed raster viewer shipped and Preview-smoked via a temporary public TiTiler endpoint. Controlled TiTiler deployment artifacts, smoke script, and release gate are now in-repo; the external Nat Ford service still must be deployed before production claim.
-- Phase 4 AI / domain modules — **in progress (Wave 2 copilot landing)**: Aerial Copilot framework + mission-brief (W2-C1) + processing-QA (W2-C2) + data-cleaning scout (W2-C3) + admin support assistant + artifact report-summary generator shipped, default-off per org, grounded via citation-gated output; org-scoped copilot audit events now record attempts, refusals, failures, spend, and sentence-drop counts in the admin dashboard with CSV export for review packets. Processing-QA has live Preview verification through Vercel AI Gateway and uses a bounded Haiku call for the internal diagnostic path.
+- Phase 3 viewing / delivery / collaboration — **near-complete (delivery pillar honest)**: MapLibre-backed planning + coverage maps shipped; install-bundle export shipped; mission-version snapshot + promote shipped; side-by-side version diff shipped; signed-share artifact links shipped (`/s/[token]`); read-only admin console shipped (`/admin`); Playwright public-showcase smoke shipped; authenticated ops smoke is now opt-in; copy-to-storage for real NodeODM outputs shipped (W1-A); artifact comments + approvals shipped (W1-C); TiTiler-backed raster viewer shipped and localhost browser-verified against the Toledo-20 orthomosaic on 2026-04-24. Controlled TiTiler deployment artifacts, smoke script, and release gate are now in-repo; the external Nat Ford TiTiler service still must be deployed before a production raster-delivery claim.
+- Phase 4 AI / domain modules — **Wave 2.5 verified**: Aerial Copilot framework + mission-brief (W2-C1) + processing-QA (W2-C2) + data-cleaning scout (W2-C3) + admin support assistant + artifact report-summary generator shipped, default-off per org, grounded via citation-gated output; org-scoped copilot audit events record attempts, refusals, failures, spend, and sentence-drop counts in the admin dashboard with CSV export for review packets. W2-C2 has live Preview verification, W2-C1 happy path is verified on Production, grounding-injection resistance and cap-exhaustion were verified on an audit-capable Preview, and the stale `aklvm4c7y` Preview mismatch is dispositioned as a non-main branch build.
 - Phase 5 enterprise / ecosystem — **not started**.
 
 ## Phase 0 — Foundations and architecture spikes
@@ -47,7 +47,7 @@ Goal: turn the shell into a real operational pipeline.
 Goal: provide WebODM-grade output review with stronger delivery UX.
 
 ### In scope
-- TiTiler-backed COG raster delivery (shipped — W1-B — wired behind `AERIAL_TITILER_URL`; Preview-smoked via `https://titiler.xyz`; controlled service deployment artifacts live in `infra/titiler`; external Nat Ford TiTiler service pending)
+- TiTiler-backed COG raster delivery (shipped — W1-B — wired behind `AERIAL_TITILER_URL`; localhost browser-verified for Toledo-20 on 2026-04-24; controlled service deployment artifacts live in `infra/titiler`; external Nat Ford TiTiler service pending)
 - orthomosaic/DSM viewing (shipped — `/artifacts/[artifactId]` renders a MapLibre raster overlay for ready COGs)
 - share pages and export bundles (share pages shipped at `/s/[token]`; export bundles shipped via install-bundle route)
 - comments, approvals, and activity feed depth (activity feed shipped; comments/approvals shipped — W1-C)
@@ -67,6 +67,7 @@ Goal: add high-leverage assistance, not gimmicks. Narrow grounded skills, citati
 - docs search / support assistant (shipped as an admin Copilot panel backed by a curated ops-doc fact corpus)
 - report summary generation (shipped as an artifact-level Copilot panel backed by storage, benchmark, review, and handoff facts)
 - copilot audit events (shipped as `drone_org_events` rows surfaced on `/admin/copilot`, with spend, grounding, model, failure context, and owner/admin CSV export)
+- live Wave 2.5 verification (closed: W2-C1 Production happy path, W2-C2 Preview diagnostic, Preview cap-exhaustion proof, and stale Preview disposition)
 - change-intelligence and agronomy modules later
 
 ## Phase 5 — Enterprise and ecosystem expansion

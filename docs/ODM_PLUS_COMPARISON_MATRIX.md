@@ -21,9 +21,9 @@ This matrix compares current open-source ODM options with the proposed Nat Ford 
 - Phase 2: Packaging and operational hardening for client pilots.
 - Phase 3: Domain-tailored analytics/reporting extensions.
 
-## Shipped now (Wave 1 + Wave 2, as of 2026-04-19)
+## Shipped now (Wave 1 + Wave 2.5, as of 2026-04-24)
 
-The matrix above describes the ODM+ direction. This section lists what is actually merged and running in the Aerial Intel Platform today, so client-facing copy on natfordplanning.com can claim these without caveat. The Toledo-20 orthomosaic was end-to-end verified through TiTiler /cog/info, /cog/tilejson, and /cog/preview on 2026-04-19; browser-side MapLibre rendering of the same artifact is authored but awaits a signed-in hands-on check.
+The matrix above describes the ODM+ direction. This section lists what is actually merged and running in the Aerial Intel Platform today, so client-facing copy on natfordplanning.com can claim these without caveat. The Toledo-20 orthomosaic was end-to-end verified through TiTiler `/cog/info`, `/cog/tilejson`, and `/cog/preview` on 2026-04-19; signed-in localhost MapLibre rendering of the same artifact was verified on 2026-04-24. A controlled external Nat Ford TiTiler service is still required before claiming production raster delivery.
 
 | Capability | Status | How it lands |
 | --- | --- | --- |
@@ -37,5 +37,6 @@ The matrix above describes the ODM+ direction. This section lists what is actual
 | AI-assisted dataset quality scout (W2-C3) | Shipped | Pre-dispatch per-image EXIF/GPS/blur classifier with a Haiku-generated human-readable summary, advisory only. |
 | Operator spend + refusal dashboard | Shipped | `/admin/copilot` per-org month-to-date spend, refusal rate, drop ratio, read-only. |
 | Org admin invitations + seat suspend/reactivate | Shipped | `/admin/people` with token-based invitation URLs, ADR-003 boundary (only owners may mint admins). |
+| Live copilot verification (Wave 2.5) | Shipped | W2-C2 diagnostic verified on Preview; W2-C1 happy path verified on Production with visible `[fact:*]` citations and `drone_org_events` audit row; cap-exhaustion and prompt-injection resistance verified on an audit-capable Preview. |
 
-Items still explicitly deferred: live-feedback pass against the Aerial Copilot skills (blocked on the operator running the W2-C1/C2 verification loops), multi-org copilot rollout (waiting on the spend dashboard being exercised against a second org), and any volume/NDVI work (Wave 3, deliberately not started until at least one copilot skill has fired against a live org).
+Items still explicitly deferred: controlled production TiTiler service deployment, multi-org copilot rollout (waiting on the spend dashboard being exercised against a second org), and any volume/NDVI work (Wave 3).
