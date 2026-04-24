@@ -9,7 +9,7 @@ Closed the remaining evidence loop against the current `main` state rather than 
 - **Grounding challenge:** support assistant ignored a prompt-side "surveyed on Mars" injection, returned only grounded TiTiler/raster facts, kept `2/2` sentences, and inserted a `copilot.call.succeeded` `support-assistant` audit row. This proves resistance to that prompt, not a refusal branch.
 - **Cap exhaustion:** with explicit chat approval, the April quota row was temporarily set to cap, one mission-brief call refused pre-call with the visible `$50.000 of $50.000` quota message, and `/admin/copilot` recorded `copilot.call.blocked` with `reason=quota-exhausted`; the row was restored to `698` tenth-cents afterward.
 
-Truthfulness note: the latest listed Preview `aklvm4c7y` was not used as the exit proof target because it rendered mission-brief text without visible `[fact:*]` citations and did not insert a current audit row, despite updating spend. Supabase leaked-password protection was user-reported enabled but not independently advisor-verified from this shell.
+Truthfulness note: the latest listed Preview `aklvm4c7y` was not used as the exit proof target because it rendered mission-brief text without visible `[fact:*]` citations and did not insert a current audit row, despite updating spend. A later linked Security Advisor check showed `auth_leaked_password_protection` still present as a WARN, so #106 remains open until the Supabase dashboard toggle is enabled and rechecked.
 
 ## 2026-04-19 — Wave 2 C-2 exit: processing-QA diagnostic verified end-to-end on Preview
 
