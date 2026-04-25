@@ -730,7 +730,7 @@ export async function recordManagedNodeOdmLaunchOutcome(options: {
         workflowMode: "managed_processing_v1",
         serviceModel: "operator_assisted",
         eta: "Awaiting image upload to NodeODM",
-        notes: `NodeODM task ${taskUuid} queued via ${adapterLabel} from ${sourceLabel}. Images have NOT been uploaded yet — the task will sit queued until the upload step runs. See docs/ops/nodeodm-upload-gap-1-plan.md.`,
+        notes: `NodeODM task ${taskUuid} queued via ${adapterLabel} from ${sourceLabel}. Images have NOT been uploaded yet; run the internal nodeodm-upload route after the dataset is extracted, then poll nodeodm-poll for completion.`,
         latestCheckpoint: `NodeODM task ${taskUuidShort} queued; awaiting upload`,
         deliveryPosture: "No outputs can exist until images are uploaded and processing completes.",
         nodeodm: {

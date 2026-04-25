@@ -18,6 +18,8 @@ guessing credentials or weakening the TiTiler Cloud Run setup posture.
 - `gcloud` is now on the default shell `PATH`, but no active authenticated
   account is configured.
 - No GCP writes were run during this check or install.
+- The local bootstrap helper prints only redacted key presence/length status and
+  warnings; it does not write `web/.env.local` or generate local secrets.
 
 ## Gcloud setup posture
 
@@ -102,7 +104,20 @@ node scripts/check_phase3_live_stub_bootstrap.mjs
 ```
 
 Expected failure mode today: missing `CRON_SECRET` and missing or non-stub
-`AERIAL_NODEODM_MODE`. Once those are present, the next round-trip step is:
+`AERIAL_NODEODM_MODE`. If the Supabase-looking values are unusually short, the
+helper also warns the operator to verify they are real local keys before trying
+the loop.
+
+Once the local check passes, print the redacted operator-loop plan:
+
+```bash
+node scripts/check_phase3_live_stub_bootstrap.mjs --print-operator-loop
+```
+
+That command prints browser steps and curl commands with `$CRON_SECRET` and
+`$TASK_UUID` placeholders only; it does not execute requests.
+
+The first round-trip step is:
 
 1. Start the app from `web/` with `npm run dev`.
 2. Sign in with the seeded Supabase test user.
@@ -116,10 +131,23 @@ Expected failure mode today: missing `CRON_SECRET` and missing or non-stub
 8. Confirm the job reaches `succeeded`, emits `nodeodm.task.imported`, and the
    output summary includes the synthetic orthophoto, DEM, point cloud, and mesh.
 
+The dev-only stub advance route now also requires the internal-route auth
+pattern. In local live-stub mode, use the same bearer token as upload and poll:
+
+```bash
+export TASK_UUID="<output_summary.nodeodm.taskUuid>"
+curl -fsS -X POST \
+  -H "Authorization: Bearer $CRON_SECRET" \
+  "http://localhost:3000/api/internal/dev/nodeodm-stub-advance?taskUuid=$TASK_UUID&to=completed"
+```
+
 ## Deterministic coverage
 
 - `node scripts/check_phase3_live_stub_bootstrap.mjs --example` verifies the
   example env file still advertises the names needed for a live-stub bootstrap.
+- `node --test scripts/check_phase3_live_stub_bootstrap.test.mjs` verifies
+  redacted output, missing-env failures, production stub rejection, and the
+  operator-loop command plan.
 - `node scripts/check_titiler_ops_pipeline.mjs` verifies the gcloud installer,
   TiTiler setup doc, and release checklist keep the checksum-gated setup
   posture wired into the repo.

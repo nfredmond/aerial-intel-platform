@@ -2,7 +2,7 @@
 
 _Last updated: 2026-04-18 · Applies to: `web/` Next.js app._
 
-This doc captures the operator view of the NodeODM dispatch → poll → import path: what you can exercise **today** against the in-memory stub, what's still **blocked** before real NodeODM can round-trip end-to-end, and the runbook for Phase C verification when the blockers are cleared.
+This doc captures the operator view of the NodeODM dispatch → upload → poll → import path: what you can exercise **today** against the in-memory stub, what evidence is needed before claiming a real NodeODM round-trip, and the runbook for Phase C verification.
 
 ## At a glance
 
@@ -29,32 +29,60 @@ NODE_ENV=development   # guard: stub in production throws
 ### Verified paths (covered by tests)
 
 - **Unit coverage** — `web/src/lib/nodeodm/stub.test.ts` (11 tests): state-machine advance, terminal states, `cancelTask` stability, progress clamping.
-- **Integration coverage** — `web/src/app/api/internal/nodeodm-poll/route.test.ts` (3 tests): full `launchNodeOdmTask` → `GET /api/internal/nodeodm-poll` → `status=awaiting_output_import` walk across 5 polls, with `nodeodm.task.completed` event emission.
+- **Integration coverage** — `web/src/app/api/internal/nodeodm-upload/route.test.ts` and `web/src/app/api/internal/nodeodm-poll/route.test.ts`: launch → upload/commit → poll → auto-import, with synthetic stub outputs copied through the same storage/output persistence path used by real bundles.
+- **Bootstrap coverage** — `scripts/check_phase3_live_stub_bootstrap.mjs --print-operator-loop` emits redacted local commands only after env posture passes, and `scripts/check_phase3_live_stub_bootstrap.test.mjs` guards the no-secret-output behavior.
 
-Both test suites use `resetSharedStubNodeOdmClient()` in `afterEach` to isolate runs.
+The Vitest suites use `resetSharedStubNodeOdmClient()` in `afterEach` to isolate runs.
 
 ### Manual exercise via curl
 
 1. Run `AERIAL_NODEODM_MODE=stub npm run dev` in `web/`.
-2. Insert a `drone_processing_jobs` row with `output_summary = {"nodeodm": {"taskUuid": "<some-uuid>"}}` and status `queued` (requires live Supabase).
-3. `curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/internal/nodeodm-poll`
-4. Watch `/admin` → "NodeODM tasks in flight" for the row.
-5. Advance the stub task state via HTTP (only available when `AERIAL_NODEODM_MODE=stub` and `NODE_ENV !== "production"`):
+2. In the browser, sign in, select a mission, extract a dataset, create a managed-processing request, start intake review, then launch the NodeODM task.
+3. Copy `output_summary.nodeodm.taskUuid` from the job page or `/admin`:
+
+   ```bash
+   export TASK_UUID="<task-uuid-from-job-summary>"
+   ```
+
+4. Upload and commit extracted images to the stub through the same cron route used by real mode:
+
+   ```bash
+   curl -fsS -H "Authorization: Bearer $CRON_SECRET" \
+     http://localhost:3000/api/internal/nodeodm-upload
+   ```
+
+5. Advance the stub task state via HTTP (only available when `AERIAL_NODEODM_MODE=stub` and `NODE_ENV !== "production"`). This dev-only route now requires the same internal-route auth pattern as upload and poll:
 
    ```bash
    # Flip to running (simulates commit after upload)
-   curl -X POST "http://localhost:3000/api/internal/dev/nodeodm-stub-advance?taskUuid=<uuid>&to=running"
+   curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" \
+     "http://localhost:3000/api/internal/dev/nodeodm-stub-advance?taskUuid=$TASK_UUID&to=running"
    # Tick progress forward one step
-   curl -X POST "http://localhost:3000/api/internal/dev/nodeodm-stub-advance?taskUuid=<uuid>&to=progress"
+   curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" \
+     "http://localhost:3000/api/internal/dev/nodeodm-stub-advance?taskUuid=$TASK_UUID&to=progress"
    # Jump straight to completed (progress=100, statusCode=40)
-   curl -X POST "http://localhost:3000/api/internal/dev/nodeodm-stub-advance?taskUuid=<uuid>&to=completed"
+   curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" \
+     "http://localhost:3000/api/internal/dev/nodeodm-stub-advance?taskUuid=$TASK_UUID&to=completed"
    # Simulate failure (statusCode=30)
-   curl -X POST "http://localhost:3000/api/internal/dev/nodeodm-stub-advance?taskUuid=<uuid>&to=failed"
+   curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" \
+     "http://localhost:3000/api/internal/dev/nodeodm-stub-advance?taskUuid=$TASK_UUID&to=failed"
    # Simulate cancellation (statusCode=50)
-   curl -X POST "http://localhost:3000/api/internal/dev/nodeodm-stub-advance?taskUuid=<uuid>&to=canceled"
+   curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" \
+     "http://localhost:3000/api/internal/dev/nodeodm-stub-advance?taskUuid=$TASK_UUID&to=canceled"
    ```
 
-   Then re-hit the poll route to let the app pick up the new state.
+6. Re-hit the poll route to let the app pick up the new state and auto-import the synthetic outputs:
+
+   ```bash
+   curl -fsS -H "Authorization: Bearer $CRON_SECRET" \
+     http://localhost:3000/api/internal/nodeodm-poll
+   ```
+
+For a redacted checklist of the same sequence, run:
+
+```bash
+node scripts/check_phase3_live_stub_bootstrap.mjs --print-operator-loop
+```
 
 ## Phase C (real NodeODM round-trip): gap status
 
@@ -66,11 +94,11 @@ Closed by the upload cron at `GET /api/internal/nodeodm-upload` (`CRON_SECRET` b
 
 Closed by `POST /api/internal/dev/nodeodm-stub-advance?taskUuid=X&to=running|completed|failed|canceled|progress`, guarded 404 unless `AERIAL_NODEODM_MODE=stub` AND `NODE_ENV !== "production"`. See the "Manual exercise via curl" section above for the call shape. `/admin` observability panels are now live-demonstrable without a container.
 
-### Gap 3 — Output import (real mode closed 2026-04-18, stub mode still short-circuits)
+### ~~Gap 3 — Output import~~ (closed 2026-04-18, storage copy closed later)
 
-Real NodeODM bundles do not emit `benchmark_summary.json` (that file is a stub/scripted-benchmark invention). The poll route (`web/src/app/api/internal/nodeodm-poll/route.ts` → `importCompletedOutputs`) now branches on the presence of `benchmark_summary.json` in the downloaded zip. If present, the existing stub/scripted path runs. If absent, `inventoryNodeOdmBundle` + `synthesizeBenchmarkSummary` (`web/src/lib/nodeodm/real-output-adapter.ts`) build a `ManagedImportSummary`-shaped record from canonical ODM output paths (`odm_orthophoto/odm_orthophoto.tif`, `odm_dem/{dsm,dtm}.tif`, `odm_georeferencing/*.laz` + `entwine_pointcloud/ept.json`, `odm_texturing/*.obj`) and round-trips it through `parseManagedBenchmarkSummaryText` to keep a single source of truth. Real-mode jobs with the two required outputs (orthophoto + DSM) flip to `status=succeeded` with `benchmarkSummary.source=nodeodm-real-bundle`. When neither `benchmark_summary.json` nor any recognized ODM output is found, the import throws and the job stays `awaiting_output_import` with `lastImportError` populated. Stub mode still reports `synthetic: true` in its outputs and its integration walk still ends at `status=succeeded` via the stub's fabricated `benchmark_summary.json`.
+Real NodeODM bundles do not emit `benchmark_summary.json` (that file is a stub/scripted-benchmark invention). The poll route (`web/src/app/api/internal/nodeodm-poll/route.ts` → `importCompletedOutputs`) now branches on the presence of `benchmark_summary.json` in the downloaded zip. If present, the existing stub/scripted path runs. If absent, `inventoryNodeOdmBundle` + `synthesizeBenchmarkSummary` (`web/src/lib/nodeodm/real-output-adapter.ts`) build a `ManagedImportSummary`-shaped record from canonical ODM output paths (`odm_orthophoto/odm_orthophoto.tif`, `odm_dem/{dsm,dtm}.tif`, `odm_georeferencing/*.laz` + `entwine_pointcloud/ept.json`, `odm_texturing/*.obj`) and round-trips it through `parseManagedBenchmarkSummaryText` to keep a single source of truth. Real-mode jobs with the two required outputs (orthophoto + DSM) flip to `status=succeeded` with `benchmarkSummary.source=nodeodm-real-bundle`. When neither `benchmark_summary.json` nor any recognized ODM output is found, the import throws and the job stays `awaiting_output_import` with `lastImportError` populated. Stub mode still carries an explicitly synthetic dataset root and tiny fabricated output bytes, and its integration walk ends at `status=succeeded` via the stub's fabricated `benchmark_summary.json`.
 
-**What's not closed:** bytes are still path-only — no copy-to-Supabase-Storage for the output files. That's the next slice after the first real round-trip is in evidence.
+The poll route now copies recognized ODM bundle outputs into protected Supabase Storage and inserts ready `drone_processing_outputs` rows. The stub bundle uses tiny synthetic bytes, so it is a safety proof for orchestration and persistence only; it is not evidence of real ODM compute quality.
 
 ## Phase C runbook — real-mode Toledo round-trip (Gap 1 + Gap 3 closed)
 

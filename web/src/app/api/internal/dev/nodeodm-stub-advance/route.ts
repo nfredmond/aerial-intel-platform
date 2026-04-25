@@ -12,6 +12,18 @@ function isDevStubEnabled(): boolean {
   return process.env.AERIAL_NODEODM_MODE === "stub" && process.env.NODE_ENV !== "production";
 }
 
+function isAuthorized(request: NextRequest): boolean {
+  const configuredSecret = process.env.CRON_SECRET;
+  const authorization = request.headers.get("authorization");
+
+  if (configuredSecret) {
+    return authorization === `Bearer ${configuredSecret}`;
+  }
+
+  const userAgent = request.headers.get("user-agent") ?? "";
+  return userAgent.startsWith("vercel-cron/");
+}
+
 function notFound() {
   return NextResponse.json({ ok: false, error: "not-found" }, { status: 404 });
 }
@@ -24,6 +36,11 @@ export async function POST(request: NextRequest) {
   if (!isDevStubEnabled()) {
     log.warn("blocked.not-stub-mode");
     return notFound();
+  }
+
+  if (!isAuthorized(request)) {
+    log.warn("blocked.unauthorized");
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
   const url = new URL(request.url);

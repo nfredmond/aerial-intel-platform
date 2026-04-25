@@ -7,6 +7,7 @@ const setupPath = "scripts/configure_titiler_github_actions_prereqs.sh";
 const wrapperPath = "scripts/run_titiler_cloud_run_workflow.sh";
 const gcloudInstallPath = "scripts/install_gcloud_cli_verified.sh";
 const liveStubCheckPath = "scripts/check_phase3_live_stub_bootstrap.mjs";
+const liveStubCheckTestPath = "scripts/check_phase3_live_stub_bootstrap.test.mjs";
 const workflowPath = ".github/workflows/deploy-titiler-cloud-run.yml";
 const titilerSetupPath = "docs/ops/titiler-setup.md";
 const releaseChecklistPath = "docs/RELEASE_CHECKLIST.md";
@@ -18,6 +19,7 @@ const setup = readFileSync(setupPath, "utf8");
 const wrapper = readFileSync(wrapperPath, "utf8");
 const gcloudInstall = readFileSync(gcloudInstallPath, "utf8");
 const liveStubCheck = readFileSync(liveStubCheckPath, "utf8");
+const liveStubCheckTest = readFileSync(liveStubCheckTestPath, "utf8");
 const workflow = readFileSync(workflowPath, "utf8");
 const titilerSetup = readFileSync(titilerSetupPath, "utf8");
 const releaseChecklist = readFileSync(releaseChecklistPath, "utf8");
@@ -151,6 +153,22 @@ for (const name of [
   if (!liveStubBootstrap.includes(name)) {
     failures.push(`${liveStubBootstrapPath}: must document ${name}`);
   }
+}
+
+if (!liveStubCheck.includes("--print-operator-loop")) {
+  failures.push(`${liveStubCheckPath}: must keep the redacted operator-loop plan flag`);
+}
+
+if (!liveStubBootstrap.includes("--print-operator-loop")) {
+  failures.push(`${liveStubBootstrapPath}: must document the redacted operator-loop plan`);
+}
+
+if (!liveStubBootstrap.includes("node --test scripts/check_phase3_live_stub_bootstrap.test.mjs")) {
+  failures.push(`${liveStubBootstrapPath}: must document the live-stub bootstrap test`);
+}
+
+if (!liveStubCheckTest.includes("doesNotMatch") || !liveStubCheckTest.includes("local-cron-secret-value-that-is-long")) {
+  failures.push(`${liveStubCheckTestPath}: must verify that secret-like values are not printed`);
 }
 
 if (!liveStubBootstrap.includes("No GCP writes were run")) {

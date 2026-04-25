@@ -1,45 +1,16 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync as fsExistsSync, readFileSync as fsReadFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 
-const args = process.argv.slice(2);
-let envFile = "web/.env.local";
-let allowExample = false;
-let mode = "live-stub";
-
-for (let index = 0; index < args.length; index += 1) {
-  const arg = args[index];
-  if (arg === "--env-file") {
-    envFile = args[index + 1] ?? "";
-    index += 1;
-  } else if (arg === "--example") {
-    envFile = "web/.env.example";
-    allowExample = true;
-  } else if (arg === "--mode") {
-    mode = args[index + 1] ?? "";
-    index += 1;
-  } else if (arg === "-h" || arg === "--help") {
-    console.log(`Usage: node scripts/check_phase3_live_stub_bootstrap.mjs [--env-file PATH] [--example] [--mode live-stub|real-nodeodm]
+const usage = `Usage: node scripts/check_phase3_live_stub_bootstrap.mjs [--env-file PATH] [--example] [--mode live-stub|real-nodeodm] [--print-operator-loop] [--app-url ORIGIN]
 
 Checks the local Phase 3 / live-stub bootstrap environment without printing
 secret values. --example validates that web/.env.example still documents the
 required names; the default checks web/.env.local for an executable live-stub
-round-trip posture.`);
-    process.exit(0);
-  } else {
-    console.error(`unknown argument: ${arg}`);
-    process.exit(2);
-  }
-}
+round-trip posture.
 
-if (!envFile) {
-  console.error("--env-file requires a path.");
-  process.exit(2);
-}
-
-if (!["live-stub", "real-nodeodm"].includes(mode)) {
-  console.error("--mode must be live-stub or real-nodeodm.");
-  process.exit(2);
-}
+--print-operator-loop emits redacted local curl/browser steps after the check
+passes. It does not execute requests or print CRON_SECRET.`;
 
 const requiredBase = [
   "NEXT_PUBLIC_SUPABASE_URL",
@@ -53,7 +24,51 @@ const requiredByMode = {
   "real-nodeodm": ["AERIAL_NODEODM_URL"],
 };
 
-function parseEnv(text) {
+function formatLines(lines) {
+  return lines.length > 0 ? `${lines.join("\n")}\n` : "";
+}
+
+function parseArgs(args) {
+  let envFile = "web/.env.local";
+  let allowExample = false;
+  let mode = "live-stub";
+  let printOperatorLoop = false;
+  let appUrl = "http://localhost:3000";
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--env-file") {
+      envFile = args[index + 1] ?? "";
+      index += 1;
+    } else if (arg === "--example") {
+      envFile = "web/.env.example";
+      allowExample = true;
+    } else if (arg === "--mode") {
+      mode = args[index + 1] ?? "";
+      index += 1;
+    } else if (arg === "--print-operator-loop") {
+      printOperatorLoop = true;
+    } else if (arg === "--app-url") {
+      appUrl = args[index + 1] ?? "";
+      index += 1;
+    } else if (arg === "-h" || arg === "--help") {
+      return { ok: false, exitCode: 0, stdout: [usage], stderr: [] };
+    } else {
+      return { ok: false, exitCode: 2, stdout: [], stderr: [`unknown argument: ${arg}`] };
+    }
+  }
+
+  return {
+    ok: true,
+    envFile,
+    allowExample,
+    mode,
+    printOperatorLoop,
+    appUrl,
+  };
+}
+
+export function parseEnv(text) {
   const env = new Map();
   for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.trim();
@@ -72,79 +87,204 @@ function parseEnv(text) {
   return env;
 }
 
-function looksPlaceholder(name, value) {
-  if (!value) return false;
-  const lowered = value.toLowerCase();
-  if (allowExample) return false;
-  if (lowered.includes("your-project-ref")) return true;
-  if (lowered.includes("your-anon-key")) return true;
-  if (lowered.includes("your-service-role-key")) return true;
-  if (lowered.includes("replace-with")) return true;
-  if (lowered === "replace-me" || lowered.startsWith("replace-me-")) return true;
-  if (name.endsWith("_URL") && lowered.includes("example.com")) return true;
-  return false;
+function createPlaceholderDetector(allowExample) {
+  return function looksPlaceholder(name, value) {
+    if (!value) return false;
+    const lowered = value.toLowerCase();
+    if (allowExample) return false;
+    if (lowered.includes("your-project-ref")) return true;
+    if (lowered.includes("your-anon-key")) return true;
+    if (lowered.includes("your-service-role-key")) return true;
+    if (lowered.includes("replace-with")) return true;
+    if (lowered === "replace-me" || lowered.startsWith("replace-me-")) return true;
+    if (name.endsWith("_URL") && lowered.includes("example.com")) return true;
+    return false;
+  };
 }
 
-function redactedStatus(name, value) {
-  if (!value) return `${name}=missing`;
-  if (looksPlaceholder(name, value)) return `${name}=placeholder`;
-  return `${name}=set len=${value.length}`;
+function buildOperatorLoopPlan({ appOrigin, envFile }) {
+  return [
+    "",
+    "Local live-stub operator-loop plan (commands are redacted and not executed):",
+    "1. Start the app from web/:",
+    "   npm run dev",
+    "2. In the browser, sign in, select a mission, extract a dataset, create a managed-processing request, start intake review, then launch the NodeODM task.",
+    "3. Copy the task UUID from the job page or /admin, then keep only shell variable names in command history:",
+    '   export TASK_UUID="<output_summary.nodeodm.taskUuid>"',
+    `   export CRON_SECRET="<value from ${envFile}>"`,
+    "4. Upload and commit extracted images to the in-memory stub:",
+    `   curl -fsS -H "Authorization: Bearer $CRON_SECRET" "${appOrigin}/api/internal/nodeodm-upload"`,
+    "5. If you need a deterministic first proof, advance the stub task to completed:",
+    `   curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" "${appOrigin}/api/internal/dev/nodeodm-stub-advance?taskUuid=$TASK_UUID&to=completed"`,
+    "6. Poll the task and import synthetic outputs:",
+    `   curl -fsS -H "Authorization: Bearer $CRON_SECRET" "${appOrigin}/api/internal/nodeodm-poll"`,
+    "Expected evidence: nodeodm.task.launched, nodeodm.task.committed, nodeodm.task.completed, nodeodm.task.imported; job status succeeded; ready outputs attached from the synthetic stub bundle.",
+  ];
 }
 
-const failures = [];
+export function runPhase3LiveStubBootstrapCheck(args, options = {}) {
+  const parsed = parseArgs(args);
+  if (!parsed.ok) {
+    return {
+      exitCode: parsed.exitCode,
+      stdout: formatLines(parsed.stdout),
+      stderr: formatLines(parsed.stderr),
+    };
+  }
 
-if (!existsSync(envFile)) {
-  failures.push(`${envFile} does not exist`);
-} else {
-  const env = parseEnv(readFileSync(envFile, "utf8"));
-  const required = [...requiredBase, ...requiredByMode[mode]];
+  const stdout = [];
+  const stderr = [];
+  const failures = [];
+  const warnings = [];
+  const existsSync = options.existsSync ?? fsExistsSync;
+  const readFileSync = options.readFileSync ?? fsReadFileSync;
 
-  for (const name of required) {
-    const value = env.get(name) ?? "";
-    if (!value) {
-      failures.push(`${name} is missing or empty`);
-    } else if (looksPlaceholder(name, value)) {
-      failures.push(`${name} still contains a placeholder value`);
+  if (!parsed.envFile) {
+    stderr.push("--env-file requires a path.");
+    return { exitCode: 2, stdout: "", stderr: formatLines(stderr) };
+  }
+
+  if (!parsed.appUrl) {
+    stderr.push("--app-url requires an HTTP(S) origin.");
+    return { exitCode: 2, stdout: "", stderr: formatLines(stderr) };
+  }
+
+  if (!["live-stub", "real-nodeodm"].includes(parsed.mode)) {
+    stderr.push("--mode must be live-stub or real-nodeodm.");
+    return { exitCode: 2, stdout: "", stderr: formatLines(stderr) };
+  }
+
+  let appOrigin;
+  try {
+    const parsedAppUrl = new URL(parsed.appUrl);
+    if (!["http:", "https:"].includes(parsedAppUrl.protocol)) {
+      throw new Error("unsupported protocol");
+    }
+    appOrigin = parsedAppUrl.origin;
+  } catch {
+    stderr.push("--app-url must be a valid HTTP(S) URL.");
+    return { exitCode: 2, stdout: "", stderr: formatLines(stderr) };
+  }
+
+  if (parsed.printOperatorLoop && parsed.mode !== "live-stub") {
+    stderr.push("--print-operator-loop is only supported with --mode live-stub.");
+    return { exitCode: 2, stdout: "", stderr: formatLines(stderr) };
+  }
+
+  if (parsed.printOperatorLoop && parsed.allowExample) {
+    stderr.push("--print-operator-loop requires a real local env file; --example only checks documented names.");
+    return { exitCode: 2, stdout: "", stderr: formatLines(stderr) };
+  }
+
+  const looksPlaceholder = createPlaceholderDetector(parsed.allowExample);
+  const redactedStatus = (name, value) => {
+    if (!value) return `${name}=missing`;
+    if (looksPlaceholder(name, value)) return `${name}=placeholder`;
+    return `${name}=set len=${value.length}`;
+  };
+
+  const addShortKeyWarning = (name, value) => {
+    if (!value || parsed.allowExample || looksPlaceholder(name, value)) return;
+    if (value.length < 80) {
+      warnings.push(`${name} is set but shorter than a typical Supabase API key; verify it is a real local key before running the loop`);
+    }
+  };
+
+  if (!existsSync(parsed.envFile)) {
+    failures.push(`${parsed.envFile} does not exist`);
+  } else {
+    const env = parseEnv(readFileSync(parsed.envFile, "utf8"));
+    const required = [...requiredBase, ...requiredByMode[parsed.mode]];
+
+    for (const name of required) {
+      const value = env.get(name) ?? "";
+      if (!value) {
+        failures.push(`${name} is missing or empty`);
+      } else if (looksPlaceholder(name, value)) {
+        failures.push(`${name} still contains a placeholder value`);
+      }
+    }
+
+    const supabaseUrl = env.get("NEXT_PUBLIC_SUPABASE_URL") ?? "";
+    if (supabaseUrl && !parsed.allowExample && !/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(supabaseUrl)) {
+      failures.push("NEXT_PUBLIC_SUPABASE_URL must be a hosted Supabase project URL");
+    }
+
+    const cronSecret = env.get("CRON_SECRET") ?? "";
+    if (cronSecret && !parsed.allowExample && cronSecret.length < 24) {
+      failures.push("CRON_SECRET must be at least 24 characters for live bootstrap use");
+    }
+
+    const anonKey = env.get("NEXT_PUBLIC_SUPABASE_ANON_KEY") ?? "";
+    const serviceRoleKey = env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    addShortKeyWarning("NEXT_PUBLIC_SUPABASE_ANON_KEY", anonKey);
+    addShortKeyWarning("SUPABASE_SERVICE_ROLE_KEY", serviceRoleKey);
+    if (anonKey && serviceRoleKey && anonKey === serviceRoleKey && !parsed.allowExample) {
+      failures.push("NEXT_PUBLIC_SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY must not be identical");
+    }
+
+    const nodeOdmMode = env.get("AERIAL_NODEODM_MODE") ?? "";
+    if (parsed.mode === "live-stub" && nodeOdmMode && nodeOdmMode !== "stub" && !parsed.allowExample) {
+      failures.push("AERIAL_NODEODM_MODE must be set to stub for live-stub round-trip testing");
+    }
+
+    if (parsed.mode === "live-stub" && env.get("NODE_ENV") === "production") {
+      failures.push("live-stub mode is disallowed when NODE_ENV=production");
+    }
+
+    const nodeOdmUrl = env.get("AERIAL_NODEODM_URL") ?? "";
+    if (parsed.mode === "live-stub" && nodeOdmUrl && !parsed.allowExample) {
+      warnings.push("AERIAL_NODEODM_URL is set but ignored while AERIAL_NODEODM_MODE=stub");
+    }
+    if (parsed.mode === "real-nodeodm" && nodeOdmMode === "stub" && !parsed.allowExample) {
+      failures.push("AERIAL_NODEODM_MODE must not be stub for real-nodeodm mode");
+    }
+    if (parsed.mode === "real-nodeodm" && nodeOdmUrl && !/^https?:\/\/[^/?#]+(?::[0-9]+)?$/.test(nodeOdmUrl)) {
+      failures.push("AERIAL_NODEODM_URL must be a bare HTTP(S) origin");
+    }
+
+    stdout.push(`Phase 3 ${parsed.mode} bootstrap check for ${parsed.envFile}:`);
+    for (const name of required) {
+      stdout.push(`- ${redactedStatus(name, env.get(name) ?? "")}`);
+    }
+    if (warnings.length > 0) {
+      stdout.push("Warnings:");
+      for (const warning of warnings) {
+        stdout.push(`  - ${warning}`);
+      }
     }
   }
 
-  const supabaseUrl = env.get("NEXT_PUBLIC_SUPABASE_URL") ?? "";
-  if (supabaseUrl && !allowExample && !/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(supabaseUrl)) {
-    failures.push("NEXT_PUBLIC_SUPABASE_URL must be a hosted Supabase project URL");
+  if (failures.length > 0) {
+    stderr.push("Phase 3 bootstrap prerequisites are incomplete:");
+    for (const failure of failures) {
+      stderr.push(`  - ${failure}`);
+    }
+    stderr.push("No secret values were printed.");
+    return {
+      exitCode: 1,
+      stdout: formatLines(stdout),
+      stderr: formatLines(stderr),
+    };
   }
 
-  const cronSecret = env.get("CRON_SECRET") ?? "";
-  if (cronSecret && !allowExample && cronSecret.length < 24) {
-    failures.push("CRON_SECRET must be at least 24 characters for live bootstrap use");
+  stdout.push("Phase 3 bootstrap prerequisites ok. No secret values were printed.");
+  if (parsed.printOperatorLoop) {
+    stdout.push(...buildOperatorLoopPlan({ appOrigin, envFile: parsed.envFile }));
   }
 
-  const nodeOdmMode = env.get("AERIAL_NODEODM_MODE") ?? "";
-  if (mode === "live-stub" && nodeOdmMode && nodeOdmMode !== "stub" && !allowExample) {
-    failures.push("AERIAL_NODEODM_MODE must be set to stub for live-stub round-trip testing");
-  }
-
-  if (mode === "live-stub" && env.get("NODE_ENV") === "production") {
-    failures.push("live-stub mode is disallowed when NODE_ENV=production");
-  }
-
-  const nodeOdmUrl = env.get("AERIAL_NODEODM_URL") ?? "";
-  if (mode === "real-nodeodm" && nodeOdmUrl && !/^https?:\/\/[^/?#]+(?::[0-9]+)?$/.test(nodeOdmUrl)) {
-    failures.push("AERIAL_NODEODM_URL must be a bare HTTP(S) origin");
-  }
-
-  console.log(`Phase 3 ${mode} bootstrap check for ${envFile}:`);
-  for (const name of required) {
-    console.log(`- ${redactedStatus(name, env.get(name) ?? "")}`);
-  }
+  return {
+    exitCode: 0,
+    stdout: formatLines(stdout),
+    stderr: "",
+  };
 }
 
-if (failures.length > 0) {
-  console.error("Phase 3 bootstrap prerequisites are incomplete:");
-  for (const failure of failures) {
-    console.error(`  - ${failure}`);
-  }
-  console.error("No secret values were printed.");
-  process.exit(1);
-}
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 
-console.log("Phase 3 bootstrap prerequisites ok. No secret values were printed.");
+if (isMain) {
+  const result = runPhase3LiveStubBootstrapCheck(process.argv.slice(2));
+  process.stdout.write(result.stdout);
+  process.stderr.write(result.stderr);
+  process.exitCode = result.exitCode;
+}

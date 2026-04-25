@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-04-25 - Phase 3 live-stub operator-loop hardening
+
+Advanced the local Phase 3 proof path without creating secrets or touching GCP:
+`scripts/check_phase3_live_stub_bootstrap.mjs` now has a redacted
+`--print-operator-loop` mode that emits the local browser/curl sequence only
+after env posture passes, plus black-box `node:test` coverage that verifies
+secret-like values are not printed. The dev-only NodeODM stub advance route now
+requires the same internal-route auth pattern as upload and poll, keeping the
+first stub proof tied to the local `CRON_SECRET`. Operator-facing copy and
+runbooks now point at the current upload/poll/import path instead of the old
+upload-gap wording.
+
 ## 2026-04-24 - Gcloud checksum posture and Phase 3 bootstrap check added
 
 Documented and resolved the local `gcloud` install blocker without running any

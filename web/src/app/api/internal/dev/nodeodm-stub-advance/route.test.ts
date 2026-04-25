@@ -11,6 +11,7 @@ import { POST } from "./route";
 beforeEach(() => {
   vi.stubEnv("AERIAL_NODEODM_MODE", "stub");
   vi.stubEnv("NODE_ENV", "test");
+  vi.stubEnv("CRON_SECRET", "stub-advance-secret");
 });
 
 afterEach(() => {
@@ -18,12 +19,15 @@ afterEach(() => {
   resetSharedStubNodeOdmClient();
 });
 
-function postRequest(params: Record<string, string>): NextRequest {
+function postRequest(params: Record<string, string>, headers?: HeadersInit): NextRequest {
   const url = new URL("https://example.com/api/internal/dev/nodeodm-stub-advance");
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, value);
   }
-  return new NextRequest(url, { method: "POST" });
+  return new NextRequest(url, {
+    method: "POST",
+    headers: headers ?? { authorization: "Bearer stub-advance-secret" },
+  });
 }
 
 describe("POST /api/internal/dev/nodeodm-stub-advance", () => {
@@ -37,6 +41,23 @@ describe("POST /api/internal/dev/nodeodm-stub-advance", () => {
     vi.stubEnv("NODE_ENV", "production");
     const response = await POST(postRequest({ taskUuid: "x", to: "running" }));
     expect(response.status).toBe(404);
+  });
+
+  it("returns 401 when stub mode is enabled but bearer auth is missing", async () => {
+    const response = await POST(postRequest({ taskUuid: "x", to: "running" }, {}));
+    expect(response.status).toBe(401);
+    const body = await response.json();
+    expect(body.error).toBe("unauthorized");
+  });
+
+  it("accepts the cron user-agent fallback only when CRON_SECRET is unset", async () => {
+    vi.stubEnv("CRON_SECRET", "");
+    const response = await POST(
+      postRequest({ taskUuid: "never-created", to: "running" }, { "user-agent": "vercel-cron/1.0" }),
+    );
+    expect(response.status).toBe(404);
+    const body = await response.json();
+    expect(body.error).toBe("task-not-found");
   });
 
   it("returns 400 when taskUuid is missing", async () => {

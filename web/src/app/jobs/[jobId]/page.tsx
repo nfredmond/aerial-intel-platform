@@ -1339,7 +1339,9 @@ Operator note: ${operatorNotes}`
                     </button>
                     <p className="muted">
                       {nodeodmAdapterConfig.configured
-                        ? "Creates the task on NodeODM and records the UUID. Images are NOT uploaded yet — the task will sit queued until the upload step lands (see docs/ops/nodeodm-upload-gap-1-plan.md)."
+                        ? nodeodmAdapterConfig.mode === "stub"
+                          ? "Creates an in-memory stub task and records the UUID. No real NodeODM or GCP write happens; run nodeodm-upload, optionally advance the stub task, then run nodeodm-poll."
+                          : "Creates the task on NodeODM and records the UUID. Images are NOT uploaded yet; run nodeodm-upload after the dataset is extracted, then run nodeodm-poll."
                         : "AERIAL_NODEODM_URL is not set in this deployment. Set it (and AERIAL_NODEODM_TOKEN if required) to enable direct NodeODM dispatch."}
                     </p>
                   </form>
