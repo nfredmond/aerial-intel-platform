@@ -36,6 +36,7 @@ test("valid live-stub env can print a redacted operator-loop plan", () => {
       "--env-file",
       envFile,
       "--print-operator-loop",
+      "--print-evidence-template",
       "--app-url",
       "http://127.0.0.1:3999/some/path",
     ]);
@@ -43,6 +44,9 @@ test("valid live-stub env can print a redacted operator-loop plan", () => {
     assert.equal(result.exitCode, 0, result.stderr);
     assert.match(result.stdout, /Phase 3 bootstrap prerequisites ok/);
     assert.match(result.stdout, /Local live-stub operator-loop plan/);
+    assert.match(result.stdout, /Phase 3 live-stub operator proof note/);
+    assert.match(result.stdout, /Do not paste CRON_SECRET, Supabase keys, cookies, bearer tokens, or magic-link tokens/);
+    assert.match(result.stdout, /App origin tested: http:\/\/127\.0\.0\.1:3999/);
     assert.match(result.stdout, /Authorization: Bearer \$CRON_SECRET/);
     assert.match(result.stdout, /http:\/\/127\.0\.0\.1:3999\/api\/internal\/nodeodm-upload/);
     assert.doesNotMatch(result.stdout, /local-cron-secret-value-that-is-long/);
@@ -77,6 +81,19 @@ test("example mode validates documented names but cannot print an operator-loop 
   const planResult = runCheck(["--example", "--print-operator-loop"]);
   assert.equal(planResult.exitCode, 2);
   assert.match(planResult.stderr, /requires a real local env file/);
+
+  const evidenceResult = runCheck(["--example", "--print-evidence-template"]);
+  assert.equal(evidenceResult.exitCode, 2);
+  assert.match(evidenceResult.stderr, /requires a real local env file/);
+});
+
+test("evidence template is only available for live-stub mode", () => {
+  withEnvFile(`${validLiveStubEnv}AERIAL_NODEODM_URL=http://localhost:3000\n`, (envFile) => {
+    const result = runCheck(["--env-file", envFile, "--mode", "real-nodeodm", "--print-evidence-template"]);
+
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /only supported with --mode live-stub/);
+  });
 });
 
 test("live-stub mode rejects production NODE_ENV", () => {

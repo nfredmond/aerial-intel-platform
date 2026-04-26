@@ -117,6 +117,22 @@ node scripts/check_phase3_live_stub_bootstrap.mjs --print-operator-loop
 That command prints browser steps and curl commands with `$CRON_SECRET` and
 `$TASK_UUID` placeholders only; it does not execute requests.
 
+To produce a fill-in proof note for the operator-assisted run, include the
+evidence-template flag and redirect to a local scratch file or a new dated ops
+note:
+
+```bash
+node scripts/check_phase3_live_stub_bootstrap.mjs \
+  --print-operator-loop \
+  --print-evidence-template \
+  > /tmp/aerial-phase-3-live-stub-proof.md
+```
+
+The generated template repeats the no-secret rule and asks for only status
+codes, UUIDs, event types, output counts, and visible UI outcomes. Do not paste
+`CRON_SECRET`, Supabase keys, cookies, bearer tokens, or magic-link tokens into
+the proof note.
+
 The first round-trip step is:
 
 1. Start the app from `web/` with `npm run dev`.
@@ -146,8 +162,8 @@ curl -fsS -X POST \
 - `node scripts/check_phase3_live_stub_bootstrap.mjs --example` verifies the
   example env file still advertises the names needed for a live-stub bootstrap.
 - `node --test scripts/check_phase3_live_stub_bootstrap.test.mjs` verifies
-  redacted output, missing-env failures, production stub rejection, and the
-  operator-loop command plan.
+  redacted output, missing-env failures, production stub rejection, the
+  operator-loop command plan, and the proof-note template guardrails.
 - `node scripts/check_titiler_ops_pipeline.mjs` verifies the gcloud installer,
   TiTiler setup doc, and release checklist keep the checksum-gated setup
   posture wired into the repo.

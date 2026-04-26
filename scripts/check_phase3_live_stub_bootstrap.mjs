@@ -2,7 +2,7 @@
 import { existsSync as fsExistsSync, readFileSync as fsReadFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-const usage = `Usage: node scripts/check_phase3_live_stub_bootstrap.mjs [--env-file PATH] [--example] [--mode live-stub|real-nodeodm] [--print-operator-loop] [--app-url ORIGIN]
+const usage = `Usage: node scripts/check_phase3_live_stub_bootstrap.mjs [--env-file PATH] [--example] [--mode live-stub|real-nodeodm] [--print-operator-loop] [--print-evidence-template] [--app-url ORIGIN]
 
 Checks the local Phase 3 / live-stub bootstrap environment without printing
 secret values. --example validates that web/.env.example still documents the
@@ -10,7 +10,9 @@ required names; the default checks web/.env.local for an executable live-stub
 round-trip posture.
 
 --print-operator-loop emits redacted local curl/browser steps after the check
-passes. It does not execute requests or print CRON_SECRET.`;
+passes. --print-evidence-template emits a redacted proof-note template for the
+operator to fill in after the browser/curl loop. Neither option executes
+requests or prints CRON_SECRET.`;
 
 const requiredBase = [
   "NEXT_PUBLIC_SUPABASE_URL",
@@ -33,6 +35,7 @@ function parseArgs(args) {
   let allowExample = false;
   let mode = "live-stub";
   let printOperatorLoop = false;
+  let printEvidenceTemplate = false;
   let appUrl = "http://localhost:3000";
 
   for (let index = 0; index < args.length; index += 1) {
@@ -48,6 +51,8 @@ function parseArgs(args) {
       index += 1;
     } else if (arg === "--print-operator-loop") {
       printOperatorLoop = true;
+    } else if (arg === "--print-evidence-template") {
+      printEvidenceTemplate = true;
     } else if (arg === "--app-url") {
       appUrl = args[index + 1] ?? "";
       index += 1;
@@ -64,6 +69,7 @@ function parseArgs(args) {
     allowExample,
     mode,
     printOperatorLoop,
+    printEvidenceTemplate,
     appUrl,
   };
 }
@@ -122,6 +128,57 @@ function buildOperatorLoopPlan({ appOrigin, envFile }) {
   ];
 }
 
+function buildEvidenceTemplate({ appOrigin, envFile, mode }) {
+  const generatedAt = new Date().toISOString();
+  return [
+    "",
+    "---",
+    "# Phase 3 live-stub operator proof note",
+    "",
+    `Generated: ${generatedAt}`,
+    `App origin tested: ${appOrigin}`,
+    `Env file checked: ${envFile}`,
+    `Mode: ${mode}`,
+    "",
+    "## Secret-handling rule",
+    "",
+    "Do not paste CRON_SECRET, Supabase keys, cookies, bearer tokens, or magic-link tokens into this note. Record only redacted command shapes, status codes, UUIDs, event types, and UI outcomes.",
+    "",
+    "## Preflight evidence",
+    "",
+    "- [ ] `node scripts/check_phase3_live_stub_bootstrap.mjs --print-operator-loop --print-evidence-template` exited 0.",
+    "- [ ] Local app started from `web/` with `npm run dev`.",
+    "- [ ] Signed in with a seeded local/test user; no production customer account used.",
+    "- [ ] Mission selected:",
+    "- [ ] Job selected:",
+    "- [ ] Task UUID captured as `TASK_UUID` in shell only:",
+    "",
+    "## Operator loop results",
+    "",
+    "| Step | Expected | Observed | Evidence to record |",
+    "| --- | --- | --- | --- |",
+    "| Launch NodeODM task | `nodeodm.task.launched` event and task UUID |  | event id / task UUID only |",
+    "| Upload extracted images | `nodeodm.task.committed` or upload retry/failure event |  | HTTP status + event type |",
+    "| Advance stub task | dev route returns success for selected task |  | HTTP status + redacted response fields |",
+    "| Poll/import outputs | job reaches `succeeded`; `nodeodm.task.completed` and `nodeodm.task.imported` events |  | event ids + output count |",
+    "| UI verification | job page/admin surface shows ready synthetic outputs |  | visible labels, no screenshots with secrets |",
+    "",
+    "## Acceptance checklist",
+    "",
+    "- [ ] Synthetic orthophoto output attached.",
+    "- [ ] Synthetic DEM output attached.",
+    "- [ ] Synthetic point cloud output attached.",
+    "- [ ] Synthetic mesh output attached.",
+    "- [ ] No unauthorized response was accepted when `CRON_SECRET` was configured.",
+    "- [ ] No production NodeODM, GCP, Vercel, GitHub, or Supabase schema writes were required for this proof.",
+    "",
+    "## Non-claims",
+    "",
+    "- This is a local live-stub proof, not a real NodeODM processing benchmark.",
+    "- This does not prove production TiTiler raster delivery unless a controlled TiTiler URL is separately deployed, configured, and smoked.",
+  ];
+}
+
 export function runPhase3LiveStubBootstrapCheck(args, options = {}) {
   const parsed = parseArgs(args);
   if (!parsed.ok) {
@@ -173,6 +230,16 @@ export function runPhase3LiveStubBootstrapCheck(args, options = {}) {
 
   if (parsed.printOperatorLoop && parsed.allowExample) {
     stderr.push("--print-operator-loop requires a real local env file; --example only checks documented names.");
+    return { exitCode: 2, stdout: "", stderr: formatLines(stderr) };
+  }
+
+  if (parsed.printEvidenceTemplate && parsed.mode !== "live-stub") {
+    stderr.push("--print-evidence-template is only supported with --mode live-stub.");
+    return { exitCode: 2, stdout: "", stderr: formatLines(stderr) };
+  }
+
+  if (parsed.printEvidenceTemplate && parsed.allowExample) {
+    stderr.push("--print-evidence-template requires a real local env file; --example only checks documented names.");
     return { exitCode: 2, stdout: "", stderr: formatLines(stderr) };
   }
 
@@ -271,6 +338,9 @@ export function runPhase3LiveStubBootstrapCheck(args, options = {}) {
   stdout.push("Phase 3 bootstrap prerequisites ok. No secret values were printed.");
   if (parsed.printOperatorLoop) {
     stdout.push(...buildOperatorLoopPlan({ appOrigin, envFile: parsed.envFile }));
+  }
+  if (parsed.printEvidenceTemplate) {
+    stdout.push(...buildEvidenceTemplate({ appOrigin, envFile: parsed.envFile, mode: parsed.mode }));
   }
 
   return {

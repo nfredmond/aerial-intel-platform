@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-04-25 - Live-stub proof-note template added
+
+Added `--print-evidence-template` to
+`scripts/check_phase3_live_stub_bootstrap.mjs` so the local live-stub preflight
+can emit a fill-in operator proof note after prerequisites pass. The template is
+explicitly redacted: it asks for status codes, UUIDs, event types, output
+counts, and visible UI outcomes while warning the operator not to paste
+`CRON_SECRET`, Supabase keys, cookies, bearer tokens, or magic-link tokens.
+`node:test` coverage now verifies the template stays secret-free and is only
+available for a real local live-stub env, not `--example` or real-NodeODM mode.
+
 ## 2026-04-25 - Phase 3 live-stub operator-loop hardening
 
 Advanced the local Phase 3 proof path without creating secrets or touching GCP:
