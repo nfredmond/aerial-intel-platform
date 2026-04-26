@@ -69,6 +69,9 @@ SUPABASE_SERVICE_ROLE_KEY=secret-service-role-value
       assert.match(result.stderr, /AERIAL_NODEODM_MODE is missing or empty/);
       assert.match(result.stderr, /Local env repair hints/);
       assert.match(result.stderr, /AERIAL_NODEODM_MODE=stub/);
+      assert.match(result.stderr, /Agent-safe local-only action: AERIAL_NODEODM_MODE=stub is non-secret/);
+      assert.match(result.stderr, /do not generate, store, or append CRON_SECRET from an automation\/delegated proof run/);
+      assert.match(result.stderr, /Human\/operator-only secret setup/);
       assert.match(result.stderr, /randomBytes\(32\)/);
       assert.match(result.stderr, /edit the existing line instead of appending a duplicate/);
       assert.doesNotMatch(result.stdout + result.stderr, /secret-service-role-value/);

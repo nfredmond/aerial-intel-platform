@@ -108,6 +108,13 @@ Expected failure mode today: missing `CRON_SECRET` and missing or non-stub
 helper also warns the operator to verify they are real local keys before trying
 the loop.
 
+Delegated-agent boundary: `AERIAL_NODEODM_MODE=stub` is a non-secret local env
+setting, but `CRON_SECRET` is a secret-bearing control. Automation should not
+invent, append, or store `CRON_SECRET` during a delegated proof run unless an
+approved local secret location or existing value is already available. The
+checker prints the human/operator-only secret setup command shape for local use
+without ever printing or reading the generated value.
+
 Once the local check passes, print the redacted operator-loop plan:
 
 ```bash

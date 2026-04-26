@@ -185,6 +185,8 @@ function buildLocalEnvRepairHints({ envFile, mode }) {
     "",
     "Local env repair hints (copy/edit only; no secret values printed):",
     `- Preserve any existing real values in ${envFile}. Do not paste Supabase keys or CRON_SECRET into docs, chat, screenshots, or commit history.`,
+    "- Agent-safe local-only action: AERIAL_NODEODM_MODE=stub is non-secret and may be added to local env when the operator has approved local env edits.",
+    "- Secret action: do not generate, store, or append CRON_SECRET from an automation/delegated proof run unless an approved local secret location or existing value is already available.",
   ];
 
   if (mode === "live-stub") {
@@ -192,7 +194,7 @@ function buildLocalEnvRepairHints({ envFile, mode }) {
       "- For the Phase 3 live-stub proof, make sure these local-only names exist:",
       "  AERIAL_NODEODM_MODE=stub",
       "  CRON_SECRET=<local random value, at least 24 characters>",
-      "- Generate CRON_SECRET locally without this checker seeing or printing it:",
+      "- Human/operator-only secret setup, run locally without this checker seeing or printing the value:",
       `  node -e 'process.stdout.write("CRON_SECRET="+require("node:crypto").randomBytes(32).toString("hex")+"\\n")' >> ${envFile}`,
       `- If ${envFile} already has CRON_SECRET or AERIAL_NODEODM_MODE, edit the existing line instead of appending a duplicate.`,
       "- Re-run: node scripts/check_phase3_live_stub_bootstrap.mjs --print-operator-loop --print-evidence-template",
@@ -203,7 +205,7 @@ function buildLocalEnvRepairHints({ envFile, mode }) {
       "  AERIAL_NODEODM_URL=http://localhost:3101",
       "  AERIAL_NODEODM_MODE=real",
       "  CRON_SECRET=<local random value, at least 24 characters>",
-      "- Generate CRON_SECRET locally without this checker seeing or printing it:",
+      "- Human/operator-only secret setup, run locally without this checker seeing or printing the value:",
       `  node -e 'process.stdout.write("CRON_SECRET="+require("node:crypto").randomBytes(32).toString("hex")+"\\n")' >> ${envFile}`,
       `- If ${envFile} already has any of those names, edit the existing line instead of appending a duplicate.`,
     );

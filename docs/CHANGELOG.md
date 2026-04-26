@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-04-25 - Live-stub secret-boundary repair hints hardened
+
+Hardened `scripts/check_phase3_live_stub_bootstrap.mjs` when the local proof is
+blocked by missing env: the repair hints now separate agent-safe non-secret
+local env setup (`AERIAL_NODEODM_MODE=stub`) from human/operator-only
+`CRON_SECRET` creation. This keeps delegated proof attempts from inventing or
+storing cron secrets while still giving the operator a redacted local repair
+path. `node:test` coverage now locks the secret-boundary language in place.
+
 ## 2026-04-25 - Live-stub proof-note template added
 
 Added `--print-evidence-template` to
