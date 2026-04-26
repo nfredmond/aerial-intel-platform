@@ -12,7 +12,8 @@ round-trip posture.
 --print-operator-loop emits redacted local curl/browser steps after the check
 passes. --print-evidence-template emits a redacted proof-note template for the
 operator to fill in after the browser/curl loop. Neither option executes
-requests or prints CRON_SECRET.`;
+requests or prints CRON_SECRET. When prerequisites fail, the checker prints a
+redacted local-env repair scaffold; it never generates or writes secret values.`;
 
 const requiredBase = [
   "NEXT_PUBLIC_SUPABASE_URL",
@@ -179,6 +180,38 @@ function buildEvidenceTemplate({ appOrigin, envFile, mode }) {
   ];
 }
 
+function buildLocalEnvRepairHints({ envFile, mode }) {
+  const lines = [
+    "",
+    "Local env repair hints (copy/edit only; no secret values printed):",
+    `- Preserve any existing real values in ${envFile}. Do not paste Supabase keys or CRON_SECRET into docs, chat, screenshots, or commit history.`,
+  ];
+
+  if (mode === "live-stub") {
+    lines.push(
+      "- For the Phase 3 live-stub proof, make sure these local-only names exist:",
+      "  AERIAL_NODEODM_MODE=stub",
+      "  CRON_SECRET=<local random value, at least 24 characters>",
+      "- Generate CRON_SECRET locally without this checker seeing or printing it:",
+      `  node -e 'process.stdout.write("CRON_SECRET="+require("node:crypto").randomBytes(32).toString("hex")+"\\n")' >> ${envFile}`,
+      `- If ${envFile} already has CRON_SECRET or AERIAL_NODEODM_MODE, edit the existing line instead of appending a duplicate.`,
+      "- Re-run: node scripts/check_phase3_live_stub_bootstrap.mjs --print-operator-loop --print-evidence-template",
+    );
+  } else {
+    lines.push(
+      "- For a real NodeODM proof, make sure these local-only names exist:",
+      "  AERIAL_NODEODM_URL=http://localhost:3101",
+      "  AERIAL_NODEODM_MODE=real",
+      "  CRON_SECRET=<local random value, at least 24 characters>",
+      "- Generate CRON_SECRET locally without this checker seeing or printing it:",
+      `  node -e 'process.stdout.write("CRON_SECRET="+require("node:crypto").randomBytes(32).toString("hex")+"\\n")' >> ${envFile}`,
+      `- If ${envFile} already has any of those names, edit the existing line instead of appending a duplicate.`,
+    );
+  }
+
+  return lines;
+}
+
 export function runPhase3LiveStubBootstrapCheck(args, options = {}) {
   const parsed = parseArgs(args);
   if (!parsed.ok) {
@@ -328,6 +361,9 @@ export function runPhase3LiveStubBootstrapCheck(args, options = {}) {
       stderr.push(`  - ${failure}`);
     }
     stderr.push("No secret values were printed.");
+    if (!parsed.allowExample) {
+      stderr.push(...buildLocalEnvRepairHints({ envFile: parsed.envFile, mode: parsed.mode }));
+    }
     return {
       exitCode: 1,
       stdout: formatLines(stdout),

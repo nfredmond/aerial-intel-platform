@@ -67,10 +67,27 @@ SUPABASE_SERVICE_ROLE_KEY=secret-service-role-value
       assert.equal(result.exitCode, 1);
       assert.match(result.stderr, /CRON_SECRET is missing or empty/);
       assert.match(result.stderr, /AERIAL_NODEODM_MODE is missing or empty/);
+      assert.match(result.stderr, /Local env repair hints/);
+      assert.match(result.stderr, /AERIAL_NODEODM_MODE=stub/);
+      assert.match(result.stderr, /randomBytes\(32\)/);
+      assert.match(result.stderr, /edit the existing line instead of appending a duplicate/);
       assert.doesNotMatch(result.stdout + result.stderr, /secret-service-role-value/);
       assert.doesNotMatch(result.stdout + result.stderr, /secret-anon-value/);
     },
   );
+});
+
+test("example-mode failures do not print local secret-generation repair commands", () => {
+  const result = runCheck([
+    "--env-file",
+    "ignored.env",
+    "--example",
+    "--mode",
+    "not-a-mode",
+  ]);
+
+  assert.equal(result.exitCode, 2);
+  assert.doesNotMatch(result.stderr, /randomBytes\(32\)/);
 });
 
 test("example mode validates documented names but cannot print an operator-loop plan", () => {
