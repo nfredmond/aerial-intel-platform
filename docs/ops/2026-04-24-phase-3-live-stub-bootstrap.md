@@ -103,6 +103,10 @@ Check the local posture without printing secrets:
 node scripts/check_phase3_live_stub_bootstrap.mjs
 ```
 
+For a non-default local env file, use `--env-path <path>`. The older
+`--env-file` spelling is still accepted when passed through with `node --`, but
+Node 24+ also has a native `--env-file` option and can intercept that argument.
+
 Expected failure mode today: missing `CRON_SECRET` and missing or non-stub
 `AERIAL_NODEODM_MODE`. If the Supabase-looking values are unusually short, the
 helper also warns the operator to verify they are real local keys before trying
@@ -132,6 +136,22 @@ node scripts/check_phase3_live_stub_bootstrap.mjs --print-operator-loop
 
 That command prints browser steps and curl commands with `$CRON_SECRET` and
 `$TASK_UUID` placeholders only; it does not execute requests.
+
+To produce a no-secret dry-run artifact that says exactly what remains before a
+Phase 3 live-stub proof, including the current redacted preflight status, run:
+
+```bash
+node scripts/check_phase3_live_stub_bootstrap.mjs \
+  --print-dry-run-artifact \
+  > /tmp/aerial-phase-3-live-stub-dry-run.md || true
+```
+
+The dry-run artifact may exit 1 when local env is still incomplete. That is
+intentional: it keeps readiness truthful while still leaving the operator with a
+redacted checklist of remaining local env work, browser setup, endpoint calls,
+expected JSON fields, event evidence, and out-of-scope items. It does not run
+the app, call internal routes, create secrets, touch GCP, dispatch GitHub
+Actions, write Vercel env, or modify `web/.env.local`.
 
 To produce a fill-in proof note for the operator-assisted run, include the
 evidence-template flag and redirect to a local scratch file or a new dated ops
@@ -179,7 +199,8 @@ curl -fsS -X POST \
   example env file still advertises the names needed for a live-stub bootstrap.
 - `node --test scripts/check_phase3_live_stub_bootstrap.test.mjs` verifies
   redacted output, missing-env failures, production stub rejection, the
-  operator-loop command plan, and the proof-note template guardrails.
+  operator-loop command plan, the dry-run artifact, and the proof-note template
+  guardrails.
 - `node scripts/check_titiler_ops_pipeline.mjs` verifies the gcloud installer,
   TiTiler setup doc, and release checklist keep the checksum-gated setup
   posture wired into the repo.

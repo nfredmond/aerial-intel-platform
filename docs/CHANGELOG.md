@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-04-28 - Live-stub dry-run artifact added
+
+Added `--print-dry-run-artifact` to
+`scripts/check_phase3_live_stub_bootstrap.mjs`. The checker can now emit a
+redacted operator artifact even when local env is still blocked, with exact
+remaining work for env repair, browser setup, upload/stub-advance/poll calls,
+expected JSON fields, event evidence, and out-of-scope cloud actions. The mode
+does not execute requests, create secrets, touch GCP, or modify `.env.local`.
+Also added `--env-path` as the documented custom-env flag so Node 24+'s native
+`--env-file` option cannot intercept operator checker arguments.
+
 ## 2026-04-27 - Live-stub duplicate env preflight added
 
 Tightened `scripts/check_phase3_live_stub_bootstrap.mjs` so the no-secret

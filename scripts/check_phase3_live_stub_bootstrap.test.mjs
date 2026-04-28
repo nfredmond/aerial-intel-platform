@@ -55,6 +55,42 @@ test("valid live-stub env can print a redacted operator-loop plan", () => {
   });
 });
 
+test("valid live-stub env can print a no-secret dry-run artifact", () => {
+  withEnvFile(validLiveStubEnv, (envFile) => {
+    const result = runCheck([
+      "--env-file",
+      envFile,
+      "--print-dry-run-artifact",
+      "--app-url",
+      "http://127.0.0.1:3999/some/path",
+    ]);
+
+    assert.equal(result.exitCode, 0, result.stderr);
+    assert.match(result.stdout, /Phase 3 live-stub dry-run artifact/);
+    assert.match(result.stdout, /Readiness result: ready-for-operator-loop/);
+    assert.match(result.stdout, /Preflight blocking items from this checker: none/);
+    assert.match(result.stdout, /What remains before proof/);
+    assert.match(result.stdout, /Dry-run command plan/);
+    assert.match(result.stdout, /details\[\]\.importedOutputs >= 4/);
+    assert.match(result.stdout, /GCP project choice, TiTiler Cloud Run deployment/);
+    assert.match(result.stdout, /http:\/\/127\.0\.0\.1:3999\/api\/internal\/nodeodm-poll/);
+    assert.doesNotMatch(result.stdout, /local-cron-secret-value-that-is-long/);
+    assert.doesNotMatch(result.stdout, /sb_secret_/);
+    assert.doesNotMatch(result.stdout, /sb_publishable_/);
+  });
+});
+
+test("custom env path alias avoids the Node --env-file option collision", () => {
+  withEnvFile(validLiveStubEnv, (envFile) => {
+    const result = runCheck(["--env-path", envFile, "--print-dry-run-artifact"]);
+
+    assert.equal(result.exitCode, 0, result.stderr);
+    assert.match(result.stdout, /Phase 3 live-stub dry-run artifact/);
+    assert.match(result.stdout, /Readiness result: ready-for-operator-loop/);
+    assert.doesNotMatch(result.stdout + result.stderr, /local-cron-secret-value-that-is-long/);
+  });
+});
+
 test("missing live-stub names fail without printing secret-like values", () => {
   withEnvFile(
     `NEXT_PUBLIC_SUPABASE_URL=https://abc123.supabase.co
@@ -75,6 +111,31 @@ SUPABASE_SERVICE_ROLE_KEY=secret-service-role-value
       assert.match(result.stderr, /randomBytes\(32\)/);
       assert.match(result.stderr, /grep -nE '\^\(CRON_SECRET\|AERIAL_NODEODM_MODE\)='/);
       assert.match(result.stderr, /edit the existing line instead of appending a duplicate/);
+      assert.doesNotMatch(result.stdout + result.stderr, /secret-service-role-value/);
+      assert.doesNotMatch(result.stdout + result.stderr, /secret-anon-value/);
+    },
+  );
+});
+
+test("dry-run artifact still prints exact remaining work when preflight is blocked", () => {
+  withEnvFile(
+    `NEXT_PUBLIC_SUPABASE_URL=https://abc123.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=secret-anon-value
+SUPABASE_SERVICE_ROLE_KEY=secret-service-role-value
+`,
+    (envFile) => {
+      const result = runCheck(["--env-file", envFile, "--print-dry-run-artifact"]);
+
+      assert.equal(result.exitCode, 1);
+      assert.match(result.stdout, /Phase 3 live-stub dry-run artifact/);
+      assert.match(result.stdout, /Readiness result: blocked/);
+      assert.match(result.stdout, /CRON_SECRET=missing/);
+      assert.match(result.stdout, /AERIAL_NODEODM_MODE=missing/);
+      assert.match(result.stdout, /Resolve every blocking item below/);
+      assert.match(result.stdout, /CRON_SECRET is missing or empty/);
+      assert.match(result.stdout, /AERIAL_NODEODM_MODE is missing or empty/);
+      assert.match(result.stdout, /Duplicate check before any local edit/);
+      assert.match(result.stdout, /Out of scope for this live-stub proof/);
       assert.doesNotMatch(result.stdout + result.stderr, /secret-service-role-value/);
       assert.doesNotMatch(result.stdout + result.stderr, /secret-anon-value/);
     },
@@ -124,11 +185,24 @@ test("example mode validates documented names but cannot print an operator-loop 
   const evidenceResult = runCheck(["--example", "--print-evidence-template"]);
   assert.equal(evidenceResult.exitCode, 2);
   assert.match(evidenceResult.stderr, /requires a real local env file/);
+
+  const dryRunResult = runCheck(["--example", "--print-dry-run-artifact"]);
+  assert.equal(dryRunResult.exitCode, 2);
+  assert.match(dryRunResult.stderr, /requires a local env path/);
 });
 
 test("evidence template is only available for live-stub mode", () => {
   withEnvFile(`${validLiveStubEnv}AERIAL_NODEODM_URL=http://localhost:3000\n`, (envFile) => {
     const result = runCheck(["--env-file", envFile, "--mode", "real-nodeodm", "--print-evidence-template"]);
+
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /only supported with --mode live-stub/);
+  });
+});
+
+test("dry-run artifact is only available for live-stub mode", () => {
+  withEnvFile(`${validLiveStubEnv}AERIAL_NODEODM_URL=http://localhost:3000\n`, (envFile) => {
+    const result = runCheck(["--env-file", envFile, "--mode", "real-nodeodm", "--print-dry-run-artifact"]);
 
     assert.equal(result.exitCode, 2);
     assert.match(result.stderr, /only supported with --mode live-stub/);

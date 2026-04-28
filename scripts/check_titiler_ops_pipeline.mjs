@@ -159,8 +159,16 @@ if (!liveStubCheck.includes("--print-operator-loop")) {
   failures.push(`${liveStubCheckPath}: must keep the redacted operator-loop plan flag`);
 }
 
+if (!liveStubCheck.includes("--print-dry-run-artifact")) {
+  failures.push(`${liveStubCheckPath}: must keep the redacted dry-run artifact flag`);
+}
+
 if (!liveStubBootstrap.includes("--print-operator-loop")) {
   failures.push(`${liveStubBootstrapPath}: must document the redacted operator-loop plan`);
+}
+
+if (!liveStubBootstrap.includes("--print-dry-run-artifact")) {
+  failures.push(`${liveStubBootstrapPath}: must document the redacted dry-run artifact`);
 }
 
 if (!liveStubBootstrap.includes("node --test scripts/check_phase3_live_stub_bootstrap.test.mjs")) {
@@ -169,6 +177,10 @@ if (!liveStubBootstrap.includes("node --test scripts/check_phase3_live_stub_boot
 
 if (!liveStubCheckTest.includes("doesNotMatch") || !liveStubCheckTest.includes("local-cron-secret-value-that-is-long")) {
   failures.push(`${liveStubCheckTestPath}: must verify that secret-like values are not printed`);
+}
+
+if (!liveStubCheckTest.includes("Phase 3 live-stub dry-run artifact")) {
+  failures.push(`${liveStubCheckTestPath}: must verify the dry-run artifact output`);
 }
 
 if (!liveStubBootstrap.includes("No GCP writes were run")) {

@@ -2,18 +2,25 @@
 import { existsSync as fsExistsSync, readFileSync as fsReadFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-const usage = `Usage: node scripts/check_phase3_live_stub_bootstrap.mjs [--env-file PATH] [--example] [--mode live-stub|real-nodeodm] [--print-operator-loop] [--print-evidence-template] [--app-url ORIGIN]
+const usage = `Usage: node scripts/check_phase3_live_stub_bootstrap.mjs [--env-path PATH] [--example] [--mode live-stub|real-nodeodm] [--print-operator-loop] [--print-evidence-template] [--print-dry-run-artifact] [--app-url ORIGIN]
 
 Checks the local Phase 3 / live-stub bootstrap environment without printing
 secret values. --example validates that web/.env.example still documents the
 required names; the default checks web/.env.local for an executable live-stub
 round-trip posture.
 
+Use --env-path for custom env files. --env-file remains accepted when passed
+through to the script, but Node 24+ also has a native --env-file option; use
+node -- scripts/check_phase3_live_stub_bootstrap.mjs --env-file PATH if you
+need the old spelling.
+
 --print-operator-loop emits redacted local curl/browser steps after the check
 passes. --print-evidence-template emits a redacted proof-note template for the
-operator to fill in after the browser/curl loop. Neither option executes
-requests or prints CRON_SECRET. When prerequisites fail, the checker prints a
-redacted local-env repair scaffold; it never generates or writes secret values.`;
+operator to fill in after the browser/curl loop. --print-dry-run-artifact emits
+a redacted readiness artifact even when local prerequisites are incomplete.
+None of these options execute requests or print CRON_SECRET. When
+prerequisites fail, the checker prints a redacted local-env repair scaffold; it
+never generates or writes secret values.`;
 
 const requiredBase = [
   "NEXT_PUBLIC_SUPABASE_URL",
@@ -37,11 +44,12 @@ function parseArgs(args) {
   let mode = "live-stub";
   let printOperatorLoop = false;
   let printEvidenceTemplate = false;
+  let printDryRunArtifact = false;
   let appUrl = "http://localhost:3000";
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
-    if (arg === "--env-file") {
+    if (arg === "--env-path" || arg === "--env-file") {
       envFile = args[index + 1] ?? "";
       index += 1;
     } else if (arg === "--example") {
@@ -54,6 +62,8 @@ function parseArgs(args) {
       printOperatorLoop = true;
     } else if (arg === "--print-evidence-template") {
       printEvidenceTemplate = true;
+    } else if (arg === "--print-dry-run-artifact") {
+      printDryRunArtifact = true;
     } else if (arg === "--app-url") {
       appUrl = args[index + 1] ?? "";
       index += 1;
@@ -71,6 +81,7 @@ function parseArgs(args) {
     mode,
     printOperatorLoop,
     printEvidenceTemplate,
+    printDryRunArtifact,
     appUrl,
   };
 }
@@ -181,6 +192,14 @@ function buildEvidenceTemplate({ appOrigin, envFile, mode }) {
     "- [ ] Job selected:",
     "- [ ] Task UUID captured as `TASK_UUID` in shell only:",
     "",
+    "## What remains before proof",
+    "",
+    "- [ ] Browser setup is complete: signed-in seeded/test user, selected mission, extracted dataset present, managed-processing request created, intake review started, and NodeODM task launched in stub mode.",
+    "- [ ] Shell variables are local-only: `TASK_UUID` and `CRON_SECRET` are set in the operator terminal and are not pasted into this note.",
+    "- [ ] Upload, stub advance, and poll endpoints have been called exactly once for the first deterministic proof unless a recorded retry explains otherwise.",
+    "- [ ] Job/event evidence is recorded by ids, event types, status names, output counts, and visible UI labels only.",
+    "- [ ] GCP, TiTiler, Vercel, GitHub Actions, and production Supabase changes were not used for this local live-stub proof.",
+    "",
     "## Operator loop results",
     "",
     "| Step | Expected | Observed | Evidence to record |",
@@ -204,6 +223,90 @@ function buildEvidenceTemplate({ appOrigin, envFile, mode }) {
     "",
     "- This is a local live-stub proof, not a real NodeODM processing benchmark.",
     "- This does not prove production TiTiler raster delivery unless a controlled TiTiler URL is separately deployed, configured, and smoked.",
+  ];
+}
+
+function buildRemainingBeforeProof({ failures, warnings, envFile }) {
+  const lines = [];
+  if (failures.length > 0) {
+    lines.push("- Preflight is still blocked. Resolve every blocking item below before claiming a Phase 3 live-stub proof:");
+    for (const failure of failures) {
+      lines.push(`  - ${failure}`);
+    }
+  } else {
+    lines.push("- Preflight blocking items from this checker: none.");
+  }
+
+  if (warnings.length > 0) {
+    lines.push("- Warnings to resolve or explicitly acknowledge before the proof:");
+    for (const warning of warnings) {
+      lines.push(`  - ${warning}`);
+    }
+  }
+
+  lines.push(
+    "- Operator-owned local env work: keep real Supabase URL/anon/service-role values in the local env file only; keep `AERIAL_NODEODM_MODE=stub`; keep `CRON_SECRET` at least 24 characters; edit existing lines instead of appending duplicates.",
+    `- Duplicate check before any local edit: \`grep -nE '^(CRON_SECRET|AERIAL_NODEODM_MODE)=' ${envFile} | cut -d= -f1\`.`,
+    "- Proof setup work: start `npm run dev` from `web/`, sign in with a seeded/test user, choose a mission with an extracted dataset, create/start the managed-processing job, launch the NodeODM stub task, and capture only the task UUID.",
+    "- Proof execution work: run the upload route, advance the stub task to `completed`, run the poll route, then verify `nodeodm.task.committed`, `nodeodm.task.completed`, and `nodeodm.task.imported` event types.",
+    "- Evidence work: record HTTP status codes, event ids, job id, task UUID, status names, output count, and ready synthetic output labels only.",
+    "- Out of scope for this live-stub proof: GCP project choice, TiTiler Cloud Run deployment, Vercel production env writes, GitHub Actions dispatch, real NodeODM container processing, and production customer data.",
+  );
+
+  return lines;
+}
+
+function buildDryRunArtifact({ appOrigin, envFile, mode, failures, warnings, redactedEnvStatuses }) {
+  const generatedAt = new Date().toISOString();
+  const readiness = failures.length > 0 ? "blocked" : "ready-for-operator-loop";
+  return [
+    "",
+    "---",
+    "# Phase 3 live-stub dry-run artifact",
+    "",
+    `Generated: ${generatedAt}`,
+    `App origin planned: ${appOrigin}`,
+    `Env file checked: ${envFile}`,
+    `Mode: ${mode}`,
+    `Readiness result: ${readiness}`,
+    "",
+    "## Secret-handling rule",
+    "",
+    "Do not paste CRON_SECRET, Supabase keys, cookies, bearer tokens, magic-link tokens, or production customer data into this artifact. The commands below are dry-run shapes with shell placeholders only.",
+    "",
+    "## Redacted preflight status",
+    "",
+    ...(redactedEnvStatuses.length > 0
+      ? redactedEnvStatuses.map((status) => `- ${status}`)
+      : ["- Env file could not be read; see blocking items below."]),
+    "",
+    "## What remains before proof",
+    "",
+    ...buildRemainingBeforeProof({ failures, warnings, envFile }),
+    "",
+    "## Dry-run command plan",
+    "",
+    "These commands are not executed by this checker. Run them only from the operator terminal after local env preflight passes.",
+    "",
+    "```bash",
+    "cd web",
+    "npm run dev",
+    "```",
+    "",
+    "```bash",
+    'export TASK_UUID="<output_summary.nodeodm.taskUuid>"',
+    `export CRON_SECRET="<value from ${envFile}>"`,
+    `curl -fsS -H "Authorization: Bearer $CRON_SECRET" "${appOrigin}/api/internal/nodeodm-upload"`,
+    `curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" "${appOrigin}/api/internal/dev/nodeodm-stub-advance?taskUuid=$TASK_UUID&to=completed"`,
+    `curl -fsS -H "Authorization: Bearer $CRON_SECRET" "${appOrigin}/api/internal/nodeodm-poll"`,
+    "```",
+    "",
+    "## Expected redacted results",
+    "",
+    "- Upload route: HTTP 200 JSON with `ok: true`, `configured: true`, `processed >= 1`, `failures: []`, and a `details[].outcome` of `uploading` or `committed`.",
+    "- Stub advance route: HTTP 200 JSON with `ok: true`, matching `taskUuid`, `to: completed`, `statusCode: 40`, and `progress: 100`.",
+    "- Poll route: HTTP 200 JSON with `ok: true`, `configured: true`, `failures: []`, `details[].statusName: completed`, and `details[].importedOutputs >= 4`.",
+    "- Job/event evidence: job status `succeeded`, stage `completed`, events `nodeodm.task.launched`, `nodeodm.task.committed`, `nodeodm.task.completed`, `nodeodm.task.imported`, and ready synthetic orthophoto, DEM, point cloud, and mesh outputs.",
   ];
 }
 
@@ -265,7 +368,7 @@ export function runPhase3LiveStubBootstrapCheck(args, options = {}) {
   const readFileSync = options.readFileSync ?? fsReadFileSync;
 
   if (!parsed.envFile) {
-    stderr.push("--env-file requires a path.");
+    stderr.push("--env-path requires a path.");
     return { exitCode: 2, stdout: "", stderr: formatLines(stderr) };
   }
 
@@ -311,6 +414,16 @@ export function runPhase3LiveStubBootstrapCheck(args, options = {}) {
     return { exitCode: 2, stdout: "", stderr: formatLines(stderr) };
   }
 
+  if (parsed.printDryRunArtifact && parsed.mode !== "live-stub") {
+    stderr.push("--print-dry-run-artifact is only supported with --mode live-stub.");
+    return { exitCode: 2, stdout: "", stderr: formatLines(stderr) };
+  }
+
+  if (parsed.printDryRunArtifact && parsed.allowExample) {
+    stderr.push("--print-dry-run-artifact requires a local env path; --example only checks documented names.");
+    return { exitCode: 2, stdout: "", stderr: formatLines(stderr) };
+  }
+
   const looksPlaceholder = createPlaceholderDetector(parsed.allowExample);
   const redactedStatus = (name, value) => {
     if (!value) return `${name}=missing`;
@@ -324,6 +437,7 @@ export function runPhase3LiveStubBootstrapCheck(args, options = {}) {
       warnings.push(`${name} is set but shorter than a typical Supabase API key; verify it is a real local key before running the loop`);
     }
   };
+  const redactedEnvStatuses = [];
 
   if (!existsSync(parsed.envFile)) {
     failures.push(`${parsed.envFile} does not exist`);
@@ -390,7 +504,9 @@ export function runPhase3LiveStubBootstrapCheck(args, options = {}) {
 
     stdout.push(`Phase 3 ${parsed.mode} bootstrap check for ${parsed.envFile}:`);
     for (const name of required) {
-      stdout.push(`- ${redactedStatus(name, env.get(name) ?? "")}`);
+      const status = redactedStatus(name, env.get(name) ?? "");
+      redactedEnvStatuses.push(status);
+      stdout.push(`- ${status}`);
     }
     if (warnings.length > 0) {
       stdout.push("Warnings:");
@@ -409,6 +525,18 @@ export function runPhase3LiveStubBootstrapCheck(args, options = {}) {
     if (!parsed.allowExample) {
       stderr.push(...buildLocalEnvRepairHints({ envFile: parsed.envFile, mode: parsed.mode }));
     }
+    if (parsed.printDryRunArtifact) {
+      stdout.push(
+        ...buildDryRunArtifact({
+          appOrigin,
+          envFile: parsed.envFile,
+          mode: parsed.mode,
+          failures,
+          warnings,
+          redactedEnvStatuses,
+        }),
+      );
+    }
     return {
       exitCode: 1,
       stdout: formatLines(stdout),
@@ -422,6 +550,18 @@ export function runPhase3LiveStubBootstrapCheck(args, options = {}) {
   }
   if (parsed.printEvidenceTemplate) {
     stdout.push(...buildEvidenceTemplate({ appOrigin, envFile: parsed.envFile, mode: parsed.mode }));
+  }
+  if (parsed.printDryRunArtifact) {
+    stdout.push(
+      ...buildDryRunArtifact({
+        appOrigin,
+        envFile: parsed.envFile,
+        mode: parsed.mode,
+        failures,
+        warnings,
+        redactedEnvStatuses,
+      }),
+    );
   }
 
   return {
