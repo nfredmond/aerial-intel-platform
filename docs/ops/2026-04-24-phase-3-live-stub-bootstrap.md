@@ -9,8 +9,9 @@ guessing credentials or weakening the TiTiler Cloud Run setup posture.
 
 - Active repo: `/home/narford/.openclaw/workspace/aerial-intel-platform`
 - Branch: `main`, aligned with `origin/main` before this slice.
-- `web/.env.local` exists locally, but the safe key-only check showed no
-  `CRON_SECRET` entry and no explicit `AERIAL_NODEODM_MODE=stub`.
+- `web/.env.local` exists locally. As of the 2026-04-27 catch-up slice, the
+  safe key-only check shows local-only `AERIAL_NODEODM_MODE=stub` is present,
+  and `CRON_SECRET` remains missing. No secret values were printed.
 - `gcloud` was missing at the start of this slice, then installed locally from
   Google's official Linux x86_64 archive as Google Cloud CLI `565.0.0`.
 - The archive checksum was verified before extraction:
@@ -107,8 +108,8 @@ For a non-default local env file, use `--env-path <path>`. The older
 `--env-file` spelling is still accepted when passed through with `node --`, but
 Node 24+ also has a native `--env-file` option and can intercept that argument.
 
-Expected failure mode today: missing `CRON_SECRET` and missing or non-stub
-`AERIAL_NODEODM_MODE`. If the Supabase-looking values are unusually short, the
+Expected failure mode after the 2026-04-27 catch-up slice: missing
+`CRON_SECRET` only. If the Supabase-looking values are unusually short, the
 helper also warns the operator to verify they are real local keys before trying
 the loop.
 
