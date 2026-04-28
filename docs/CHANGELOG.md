@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-04-27 - Live-stub duplicate env preflight added
+
+Tightened `scripts/check_phase3_live_stub_bootstrap.mjs` so the no-secret
+preflight now fails duplicate live-stub-critical env entries by key name and
+line number only. The repair hints and Phase 3 bootstrap checklist now tell the
+operator how to check for existing `CRON_SECRET` / `AERIAL_NODEODM_MODE` lines
+before appending anything, preserving the delegated-agent boundary around
+secret creation.
+
 ## 2026-04-25 - Live-stub secret-boundary repair hints hardened
 
 Hardened `scripts/check_phase3_live_stub_bootstrap.mjs` when the local proof is

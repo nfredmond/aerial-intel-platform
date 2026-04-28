@@ -111,9 +111,18 @@ the loop.
 Delegated-agent boundary: `AERIAL_NODEODM_MODE=stub` is a non-secret local env
 setting, but `CRON_SECRET` is a secret-bearing control. Automation should not
 invent, append, or store `CRON_SECRET` during a delegated proof run unless an
-approved local secret location or existing value is already available. The
-checker prints the human/operator-only secret setup command shape for local use
-without ever printing or reading the generated value.
+approved local secret location or existing value is already available. Before a
+human appends either local-only line, check for an existing entry without
+printing values:
+
+```bash
+grep -nE '^(CRON_SECRET|AERIAL_NODEODM_MODE)=' web/.env.local | cut -d= -f1
+```
+
+Edit any existing line instead of adding a duplicate. The checker prints the
+human/operator-only secret setup command shape for local use without ever
+printing or reading the generated value, and it now fails if live-stub-critical
+env names are defined more than once.
 
 Once the local check passes, print the redacted operator-loop plan:
 

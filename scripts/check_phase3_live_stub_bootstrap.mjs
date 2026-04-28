@@ -75,13 +75,18 @@ function parseArgs(args) {
   };
 }
 
-export function parseEnv(text) {
+export function parseEnvEntries(text) {
   const env = new Map();
-  for (const rawLine of text.split(/\r?\n/)) {
+  const lineNumbersByName = new Map();
+  const lines = text.split(/\r?\n/);
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const rawLine = lines[index];
     const line = rawLine.trim();
     if (!line || line.startsWith("#")) continue;
     const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
     if (!match) continue;
+    const name = match[1];
     let value = match[2] ?? "";
     if (
       (value.startsWith('"') && value.endsWith('"')) ||
@@ -89,9 +94,31 @@ export function parseEnv(text) {
     ) {
       value = value.slice(1, -1);
     }
-    env.set(match[1], value);
+    env.set(name, value);
+
+    const lineNumbers = lineNumbersByName.get(name) ?? [];
+    lineNumbers.push(index + 1);
+    lineNumbersByName.set(name, lineNumbers);
   }
-  return env;
+
+  return { env, lineNumbersByName };
+}
+
+export function parseEnv(text) {
+  return parseEnvEntries(text).env;
+}
+
+function duplicateEnvFailures({ lineNumbersByName, names }) {
+  const failures = [];
+  for (const name of names) {
+    const lineNumbers = lineNumbersByName.get(name) ?? [];
+    if (lineNumbers.length > 1) {
+      failures.push(
+        `${name} is defined multiple times in local env (lines ${lineNumbers.join(", ")}); edit one existing line instead of appending a duplicate`,
+      );
+    }
+  }
+  return failures;
 }
 
 function createPlaceholderDetector(allowExample) {
@@ -181,10 +208,16 @@ function buildEvidenceTemplate({ appOrigin, envFile, mode }) {
 }
 
 function buildLocalEnvRepairHints({ envFile, mode }) {
+  const duplicateCheckPattern =
+    mode === "live-stub"
+      ? "CRON_SECRET|AERIAL_NODEODM_MODE"
+      : "CRON_SECRET|AERIAL_NODEODM_MODE|AERIAL_NODEODM_URL";
   const lines = [
     "",
     "Local env repair hints (copy/edit only; no secret values printed):",
     `- Preserve any existing real values in ${envFile}. Do not paste Supabase keys or CRON_SECRET into docs, chat, screenshots, or commit history.`,
+    "- Before appending a local env line, list existing entries without values:",
+    `  grep -nE '^(${duplicateCheckPattern})=' ${envFile} | cut -d= -f1`,
     "- Agent-safe local-only action: AERIAL_NODEODM_MODE=stub is non-secret and may be added to local env when the operator has approved local env edits.",
     "- Secret action: do not generate, store, or append CRON_SECRET from an automation/delegated proof run unless an approved local secret location or existing value is already available.",
   ];
@@ -295,8 +328,18 @@ export function runPhase3LiveStubBootstrapCheck(args, options = {}) {
   if (!existsSync(parsed.envFile)) {
     failures.push(`${parsed.envFile} does not exist`);
   } else {
-    const env = parseEnv(readFileSync(parsed.envFile, "utf8"));
+    const { env, lineNumbersByName } = parseEnvEntries(readFileSync(parsed.envFile, "utf8"));
     const required = [...requiredBase, ...requiredByMode[parsed.mode]];
+    const duplicateGuardNames =
+      parsed.mode === "live-stub"
+        ? [...required, "NODE_ENV"]
+        : [...required, "AERIAL_NODEODM_MODE", "NODE_ENV"];
+    failures.push(
+      ...duplicateEnvFailures({
+        lineNumbersByName,
+        names: [...new Set(duplicateGuardNames)],
+      }),
+    );
 
     for (const name of required) {
       const value = env.get(name) ?? "";

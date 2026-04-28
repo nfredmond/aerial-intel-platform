@@ -73,9 +73,28 @@ SUPABASE_SERVICE_ROLE_KEY=secret-service-role-value
       assert.match(result.stderr, /do not generate, store, or append CRON_SECRET from an automation\/delegated proof run/);
       assert.match(result.stderr, /Human\/operator-only secret setup/);
       assert.match(result.stderr, /randomBytes\(32\)/);
+      assert.match(result.stderr, /grep -nE '\^\(CRON_SECRET\|AERIAL_NODEODM_MODE\)='/);
       assert.match(result.stderr, /edit the existing line instead of appending a duplicate/);
       assert.doesNotMatch(result.stdout + result.stderr, /secret-service-role-value/);
       assert.doesNotMatch(result.stdout + result.stderr, /secret-anon-value/);
+    },
+  );
+});
+
+test("duplicate live-stub env entries fail without printing values", () => {
+  withEnvFile(
+    `${validLiveStubEnv}CRON_SECRET=second-local-secret-value-that-is-long
+AERIAL_NODEODM_MODE=stub
+`,
+    (envFile) => {
+      const result = runCheck(["--env-file", envFile]);
+
+      assert.equal(result.exitCode, 1);
+      assert.match(result.stderr, /CRON_SECRET is defined multiple times in local env \(lines 4, 7\)/);
+      assert.match(result.stderr, /AERIAL_NODEODM_MODE is defined multiple times in local env \(lines 5, 8\)/);
+      assert.match(result.stderr, /edit one existing line instead of appending a duplicate/);
+      assert.doesNotMatch(result.stdout + result.stderr, /local-cron-secret-value-that-is-long/);
+      assert.doesNotMatch(result.stdout + result.stderr, /second-local-secret-value-that-is-long/);
     },
   );
 });

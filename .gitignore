@@ -2,3 +2,4 @@
 benchmark/
 supabase/.temp/
 .vercel
+.codex
