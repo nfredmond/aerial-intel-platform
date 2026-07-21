@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { validateGrounding } from "./grounding-validator";
+import { extractHardClaims, validateGrounding } from "./grounding-validator";
 
 describe("validateGrounding", () => {
   it("keeps sentences whose citations are all in the known set", () => {
@@ -98,5 +98,76 @@ describe("validateGrounding", () => {
     });
     expect(result.totalSentences).toBe(3);
     expect(result.keptSentences).toBe(3);
+  });
+});
+
+describe("extractHardClaims", () => {
+  it("extracts money, percentages, years, and large numbers", () => {
+    expect(extractHardClaims("Costs $4,200.50 with 85% overlap since 2024 across 12000 images")).toEqual([
+      "4200.50",
+      "85",
+      "2024",
+      "12000",
+    ]);
+  });
+
+  it("ignores bare small integers and citation tokens", () => {
+    expect(extractHardClaims("Flew 2 batteries over 3 passes. [fact:a:12345]")).toEqual([]);
+  });
+});
+
+describe("numeric faithfulness belt", () => {
+  const facts = new Map([
+    ["m:area", "Coverage area: 42.5 acres"],
+    ["m:alt", "Altitude: 400 ft AGL"],
+  ]);
+
+  it("keeps sentences whose numbers appear in their cited facts", () => {
+    const result = validateGrounding({
+      text: "The mission covered 42.5 acres. [fact:m:area]",
+      knownFactIds: facts.keys(),
+      factClaimTexts: facts,
+    });
+    expect(result.keptSentences).toBe(1);
+    expect(result.droppedSentences).toBe(0);
+  });
+
+  it("drops a sentence asserting a figure absent from its cited facts", () => {
+    const result = validateGrounding({
+      text: "The mission covered 97.3 acres. [fact:m:area]",
+      knownFactIds: facts.keys(),
+      factClaimTexts: facts,
+    });
+    expect(result.keptSentences).toBe(0);
+    expect(result.sentences[0].reason).toBe("unfaithful-citation");
+    expect(result.sentences[0].unfaithfulClaims).toEqual(["97.3"]);
+  });
+
+  it("only checks numbers against the facts the sentence itself cites", () => {
+    // 42.5 exists in m:area, but this sentence cites only m:alt.
+    const result = validateGrounding({
+      text: "The site spans 42.5 acres. [fact:m:alt]",
+      knownFactIds: facts.keys(),
+      factClaimTexts: facts,
+    });
+    expect(result.keptSentences).toBe(0);
+    expect(result.sentences[0].reason).toBe("unfaithful-citation");
+  });
+
+  it("does not run the belt when factClaimTexts is omitted (back-compat)", () => {
+    const result = validateGrounding({
+      text: "The mission covered 97.3 acres. [fact:m:area]",
+      knownFactIds: facts.keys(),
+    });
+    expect(result.keptSentences).toBe(1);
+  });
+
+  it("small integers do not trip the belt", () => {
+    const result = validateGrounding({
+      text: "The crew flew 2 batteries at 400 ft. [fact:m:alt]",
+      knownFactIds: facts.keys(),
+      factClaimTexts: facts,
+    });
+    expect(result.keptSentences).toBe(1);
   });
 });

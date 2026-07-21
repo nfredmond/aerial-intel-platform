@@ -110,7 +110,8 @@ export async function generateReportSummary(
   const outputTokens = usage?.outputTokens ?? 0;
   const spendTenthCents = estimateSpendTenthCents({ modelId, inputTokens, outputTokens });
   const knownFactIds = input.facts.map((fact) => fact.id);
-  const grounded = validateGrounding({ text: rawSummary, knownFactIds, dropThreshold });
+  const factClaimTexts = new Map(input.facts.map((fact) => [fact.id, `${fact.label}: ${fact.value}`]));
+  const grounded = validateGrounding({ text: rawSummary, knownFactIds, dropThreshold, factClaimTexts });
 
   const base = {
     rawSummary,

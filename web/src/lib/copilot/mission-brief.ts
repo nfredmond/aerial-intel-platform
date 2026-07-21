@@ -136,9 +136,11 @@ export async function generateMissionBrief(
   const spendTenthCents = estimateSpendTenthCents({ modelId, inputTokens, outputTokens });
 
   const knownFactIds = input.facts.map((f) => f.id);
+  const factClaimTexts = new Map(input.facts.map((f) => [f.id, `${f.label}: ${f.value}`]));
   const grounded = validateGrounding({
     text: rawText,
     knownFactIds,
+    factClaimTexts,
     dropThreshold,
   });
 

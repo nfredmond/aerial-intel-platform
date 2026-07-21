@@ -129,7 +129,8 @@ export async function generateProcessingQaNote(
   const spendTenthCents = estimateSpendTenthCents({ modelId, inputTokens, outputTokens });
 
   const knownFactIds = input.facts.map((f) => f.id);
-  const grounded = validateGrounding({ text: rawText, knownFactIds, dropThreshold });
+  const factClaimTexts = new Map(input.facts.map((f) => [f.id, `${f.label}: ${f.value}`]));
+  const grounded = validateGrounding({ text: rawText, knownFactIds, dropThreshold, factClaimTexts });
 
   const base = {
     rawText,

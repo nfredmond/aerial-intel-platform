@@ -17,7 +17,7 @@ const knownFacts = [
 
 const groundedNote = [
   "The job failed with a low image count of 42 which is below the typical overlap threshold. [fact:benchmark:j1:image_count]",
-  "Retry the flight with 70% frontal overlap and 60% side overlap to double the match density. [fact:stage:j1:align]",
+  "Retry the flight with higher frontal and side overlap to double the match density. [fact:stage:j1:align]",
   "The ODM exit code is 1 and the align stage did not complete. [fact:benchmark:j1:exit_code]",
   "If a retry still fails, rule out motion blur from low-light capture. [fact:job:j1:status]",
 ].join(" ");

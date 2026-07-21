@@ -287,7 +287,8 @@ export async function generateSupportAnswer(
   const outputTokens = usage?.outputTokens ?? 0;
   const spendTenthCents = estimateSpendTenthCents({ modelId, inputTokens, outputTokens });
   const knownFactIds = input.facts.map((fact) => fact.id);
-  const grounded = validateGrounding({ text: rawAnswer, knownFactIds, dropThreshold });
+  const factClaimTexts = new Map(input.facts.map((fact) => [fact.id, `${fact.label}: ${fact.value}`]));
+  const grounded = validateGrounding({ text: rawAnswer, knownFactIds, dropThreshold, factClaimTexts });
   const citedSet = new Set(grounded.citedFactIds);
   const citedSources = input.facts.filter((fact) => citedSet.has(fact.id));
 

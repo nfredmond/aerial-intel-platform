@@ -21,6 +21,13 @@ export type GroundingValidationInput = {
   knownFactIds: Iterable<FactId>;
   /** Allowed max fraction of sentences that may be dropped. Default 0.30. */
   dropThreshold?: number;
+  /**
+   * Fact id → the claim text fed to the model for that fact. When supplied,
+   * the numeric faithfulness belt runs: a sentence whose consequential
+   * figures (currency, percentages, years, large numbers) appear in none of
+   * its cited facts is dropped even though its citations resolve.
+   */
+  factClaimTexts?: ReadonlyMap<FactId, string>;
 };
 
 export type GroundingValidationResult = {
@@ -43,11 +50,71 @@ export type GroundingValidationResult = {
     text: string;
     factIds: FactId[];
     kept: boolean;
-    reason?: "missing-citation" | "unknown-citation";
+    reason?: "missing-citation" | "unknown-citation" | "unfaithful-citation";
+    /** Numeric claims the sentence asserts that none of its cited facts contain. */
+    unfaithfulClaims?: string[];
   }>;
 };
 
 const SINGLE_CITATION_PATTERN = /\[fact:([a-zA-Z0-9_\-:.]+)\]/g;
+
+/*
+ * Numeric faithfulness belt — ported from openplan's
+ * src/lib/planner-pack/grounding.ts (itself ported from clawmodeler,
+ * Apache-2.0, same author). Citation presence alone cannot catch a sentence
+ * that cites a real fact while asserting a fabricated figure; these helpers
+ * cross-check the consequential numbers a sentence asserts against the claim
+ * texts of the facts it cites.
+ */
+
+/** Matches a numeric token: optional `$`, digits with optional grouping/decimals, optional `%`. */
+const NUMERIC_TOKEN_PATTERN = /\$?\d[\d,]*(?:\.\d+)?%?/g;
+
+/** Digits-and-decimal core of a numeric token (`$4,200.50%` -> `4200.50`). */
+function numericCore(token: string): string {
+  return token.replace(/[$,%\s]/g, "");
+}
+
+/**
+ * A numeric token is "consequential" — worth cross-checking against the cited
+ * fact — when it is money, a percentage, a 4-digit year, or a large / decimal /
+ * comma-grouped figure. Bare small integers ("2 batteries", "3 passes") are
+ * ignored so the belt stays low-false-positive.
+ */
+function isConsequentialNumber(token: string): boolean {
+  if (token.includes("$") || token.includes("%")) return true;
+  if (token.includes(".") || token.includes(",")) return true;
+  const core = numericCore(token);
+  if (/^\d{4}$/.test(core)) {
+    const year = Number(core);
+    if (year >= 1900 && year <= 2099) return true;
+  }
+  return core.replace(".", "").length >= 4;
+}
+
+/**
+ * Extract the normalized numeric cores of the consequential figures a sentence
+ * asserts. Citation tokens are stripped first so a numeric fact id can't be
+ * mistaken for a claim.
+ */
+export function extractHardClaims(text: string): string[] {
+  const cores: string[] = [];
+  for (const match of text.replace(SINGLE_CITATION_PATTERN, "").matchAll(NUMERIC_TOKEN_PATTERN)) {
+    if (isConsequentialNumber(match[0])) cores.push(numericCore(match[0]));
+  }
+  return cores;
+}
+
+/** All numeric cores present anywhere in the given fact claim texts. */
+function factNumericCores(texts: Iterable<string>): Set<string> {
+  const cores = new Set<string>();
+  for (const text of texts) {
+    for (const match of text.matchAll(NUMERIC_TOKEN_PATTERN)) {
+      cores.add(numericCore(match[0]));
+    }
+  }
+  return cores;
+}
 
 /**
  * Sentence boundary: a terminator (`.`, `!`, `?`) optionally followed by
@@ -116,6 +183,22 @@ export function validateGrounding(
     if (!allKnown) {
       sentences.push({ text, factIds, kept: false, reason: "unknown-citation" });
       continue;
+    }
+    if (input.factClaimTexts) {
+      const cores = factNumericCores(
+        factIds.map((id) => input.factClaimTexts?.get(id) ?? ""),
+      );
+      const unfaithful = extractHardClaims(text).filter((claim) => !cores.has(claim));
+      if (unfaithful.length > 0) {
+        sentences.push({
+          text,
+          factIds,
+          kept: false,
+          reason: "unfaithful-citation",
+          unfaithfulClaims: unfaithful,
+        });
+        continue;
+      }
     }
     factIds.forEach((id) => citedUnion.add(id));
     sentences.push({ text, factIds, kept: true });

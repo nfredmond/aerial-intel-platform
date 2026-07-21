@@ -15,15 +15,15 @@ export type ModelPricing = {
  * deltas against a capped budget.
  *
  * Model ids use the Vercel AI Gateway canonical form (`provider/model`);
- * numbers mirror the Anthropic public pricing as of 2026-04-19. AI Gateway
+ * numbers mirror the Anthropic public pricing as of 2026-07-21. AI Gateway
  * passes Anthropic pricing through at cost, so these rates are authoritative
  * for spend math regardless of whether we route via OIDC or an API key.
  */
 export const MODEL_PRICING: Record<CopilotModelId, ModelPricing> = {
-  // Opus 4.7: $15/MTok input, $75/MTok output → 15 000 / 75 000 tenth-cents
+  // Opus 4.7: $5/MTok input, $25/MTok output → 5 000 / 25 000 tenth-cents
   "anthropic/claude-opus-4.7": {
-    inputPerMillionTenthCents: 15_000,
-    outputPerMillionTenthCents: 75_000,
+    inputPerMillionTenthCents: 5_000,
+    outputPerMillionTenthCents: 25_000,
   },
   // Haiku 4.5: $1/MTok input, $5/MTok output → 1 000 / 5 000 tenth-cents
   "anthropic/claude-haiku-4.5": {

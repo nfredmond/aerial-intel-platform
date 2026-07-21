@@ -8,21 +8,35 @@ import {
   MODEL_PRICING,
 } from "./pricing";
 
+describe("MODEL_PRICING", () => {
+  it("pins rates to Anthropic public pricing (verified 2026-07-21)", () => {
+    // Opus 4.7: $5 in / $25 out per MTok; Haiku 4.5: $1 in / $5 out per MTok.
+    expect(MODEL_PRICING["anthropic/claude-opus-4.7"]).toEqual({
+      inputPerMillionTenthCents: 5_000,
+      outputPerMillionTenthCents: 25_000,
+    });
+    expect(MODEL_PRICING["anthropic/claude-haiku-4.5"]).toEqual({
+      inputPerMillionTenthCents: 1_000,
+      outputPerMillionTenthCents: 5_000,
+    });
+  });
+});
+
 describe("estimateSpendTenthCents", () => {
   it("scales opus pricing by token count", () => {
-    // 1 000 input + 500 output tokens at Opus 4.7 pricing:
-    //   input:  1 000 * 15 000 / 1 000 000 = 15 tenth-cents
-    //   output: 500 * 75 000 / 1 000 000 = 37.5 → ceiled to 38 tenth-cents
-    //   total = 53 tenth-cents (= $0.053)
+    // 1 000 input + 500 output tokens at Opus 4.7 pricing ($5/$25 per MTok):
+    //   input:  1 000 * 5 000 / 1 000 000 = 5 tenth-cents
+    //   output: 500 * 25 000 / 1 000 000 = 12.5 → ceiled to 13 tenth-cents
+    //   total = 18 tenth-cents (= $0.018)
     const cost = estimateSpendTenthCents({
       modelId: "anthropic/claude-opus-4.7",
       inputTokens: 1_000,
       outputTokens: 500,
     });
-    expect(cost).toBe(53);
+    expect(cost).toBe(18);
   });
 
-  it("haiku is ~15x cheaper than opus for the same shape", () => {
+  it("haiku is ~5x cheaper than opus for the same shape", () => {
     const opus = estimateSpendTenthCents({
       modelId: "anthropic/claude-opus-4.7",
       inputTokens: 10_000,
@@ -34,9 +48,9 @@ describe("estimateSpendTenthCents", () => {
       outputTokens: 2_000,
     });
     expect(haiku).toBeLessThan(opus);
-    // Opus at 10k/2k = 150 + 150 = 300; Haiku = 10 + 10 = 20 → ~15x
-    expect(opus / haiku).toBeGreaterThan(10);
-    expect(opus / haiku).toBeLessThan(20);
+    // Opus at 10k/2k = 50 + 50 = 100; Haiku = 10 + 10 = 20 → 5x
+    expect(opus / haiku).toBeGreaterThan(4);
+    expect(opus / haiku).toBeLessThan(6);
   });
 
   it("zero-token call returns zero", () => {

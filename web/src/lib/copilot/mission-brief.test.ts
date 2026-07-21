@@ -15,7 +15,7 @@ const longBrief = [
 ].join(" ");
 
 const knownFacts = [
-  { id: "mission:toledo-20", label: "Mission", value: "Toledo-20 stormwater parcel" },
+  { id: "mission:toledo-20", label: "Mission", value: "Toledo-20 stormwater parcel, 18.4 ha" },
   { id: "dataset:toledo-20-rgb", label: "Dataset", value: "312 RGB images, 2026-04-15, 120 m AGL" },
   { id: "job:toledo-20-job", label: "Job", value: "NodeODM default-high" },
   { id: "qa:toledo-20-verdict", label: "QA", value: "minimum_pass=true" },
@@ -132,8 +132,8 @@ describe("generateMissionBrief", () => {
       facts: knownFacts,
     });
 
-    // Opus: 1000 input * 15000 / 1e6 = 15, 500 output * 75000 / 1e6 = 37.5 → 38, total 53.
-    expect(result.spendTenthCents).toBe(53);
+    // Opus: 1000 input * 5000 / 1e6 = 5, 500 output * 25000 / 1e6 = 12.5 → 13, total 18.
+    expect(result.spendTenthCents).toBe(18);
     expect(result.inputTokens).toBe(1000);
     expect(result.outputTokens).toBe(500);
   });
