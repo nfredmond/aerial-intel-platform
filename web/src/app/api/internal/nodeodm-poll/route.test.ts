@@ -14,12 +14,16 @@ const {
   insertJobEventMock,
   insertProcessingOutputsMock,
   uploadStorageBytesMock,
+  selectExternalProcessingRequestsByStatusMock,
+  updateExternalProcessingRequestMock,
 } = vi.hoisted(() => ({
   adminSelectMock: vi.fn(),
   updateProcessingJobMock: vi.fn(),
   insertJobEventMock: vi.fn(),
   insertProcessingOutputsMock: vi.fn(),
   uploadStorageBytesMock: vi.fn(),
+  selectExternalProcessingRequestsByStatusMock: vi.fn(),
+  updateExternalProcessingRequestMock: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/admin", () => ({
@@ -27,6 +31,8 @@ vi.mock("@/lib/supabase/admin", () => ({
   updateProcessingJob: updateProcessingJobMock,
   insertJobEvent: insertJobEventMock,
   insertProcessingOutputs: insertProcessingOutputsMock,
+  selectExternalProcessingRequestsByStatus: selectExternalProcessingRequestsByStatusMock,
+  updateExternalProcessingRequest: updateExternalProcessingRequestMock,
 }));
 
 vi.mock("@/lib/supabase/admin-storage", () => ({
@@ -43,6 +49,11 @@ beforeEach(() => {
   insertJobEventMock.mockResolvedValue(undefined);
   insertProcessingOutputsMock.mockResolvedValue([]);
   uploadStorageBytesMock.mockImplementation(async ({ path }: { path: string }) => ({ path }));
+  selectExternalProcessingRequestsByStatusMock.mockReset();
+  // No external (natford-aerial-processing.v1) requests in these scenarios;
+  // the post-loop callback reconciler must see an empty outbox and no-op.
+  selectExternalProcessingRequestsByStatusMock.mockResolvedValue([]);
+  updateExternalProcessingRequestMock.mockReset();
   vi.stubEnv("AERIAL_NODEODM_MODE", "stub");
   vi.stubEnv("NODE_ENV", "test");
   vi.stubEnv("CRON_SECRET", "integration-secret");

@@ -2,6 +2,7 @@ import { strFromU8 } from "fflate";
 import { NextRequest, NextResponse } from "next/server";
 
 import { pollNodeOdmTask } from "@/lib/dispatch-adapter-nodeodm";
+import { reconcileExternalProcessingCallbacks } from "@/lib/external-processing-callbacks";
 import { checkCronAuth } from "@/lib/internal-route-auth";
 import { createLogger, extractRequestId } from "@/lib/logging";
 import { parseManagedBenchmarkSummaryText } from "@/lib/managed-processing-import";
@@ -441,9 +442,24 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Externally submitted jobs (natford-aerial-processing.v1) owe their
+    // consumer a callback as soon as this tick advances them; the
+    // external-ingest cron re-sweeps anything this call fails to deliver.
+    let externalCallbacks: Awaited<ReturnType<typeof reconcileExternalProcessingCallbacks>> = [];
+    if (cursors.length > 0) {
+      try {
+        externalCallbacks = await reconcileExternalProcessingCallbacks({
+          jobIds: cursors.map((cursor) => cursor.jobId),
+        });
+      } catch (error) {
+        log.error("external-callbacks.failed", { error });
+      }
+    }
+
     log.info("tick.complete", {
       processed: processed.length,
       failures: failures.length,
+      externalCallbacks: externalCallbacks.length,
       durationMs: Date.now() - startedAtMs,
     });
 
@@ -454,6 +470,7 @@ export async function GET(request: NextRequest) {
       processed: processed.length,
       details: processed,
       failures,
+      externalCallbacks,
     });
   } catch (error) {
     log.error("tick.failed", { error, durationMs: Date.now() - startedAtMs });

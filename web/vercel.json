@@ -11,6 +11,10 @@
     {
       "path": "/api/internal/nodeodm-poll",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/internal/external-ingest",
+      "schedule": "3-59/5 * * * *"
     }
   ]
 }

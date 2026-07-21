@@ -397,6 +397,115 @@ export async function updateProcessingOutput(id: string, orgId: string, patch: P
   return rows[0] ?? null;
 }
 
+export type ExternalProcessingRequestInsert = {
+  org_id: string;
+  request_id: string;
+  consumer_system: string;
+  consumer_workspace_id: string;
+  consumer_mission_id: string;
+  consumer_project_id?: string | null;
+  callback_url: string;
+  imagery_url: string;
+  imagery_image_count?: number | null;
+  imagery_size_bytes?: number | null;
+  preset_id: string;
+  notes?: string | null;
+  last_callback_status?: string | null;
+  last_callback_at?: string | null;
+};
+
+export type ExternalProcessingRequestPatch = {
+  mission_id?: string | null;
+  dataset_id?: string | null;
+  ingest_session_id?: string | null;
+  job_id?: string | null;
+  status?: string;
+  ingest_attempts?: number;
+  ingest_error?: string | null;
+  last_callback_status?: string | null;
+  last_callback_progress?: number | null;
+  last_callback_at?: string | null;
+  callback_attempts?: number;
+  last_callback_error?: string | null;
+};
+
+export type ExternalProcessingRequestRow = {
+  id: string;
+  org_id: string;
+  request_id: string;
+  consumer_system: string;
+  consumer_workspace_id: string;
+  consumer_mission_id: string;
+  consumer_project_id: string | null;
+  callback_url: string;
+  imagery_url: string;
+  imagery_image_count: number | null;
+  imagery_size_bytes: number | null;
+  preset_id: string;
+  notes: string | null;
+  mission_id: string | null;
+  dataset_id: string | null;
+  ingest_session_id: string | null;
+  job_id: string | null;
+  status: string;
+  ingest_attempts: number;
+  ingest_error: string | null;
+  last_callback_status: string | null;
+  last_callback_progress: number | null;
+  last_callback_at: string | null;
+  callback_attempts: number;
+  last_callback_error: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+const EXTERNAL_PROCESSING_REQUEST_COLUMNS =
+  "id,org_id,request_id,consumer_system,consumer_workspace_id,consumer_mission_id,consumer_project_id,callback_url,imagery_url,imagery_image_count,imagery_size_bytes,preset_id,notes,mission_id,dataset_id,ingest_session_id,job_id,status,ingest_attempts,ingest_error,last_callback_status,last_callback_progress,last_callback_at,callback_attempts,last_callback_error,created_at,updated_at";
+
+export async function insertExternalProcessingRequest(input: ExternalProcessingRequestInsert) {
+  const rows = await adminRestRequest<ExternalProcessingRequestRow[]>(
+    `drone_external_processing_requests?select=${EXTERNAL_PROCESSING_REQUEST_COLUMNS}`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+
+  return rows[0] ?? null;
+}
+
+export async function selectExternalProcessingRequestByRequestId(orgId: string, requestId: string) {
+  const rows = await adminSelect<ExternalProcessingRequestRow[]>(
+    `drone_external_processing_requests?org_id=eq.${encodeURIComponent(orgId)}&request_id=eq.${encodeURIComponent(requestId)}&select=${EXTERNAL_PROCESSING_REQUEST_COLUMNS}`,
+  );
+
+  return rows[0] ?? null;
+}
+
+export async function selectExternalProcessingRequestsByStatus(statuses: string[]) {
+  if (statuses.length === 0) return [] as ExternalProcessingRequestRow[];
+  const filter = statuses.map((status) => encodeURIComponent(status)).join(",");
+  return adminSelect<ExternalProcessingRequestRow[]>(
+    `drone_external_processing_requests?status=in.(${filter})&select=${EXTERNAL_PROCESSING_REQUEST_COLUMNS}&order=created_at.asc`,
+  );
+}
+
+export async function updateExternalProcessingRequest(
+  id: string,
+  orgId: string,
+  patch: ExternalProcessingRequestPatch,
+) {
+  const rows = await adminRestRequest<Array<{ id: string }>>(
+    `drone_external_processing_requests?id=eq.${encodeURIComponent(id)}&org_id=eq.${encodeURIComponent(orgId)}&select=id`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    },
+  );
+
+  return rows[0] ?? null;
+}
+
 export type ArtifactShareLinkInsert = {
   org_id: string;
   artifact_id: string;

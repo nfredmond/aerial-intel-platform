@@ -5,6 +5,7 @@ const expectedCrons = new Map([
   ["/api/internal/proving-heartbeat", "* * * * *"],
   ["/api/internal/nodeodm-upload", "2-59/5 * * * *"],
   ["/api/internal/nodeodm-poll", "*/5 * * * *"],
+  ["/api/internal/external-ingest", "3-59/5 * * * *"],
 ]);
 
 const files = ["vercel.json", "web/vercel.json"];

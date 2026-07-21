@@ -24,3 +24,22 @@ export function checkCronAuth(request: NextRequest): CronAuthResult {
 
   return { ok: true };
 }
+
+/**
+ * Authorize the external processing-request endpoint (consumer platforms such
+ * as OpenPlan posting natford-aerial-processing.v1 ProcessingRequests). Same
+ * fail-closed posture as checkCronAuth: no configured token, no access.
+ */
+export function checkExternalProcessingAuth(request: NextRequest): CronAuthResult {
+  const configuredToken = process.env.AERIAL_EXTERNAL_PROCESSING_TOKEN;
+  if (!configuredToken) {
+    return { ok: false, reason: "missing-secret" };
+  }
+
+  const authorization = request.headers.get("authorization");
+  if (authorization !== `Bearer ${configuredToken}`) {
+    return { ok: false, reason: "invalid-bearer" };
+  }
+
+  return { ok: true };
+}
