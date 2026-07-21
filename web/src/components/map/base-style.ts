@@ -75,18 +75,23 @@ export function buildMapboxRasterStyle(
 }
 
 export function resolveMapStyle(styleUrl?: string | null): string | StyleSpecification {
-  const env = typeof process !== "undefined" ? process.env : undefined;
   if (styleUrl) return styleUrl;
 
-  const envStyle = env?.NEXT_PUBLIC_MAPLIBRE_STYLE_URL;
+  // NEXT_PUBLIC_* vars must be read as direct `process.env.X` member
+  // expressions — Next.js inlines them at build time and an aliased
+  // `const env = process.env` reads as undefined in the browser bundle.
+  const envStyle =
+    typeof process !== "undefined" ? process.env.NEXT_PUBLIC_MAPLIBRE_STYLE_URL : undefined;
   if (envStyle) return envStyle;
 
-  const mapboxToken = env?.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN?.trim();
+  const mapboxToken =
+    typeof process !== "undefined"
+      ? process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN?.trim()
+      : undefined;
   if (mapboxToken) {
-    return buildMapboxRasterStyle(
-      mapboxToken,
-      env?.NEXT_PUBLIC_MAPBOX_STYLE_ID?.trim() || DEFAULT_MAPBOX_STYLE_ID,
-    );
+    const styleId =
+      typeof process !== "undefined" ? process.env.NEXT_PUBLIC_MAPBOX_STYLE_ID?.trim() : undefined;
+    return buildMapboxRasterStyle(mapboxToken, styleId || DEFAULT_MAPBOX_STYLE_ID);
   }
 
   return FALLBACK_OSM_STYLE;
