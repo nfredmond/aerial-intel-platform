@@ -217,23 +217,11 @@ export function MissionWorkspace({
           <h1>{snapshot.workspaceLabel}</h1>
           <p className="muted">
             Mission-control shell for planning, ingest, processing, install, and
-            deliverable review. This now reflects the upgraded product direction,
-            not just an auth dashboard.
+            deliverable review.
           </p>
         </div>
 
         <div className="ops-topbar-actions">
-          <label className="ops-command-search" htmlFor="ops-command-search">
-            <span className="eyebrow">Command</span>
-            <input
-              id="ops-command-search"
-              name="ops-command-search"
-              type="text"
-              value="Search missions, datasets, jobs, or commands"
-              readOnly
-              aria-readonly="true"
-            />
-          </label>
           <Link href="/dashboard" className="button button-secondary">
             Dashboard
           </Link>
@@ -268,8 +256,7 @@ export function MissionWorkspace({
             <p className="eyebrow">Workspace rail</p>
             <h2>Projects and operations</h2>
             <p className="muted">
-              The old app stopped at auth. This shell starts introducing the multi-lane
-              operations model from the new master plan.
+              Projects, missions, and operational lanes for this workspace.
             </p>
           </div>
 
@@ -575,10 +562,10 @@ export function MissionWorkspace({
 
         <aside className="ops-inspector surface stack-md">
           <div className="stack-xs">
-            <p className="eyebrow">Contextual inspector</p>
+            <p className="eyebrow">Latest mission</p>
             <h2>{selectedMission?.name ?? "Mission detail pending"}</h2>
             <p className="muted">
-              The right rail now behaves like a mission-control inspector instead of a dead-end detail card.
+              A snapshot of the most recently updated mission in this workspace.
             </p>
           </div>
 
@@ -639,7 +626,7 @@ export function MissionWorkspace({
               <p className="eyebrow">V1 milestone bar</p>
               <h3>{snapshot.v1Readiness.statusLabel}</h3>
               <p className="muted">
-                This tracks the acceptance bar from the execution plan so we can call the app a solid v1 based on shipped workflow coverage, not vibes.
+                Tracks the v1 acceptance checklist: each item is confirmed by shipped workflow coverage in this workspace.
               </p>
             </div>
             <div className="stack-xs">

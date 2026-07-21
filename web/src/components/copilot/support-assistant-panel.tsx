@@ -22,7 +22,7 @@ function SubmitButton({ disabled }: { disabled: boolean }) {
     <button
       type="submit"
       disabled={disabled || pending}
-      className="inline-flex items-center rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+      className="button button-primary"
     >
       {pending ? "Checking docs..." : "Ask support copilot"}
     </button>
@@ -85,52 +85,52 @@ export function SupportAssistantPanel({ available, availabilityHint }: Props) {
       </div>
 
       {!available ? (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <p className="callout callout-warning">
           {availabilityHint}
         </p>
       ) : (
         <form action={formAction} className="stack-sm">
-          <label className="stack-xs text-sm font-medium text-slate-900">
+          <label className="stack-xs">
             Support question
             <textarea
               name="question"
               required
               minLength={8}
               rows={3}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900"
+             
               placeholder="What is still blocking a production raster claim?"
             />
           </label>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="copilot-meta">
             <SubmitButton disabled={!available} />
             {state.status === "error" ? (
-              <span className="text-xs text-rose-700">Error: {state.message}</span>
+              <span className="copilot-inline-error">Error: {state.message}</span>
             ) : null}
           </div>
         </form>
       )}
 
       {blocked ? (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <p className="callout callout-warning">
           {blocked}
         </p>
       ) : null}
       {refused ? (
-        <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900">
+        <p className="callout callout-error">
           {refused}
         </p>
       ) : null}
 
       {state.status === "ok" ? (
-        <div className="space-y-3 rounded-md border border-slate-200 bg-slate-50 p-3">
-          <p className="whitespace-pre-wrap text-sm text-slate-800">{state.answer}</p>
+        <div className="copilot-result stack-sm">
+          <p className="copilot-result-text">{state.answer}</p>
           {state.sources.length > 0 ? (
-            <div className="space-y-1 text-xs text-slate-700">
-              <p className="font-semibold text-slate-900">Cited support sources</p>
-              <ul className="space-y-1">
+            <div className="stack-xs muted helper-copy">
+              <p className="copilot-strong">Cited support sources</p>
+              <ul className="stack-xs">
                 {state.sources.map((source) => (
                   <li key={source.id}>
-                    <span className="font-mono">{source.id}</span>
+                    <span className="mono">{source.id}</span>
                     {" - "}
                     {source.sourcePath}
                   </li>
@@ -138,7 +138,7 @@ export function SupportAssistantPanel({ available, availabilityHint }: Props) {
               </ul>
             </div>
           ) : null}
-          <p className="text-xs text-slate-600">
+          <p className="muted helper-copy">
             {state.keptSentences}/{state.totalSentences} sentences kept · spend{" "}
             {formatTenthCentsUsd(state.spendTenthCents)} · model {state.modelId}
           </p>

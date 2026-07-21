@@ -24,7 +24,7 @@ function SubmitButton({ disabled }: { disabled: boolean }) {
     <button
       type="submit"
       disabled={disabled || pending}
-      className="inline-flex items-center rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+      className="button button-primary"
     >
       {pending ? "Drafting summary..." : "Generate report summary"}
     </button>
@@ -89,50 +89,50 @@ export function ReportSummaryPanel({
   };
 
   return (
-    <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-      <header className="mb-2">
-        <h3 className="text-sm font-semibold text-slate-900">
+    <section className="surface stack-sm">
+      <header className="stack-xs">
+        <h3>
           Aerial Copilot - Report Summary
         </h3>
-        <p className="mt-0.5 text-xs text-slate-600">
+        <p className="muted helper-copy">
           Drafts a client-safe artifact summary from real storage, QA, review, and handoff
           evidence. Every sentence keeps its fact citation.
         </p>
       </header>
 
       {!available ? (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <p className="callout callout-warning">
           {availabilityHint}
         </p>
       ) : (
-        <form action={formAction} className="flex flex-wrap items-center gap-2">
+        <form action={formAction} className="copilot-meta">
           <input type="hidden" name="artifactId" value={artifactId} />
           <SubmitButton disabled={!available} />
           {state.status === "error" ? (
-            <span className="text-xs text-rose-700">Error: {state.message}</span>
+            <span className="copilot-inline-error">Error: {state.message}</span>
           ) : null}
         </form>
       )}
 
       {blocked ? (
-        <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <p className="callout callout-warning">
           {blocked}
         </p>
       ) : null}
       {refused ? (
-        <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900">
+        <p className="callout callout-error">
           {refused}
         </p>
       ) : null}
 
       {state.status === "ok" ? (
-        <div className="mt-3 space-y-3 rounded-md border border-slate-200 bg-slate-50 p-3">
-          <p className="whitespace-pre-wrap text-sm text-slate-800">{state.summary}</p>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+        <div className="copilot-result stack-sm">
+          <p className="copilot-result-text">{state.summary}</p>
+          <div className="copilot-meta">
             <button
               type="button"
               onClick={handleCopy}
-              className="rounded border border-slate-300 bg-white px-2 py-1 hover:bg-slate-100"
+              className="button button-secondary"
             >
               {copied ? "Copied" : "Copy"}
             </button>

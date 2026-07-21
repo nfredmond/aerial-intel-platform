@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
+import { AutoRefresh } from "@/components/auto-refresh";
 import { ProcessingQaPanel } from "@/components/copilot/processing-qa-panel";
 import { ManagedOutputImportForm } from "@/components/managed-output-import-form";
 import { canPerformDroneOpsAction } from "@/lib/auth/actions";
@@ -1040,6 +1041,7 @@ Operator note: ${operatorNotes}`
 
   return (
     <main className="app-shell stack-md">
+      <AutoRefresh enabled={["queued", "running"].includes(detail.job.status)} />
       <section className="surface section-header">
         <div className="stack-sm">
           <p className="eyebrow">Job detail</p>

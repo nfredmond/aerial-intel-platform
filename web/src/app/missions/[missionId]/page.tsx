@@ -8,6 +8,7 @@ import { MissionBriefPanel } from "@/components/copilot/mission-brief-panel";
 import { getCopilotConfig } from "@/lib/copilot/config";
 import { readOrgCopilotEnabled } from "@/lib/copilot/quota";
 import { canPerformDroneOpsAction } from "@/lib/auth/actions";
+import { AutoRefresh } from "@/components/auto-refresh";
 import { BrowserZipIntakeForm } from "@/components/browser-zip-intake-form";
 import { GeometryJsonField } from "@/components/geometry-json-field";
 import { GeometryPreviewCard } from "@/components/geometry-preview-card";
@@ -234,7 +235,7 @@ function getCalloutMessage(options: {
 
   if (options.ingest) {
     return options.ingest === "1"
-      ? "Truthful v1 intake session recorded. Use it to track ZIP evidence, benchmark paths, and review-bundle readiness without pretending browser upload already exists."
+      ? "Intake session recorded. Use it to track ZIP evidence, benchmark paths, and review-bundle readiness."
       : options.ingest === "browser-recorded"
         ? "Browser ZIP evidence recorded. The mission now has a new ingest session with the selected ZIP filename and size, but durable upload/storage, extraction, and ODM orchestration still have not run."
         : options.ingest === "browser-uploaded"
@@ -1830,6 +1831,9 @@ export default async function MissionDetailPage({
 
   return (
     <main className="app-shell stack-md">
+      <AutoRefresh
+        enabled={detail.jobs.some((job) => ["queued", "running"].includes(job.status))}
+      />
       <section className="surface section-header">
         <div className="stack-sm">
           <p className="eyebrow">Mission detail</p>
@@ -2021,7 +2025,7 @@ export default async function MissionDetailPage({
             <div className="stack-xs">
               <h3>Record truthful v1 intake session</h3>
               <p className="muted">
-                Capture the real ZIP, benchmark, and review-bundle evidence path for this mission. This records intake honestly while browser upload is still pending.
+                Record the ZIP, benchmark, and review-bundle evidence paths for this mission.
               </p>
             </div>
             <div className="form-grid-2">

@@ -1435,3 +1435,78 @@ main {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Aerial Copilot panels */
+.copilot-result {
+  border: 1px solid #dbe3f4;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  padding: 0.85rem;
+}
+
+.copilot-result-text {
+  white-space: pre-wrap;
+  font-size: 0.95rem;
+  color: #1e293b;
+}
+
+.copilot-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.copilot-inline-error {
+  font-size: 0.85rem;
+  color: #b91c1c;
+}
+
+.copilot-strong {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.copilot-strong--error {
+  font-weight: 600;
+  color: #b91c1c;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* Mission board filter toolbar */
+.filter-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.filter-toolbar__field {
+  min-width: 11rem;
+  flex: 1 1 11rem;
+}
+
+.filter-toolbar__reset {
+  flex: 0 0 auto;
+}
+
+/* Inline status text (upload forms) */
+.status-text {
+  font-size: 0.9rem;
+  color: #475569;
+}
+
+.status-text--warning {
+  color: #b45309;
+}
+
+/* Workspace data-source banner */
+.ops-source-banner {
+  border-left: 4px solid #f59e0b;
+  background: #fffbeb;
+}

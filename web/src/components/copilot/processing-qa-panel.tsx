@@ -26,7 +26,7 @@ function SubmitButton({ disabled }: { disabled: boolean }) {
     <button
       type="submit"
       disabled={disabled || pending}
-      className="inline-flex items-center rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+      className="button button-primary"
     >
       {pending ? "Diagnosing…" : "Ask Aerial Copilot"}
     </button>
@@ -77,10 +77,10 @@ export function ProcessingQaPanel({ jobId, available, availabilityHint, relevant
 
   if (!relevant) {
     return (
-      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+      <section className="surface stack-sm">
         <header>
-          <h3 className="text-sm font-semibold text-slate-900">Aerial Copilot — Processing QA</h3>
-          <p className="mt-0.5 text-xs text-slate-600">
+          <h3>Aerial Copilot — Processing QA</h3>
+          <p className="muted helper-copy">
             {relevanceHint ??
               "Copilot diagnostic is offered when a job failed or produced fewer artifacts than expected."}
           </p>
@@ -93,44 +93,44 @@ export function ProcessingQaPanel({ jobId, available, availabilityHint, relevant
   const refused = refusedMessage(state);
 
   return (
-    <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-      <header className="mb-2">
-        <h3 className="text-sm font-semibold text-slate-900">Aerial Copilot — Processing QA</h3>
-        <p className="mt-0.5 text-xs text-slate-600">
+    <section className="surface stack-sm">
+      <header className="stack-xs">
+        <h3>Aerial Copilot — Processing QA</h3>
+        <p className="muted helper-copy">
           AI-assisted diagnostic. Every sentence cites a real benchmark/log fact from this job.
           Review before acting on suggested settings.
         </p>
       </header>
 
       {!available ? (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <p className="callout callout-warning">
           {availabilityHint}
         </p>
       ) : (
-        <form action={formAction} className="flex items-center gap-2">
+        <form action={formAction} className="header-actions">
           <input type="hidden" name="jobId" value={jobId} />
           <SubmitButton disabled={!available} />
           {state.status === "error" ? (
-            <span className="text-xs text-rose-700">Error: {state.message}</span>
+            <span className="copilot-inline-error">Error: {state.message}</span>
           ) : null}
         </form>
       )}
 
       {blocked ? (
-        <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <p className="callout callout-warning">
           {blocked}
         </p>
       ) : null}
       {refused ? (
-        <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900">
+        <p className="callout callout-error">
           {refused}
         </p>
       ) : null}
 
       {state.status === "ok" ? (
-        <div className="mt-3 space-y-2 rounded-md border border-slate-200 bg-slate-50 p-3">
-          <p className="whitespace-pre-wrap text-sm text-slate-800">{state.text}</p>
-          <p className="text-xs text-slate-600">
+        <div className="copilot-result stack-xs">
+          <p className="copilot-result-text">{state.text}</p>
+          <p className="muted helper-copy">
             {state.keptSentences}/{state.totalSentences} sentences kept · spend{" "}
             {formatTenthCentsUsd(state.spendTenthCents)} · model {state.modelId}
           </p>

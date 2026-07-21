@@ -25,7 +25,7 @@ function SubmitButton({ disabled }: { disabled: boolean }) {
     <button
       type="submit"
       disabled={disabled || pending}
-      className="inline-flex items-center rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+      className="button button-primary"
     >
       {pending ? "Drafting brief…" : "Generate client brief"}
     </button>
@@ -102,20 +102,20 @@ function BriefResult({
   };
 
   return (
-    <div className="mt-3 space-y-3 rounded-md border border-slate-200 bg-slate-50 p-3">
-      <p className="whitespace-pre-wrap text-sm text-slate-800">{state.text}</p>
-      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+    <div className="copilot-result stack-sm">
+      <p className="copilot-result-text">{state.text}</p>
+      <div className="copilot-meta">
         <button
           type="button"
           onClick={handleCopy}
-          className="rounded border border-slate-300 bg-white px-2 py-1 hover:bg-slate-100"
+          className="button button-secondary"
         >
           {copied ? "Copied" : "Copy"}
         </button>
         <button
           type="button"
           onClick={handleDownload}
-          className="rounded border border-slate-300 bg-white px-2 py-1 hover:bg-slate-100"
+          className="button button-secondary"
         >
           Download .md
         </button>
@@ -135,11 +135,11 @@ export function MissionBriefPanel({ missionId, missionName, available, availabil
   const refused = refusedMessage(state);
 
   return (
-    <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-      <header className="mb-2 flex items-start justify-between gap-4">
+    <section className="surface stack-sm">
+      <header className="stack-xs">
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">Aerial Copilot — Mission Brief</h3>
-          <p className="mt-0.5 text-xs text-slate-600">
+          <h3>Aerial Copilot — Mission Brief</h3>
+          <p className="muted helper-copy">
             One-click ~250-word client brief. Every sentence cites a real record; ungrounded claims
             are dropped. AI-assisted draft — review before sharing externally.
           </p>
@@ -147,26 +147,26 @@ export function MissionBriefPanel({ missionId, missionName, available, availabil
       </header>
 
       {!available ? (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <p className="callout callout-warning">
           {availabilityHint}
         </p>
       ) : (
-        <form action={formAction} className="flex items-center gap-2">
+        <form action={formAction} className="header-actions">
           <input type="hidden" name="missionId" value={missionId} />
           <SubmitButton disabled={!available} />
           {state.status === "error" ? (
-            <span className="text-xs text-rose-700">Error: {state.message}</span>
+            <span className="copilot-inline-error">Error: {state.message}</span>
           ) : null}
         </form>
       )}
 
       {blocked ? (
-        <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <p className="callout callout-warning">
           {blocked}
         </p>
       ) : null}
       {refused ? (
-        <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900">
+        <p className="callout callout-error">
           {refused}
         </p>
       ) : null}
