@@ -96,7 +96,7 @@ import {
   downloadStorageBytes,
   uploadStorageBytes,
 } from "@/lib/supabase/admin-storage";
-import { parseZipToImages } from "@/lib/zip-extraction";
+import { streamZipImages } from "@/lib/zip-extraction";
 import type { Json } from "@/lib/supabase/types";
 import { createMissionDeliveryPacketAction } from "./delivery-packet-actions";
 
@@ -872,38 +872,31 @@ export default async function MissionDetailPage({
 
     try {
       const blob = await downloadStorageBytes({ bucket: sourceBucket, path: sourcePath });
-      const arrayBuffer = await blob.arrayBuffer();
-      const zipBytes = new Uint8Array(arrayBuffer);
-      const images = parseZipToImages(zipBytes);
+      const destPath = `${refreshedAccess.org.slug}/missions/${missionId}/extracted/${sessionId}`;
 
-      if (images.length === 0) {
+      // Stream the archive: each image is uploaded as soon as it inflates, so
+      // memory holds one image at a time instead of the ZIP plus every image.
+      const { imageCount } = await streamZipImages(blob.stream(), async (image) => {
+        await uploadStorageBytes({
+          path: `${destPath}/${image.name}`,
+          bytes: image.bytes,
+          upsert: true,
+        });
+      });
+
+      if (imageCount === 0) {
         outcome = "no-images";
       } else {
-        const destPath = `${refreshedAccess.org.slug}/missions/${missionId}/extracted/${sessionId}`;
-        const chunkSize = 10;
-        for (let i = 0; i < images.length; i += chunkSize) {
-          const chunk = images.slice(i, i + chunkSize);
-          await Promise.all(
-            chunk.map((image) =>
-              uploadStorageBytes({
-                path: `${destPath}/${image.name}`,
-                bytes: image.bytes,
-                upsert: true,
-              }),
-            ),
-          );
-        }
-
         await updateIngestSession(sessionId, refreshedAccess.org.id, {
           extracted_dataset_path: destPath,
-          image_count: images.length,
+          image_count: imageCount,
           status: "extracted",
         });
 
         console.info("ingest.session.extracted", {
           sessionId,
           missionId,
-          imageCount: images.length,
+          imageCount,
           extractedDatasetPath: destPath,
         });
 

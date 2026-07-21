@@ -1,4 +1,4 @@
-import { strFromU8, unzipSync } from "fflate";
+import { strFromU8 } from "fflate";
 import { NextRequest, NextResponse } from "next/server";
 
 import { pollNodeOdmTask } from "@/lib/dispatch-adapter-nodeodm";
@@ -11,10 +11,12 @@ import { statusCodeName } from "@/lib/nodeodm/contracts";
 import { isNodeOdmError } from "@/lib/nodeodm/errors";
 import {
   inventoryNodeOdmBundle,
+  isRecognizedBundlePath,
   synthesizeBenchmarkSummary,
   type RealOdmBundleInventory,
   type RealOdmOutputSlot,
 } from "@/lib/nodeodm/real-output-adapter";
+import { processZipStream } from "@/lib/zip-stream";
 import {
   adminSelect,
   insertJobEvent,
@@ -225,8 +227,19 @@ async function importCompletedOutputs(cursor: NodeOdmJobCursor): Promise<{
   if (!client) return null;
 
   const response = await client.downloadAllAssets(cursor.taskUuid);
-  const arrayBuffer = await response.arrayBuffer();
-  const zipEntries = unzipSync(new Uint8Array(arrayBuffer));
+  if (!response.body) {
+    throw new Error("NodeODM asset download returned no body to stream");
+  }
+  // Stream the bundle and retain only the entries the import uses (benchmark
+  // summary + recognized ODM outputs); logs and interim products are discarded
+  // as they inflate instead of being buffered alongside the whole archive.
+  const zipEntries: Record<string, Uint8Array> = {};
+  await processZipStream(response.body, {
+    filter: isRecognizedBundlePath,
+    handle: (entry) => {
+      zipEntries[entry.name] = entry.bytes;
+    },
+  });
   const importedAt = new Date().toISOString();
 
   const summaryBytes = zipEntries["benchmark_summary.json"];

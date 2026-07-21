@@ -22,6 +22,24 @@ const MESH_PATHS = [
   "odm_texturing/odm_textured_model.obj",
 ];
 
+const RECOGNIZED_BUNDLE_PATHS = new Set<string>([
+  "benchmark_summary.json",
+  ...ORTHOPHOTO_PATHS,
+  ...DSM_PATHS,
+  ...DTM_PATHS,
+  ...POINT_CLOUD_PATHS,
+  ...MESH_PATHS,
+]);
+
+/**
+ * True for the handful of bundle entries the import pipeline actually uses.
+ * Streaming callers use this to discard the rest of an all.zip (logs, interim
+ * products) without ever buffering it.
+ */
+export function isRecognizedBundlePath(path: string): boolean {
+  return RECOGNIZED_BUNDLE_PATHS.has(path);
+}
+
 function firstMatch(
   entries: Record<string, Uint8Array>,
   candidates: readonly string[],
