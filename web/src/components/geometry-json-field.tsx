@@ -2,6 +2,9 @@
 
 import { useMemo, useState } from "react";
 
+import type { Geometry, Polygon } from "geojson";
+
+import { GeometryDrawMap } from "@/components/map/geometry-draw-map";
 import { parseGeoJsonSurface } from "@/lib/geojson";
 import { getGeoJsonPreviewModel } from "@/lib/geojson-preview";
 
@@ -94,8 +97,20 @@ export function GeometryJsonField({
     [mode, parsedGeometry.geometry],
   );
 
+  const handleDraw = (polygon: Polygon | null) => {
+    if (polygon) {
+      setValue(JSON.stringify(polygon, null, 2));
+    }
+  };
+
   return (
     <div className="stack-sm">
+      <GeometryDrawMap
+        existingGeometry={(parsedGeometry.geometry as unknown as Geometry | null) ?? null}
+        onDraw={handleDraw}
+        ariaLabel={mode === "mission" ? "Draw the mission AOI polygon" : "Draw the dataset footprint polygon"}
+      />
+
       <label className="stack-xs">
         <span>{label}</span>
         <textarea
@@ -154,7 +169,7 @@ export function GeometryJsonField({
             ))}
           </svg>
         ) : (
-          <p className="muted">Paste or load sample GeoJSON to preview the geometry before saving it.</p>
+          <p className="muted">Draw a polygon on the map, paste GeoJSON, or load a sample to preview the geometry before saving it.</p>
         )}
       </div>
     </div>

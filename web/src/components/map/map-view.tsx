@@ -12,11 +12,11 @@ import maplibregl, {
   type ExpressionSpecification,
   type LngLatBoundsLike,
   type Map as MapLibreMap,
-  type StyleSpecification,
 } from "maplibre-gl";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { combineBboxes, expandBbox } from "@/lib/geo/bbox";
+import { resolveMapStyle } from "@/components/map/base-style";
 import { toFeatureCollection } from "@/lib/geo/serialization";
 
 export type MapLayerTone = "neutral" | "info" | "success" | "warning" | "danger";
@@ -54,36 +54,6 @@ const TONE_COLORS: Record<MapLayerTone, { fill: string; stroke: string }> = {
   warning: { fill: "#f59e0b", stroke: "#b45309" },
   danger: { fill: "#f87171", stroke: "#b91c1c" },
 };
-
-const FALLBACK_STYLE: StyleSpecification = {
-  version: 8,
-  sources: {
-    osm: {
-      type: "raster",
-      tiles: [
-        "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png",
-      ],
-      tileSize: 256,
-      attribution: "© OpenStreetMap contributors",
-    },
-  },
-  layers: [
-    {
-      id: "osm",
-      type: "raster",
-      source: "osm",
-    },
-  ],
-};
-
-function resolveStyle(styleUrl: string | null | undefined): string | StyleSpecification {
-  const envStyle = typeof process !== "undefined" ? process.env.NEXT_PUBLIC_MAPLIBRE_STYLE_URL : undefined;
-  if (styleUrl) return styleUrl;
-  if (envStyle) return envStyle;
-  return FALLBACK_STYLE;
-}
 
 function toFillLayer(id: string, sourceId: string, tone: MapLayerTone, opacity: number): maplibregl.FillLayerSpecification {
   return {
@@ -167,7 +137,7 @@ export function MapView({
   const [ready, setReady] = useState(false);
   const descriptionId = useId();
 
-  const resolvedStyle = useMemo(() => resolveStyle(styleUrl), [styleUrl]);
+  const resolvedStyle = useMemo(() => resolveMapStyle(styleUrl), [styleUrl]);
   const activeLayers = useMemo(() => layers.filter(hasFeatures), [layers]);
 
   const computedBbox = useMemo(() => {

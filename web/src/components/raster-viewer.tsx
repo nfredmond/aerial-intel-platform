@@ -5,9 +5,10 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import maplibregl, {
   type LngLatBoundsLike,
   type Map as MapLibreMap,
-  type StyleSpecification,
 } from "maplibre-gl";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+
+import { resolveMapStyle } from "@/components/map/base-style";
 
 export type RasterViewerProps = {
   tileUrlTemplate: string;
@@ -17,37 +18,6 @@ export type RasterViewerProps = {
   height?: string;
   ariaLabel?: string;
 };
-
-const FALLBACK_BASEMAP: StyleSpecification = {
-  version: 8,
-  sources: {
-    osm: {
-      type: "raster",
-      tiles: [
-        "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png",
-      ],
-      tileSize: 256,
-      attribution: "© OpenStreetMap contributors",
-    },
-  },
-  layers: [
-    {
-      id: "osm",
-      type: "raster",
-      source: "osm",
-    },
-  ],
-};
-
-function resolveBaseStyle(): string | StyleSpecification {
-  const envStyle =
-    typeof process !== "undefined"
-      ? process.env.NEXT_PUBLIC_MAPLIBRE_STYLE_URL
-      : undefined;
-  return envStyle ?? FALLBACK_BASEMAP;
-}
 
 const OVERLAY_SOURCE_ID = "titiler-overlay";
 const OVERLAY_LAYER_ID = "titiler-overlay-layer";
@@ -67,7 +37,7 @@ export function RasterViewer({
   const descriptionId = useId();
   const opacityId = useId();
 
-  const baseStyle = useMemo(() => resolveBaseStyle(), []);
+  const baseStyle = useMemo(() => resolveMapStyle(), []);
 
   useEffect(() => {
     if (!containerRef.current) return;

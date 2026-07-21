@@ -1,5 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// The draw map wraps maplibre-gl, which needs a real browser (WebGL, worker
+// blob URLs). The map's behavior is not under test here — the field contract is.
+vi.mock("@/components/map/geometry-draw-map", () => ({
+  GeometryDrawMap: () => null,
+}));
 
 import { GeometryJsonField } from "./geometry-json-field";
 
