@@ -3,3 +3,4 @@ benchmark/
 supabase/.temp/
 .vercel
 .codex
+.playwright-mcp/
