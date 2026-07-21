@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
@@ -352,10 +351,7 @@ export default async function ArtifactDetailPage({
     redirect(`/artifacts/${artifactId}?action=note-saved`);
   }
 
-  async function createShareLinkAction(
-    _prevState: ShareLinkFormState,
-    formData: FormData,
-  ): Promise<ShareLinkFormState> {
+  async function createShareLinkAction(formData: FormData): Promise<ShareLinkFormState> {
     "use server";
 
     const refreshedAccess = await getDroneOpsAccess();
@@ -432,7 +428,6 @@ export default async function ArtifactDetailPage({
     const origin = host ? `${proto}://${host}` : "";
     const url = origin ? `${origin}/s/${token}` : `/s/${token}`;
 
-    revalidatePath(`/artifacts/${artifactId}`);
     return { status: "issued", url, note };
   }
 

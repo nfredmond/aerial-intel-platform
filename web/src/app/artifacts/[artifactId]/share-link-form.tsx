@@ -1,13 +1,12 @@
 "use client";
 
-import { useActionState } from "react";
+import { useState, useTransition } from "react";
+import type { FormEvent } from "react";
 
 export type ShareLinkFormState =
   | { status: "idle" }
   | { status: "issued"; url: string; note: string | null }
   | { status: "error"; message: string };
-
-const INITIAL_STATE: ShareLinkFormState = { status: "idle" };
 
 /**
  * Issues an artifact share link and reveals the resulting capability URL
@@ -18,12 +17,23 @@ const INITIAL_STATE: ShareLinkFormState = { status: "idle" };
 export function ShareLinkForm({
   action,
 }: {
-  action: (
-    state: ShareLinkFormState,
-    formData: FormData,
-  ) => Promise<ShareLinkFormState>;
+  action: (formData: FormData) => Promise<ShareLinkFormState>;
 }) {
-  const [state, formAction, pending] = useActionState(action, INITIAL_STATE);
+  const [isPending, startTransition] = useTransition();
+  const [state, setState] = useState<ShareLinkFormState>({ status: "idle" });
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    startTransition(async () => {
+      const result = await action(formData);
+      setState(result);
+      if (result.status === "issued") {
+        form.reset();
+      }
+    });
+  }
 
   return (
     <div className="stack-sm">
@@ -38,7 +48,7 @@ export function ShareLinkForm({
         <p className="callout callout-error">{state.message}</p>
       ) : null}
 
-      <form action={formAction} className="share-links__form">
+      <form onSubmit={handleSubmit} className="share-links__form">
         <label className="stack-xs">
           <span className="muted">Note (optional)</span>
           <input
@@ -56,8 +66,8 @@ export function ShareLinkForm({
           <span className="muted">Max uses (optional)</span>
           <input type="number" name="shareMaxUses" min={1} step={1} placeholder="5" />
         </label>
-        <button type="submit" className="button button-primary" disabled={pending}>
-          {pending ? "Issuing…" : "Issue share link"}
+        <button type="submit" className="button button-primary" disabled={isPending}>
+          {isPending ? "Issuing…" : "Issue share link"}
         </button>
       </form>
     </div>
