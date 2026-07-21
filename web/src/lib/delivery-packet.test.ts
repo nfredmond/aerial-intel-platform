@@ -71,7 +71,7 @@ function createArtifact(overrides: Partial<DeliveryPacketArtifact> = {}): Delive
       id: "share-1",
       org_id: "org-1",
       artifact_id: "artifact-1",
-      token: "token-1",
+      token_hash: "hash-of-token-1",
       note: "Delivery packet",
       max_uses: 10,
       use_count: 0,

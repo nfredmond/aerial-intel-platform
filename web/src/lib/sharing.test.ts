@@ -5,6 +5,7 @@ import type { ArtifactShareLinkRow } from "@/lib/supabase/admin";
 import {
   computeExpiresAt,
   generateShareToken,
+  hashShareToken,
   isShareLinkExhausted,
   isShareLinkExpired,
   isShareLinkRevoked,
@@ -19,7 +20,7 @@ function makeLink(overrides: Partial<ArtifactShareLinkRow> = {}): ArtifactShareL
     id: "link-1",
     org_id: "org-1",
     artifact_id: "artifact-1",
-    token: "abc",
+    token_hash: "abc",
     note: null,
     max_uses: null,
     use_count: 0,
@@ -48,6 +49,23 @@ describe("generateShareToken", () => {
     const a = generateShareToken();
     const b = generateShareToken();
     expect(a).not.toBe(b);
+  });
+});
+
+describe("hashShareToken", () => {
+  it("is a stable 64-char hex SHA-256 digest of the token", () => {
+    // Matches the Postgres side: encode(digest('token','sha256'),'hex').
+    expect(hashShareToken("token")).toBe(
+      "3c469e9d6c5875d37a43f353d4f88e61fcf812c66eee3457465a40b0da4153e0",
+    );
+    expect(hashShareToken("token")).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("differs for different tokens and never returns the plaintext", () => {
+    const token = generateShareToken();
+    const hash = hashShareToken(token);
+    expect(hash).not.toBe(token);
+    expect(hashShareToken(generateShareToken())).not.toBe(hash);
   });
 });
 

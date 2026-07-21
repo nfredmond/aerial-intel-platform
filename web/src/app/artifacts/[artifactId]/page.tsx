@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
@@ -26,10 +28,12 @@ import { tryCreateSignedDownloadUrl } from "@/lib/storage-delivery";
 import {
   computeExpiresAt,
   generateShareToken,
+  hashShareToken,
   parseExpiresInHoursInput,
   parseMaxUsesInput,
   shareLinkStatus,
 } from "@/lib/sharing";
+import { ShareLinkForm, type ShareLinkFormState } from "./share-link-form";
 import {
   insertArtifactApproval,
   insertArtifactComment,
@@ -348,7 +352,10 @@ export default async function ArtifactDetailPage({
     redirect(`/artifacts/${artifactId}?action=note-saved`);
   }
 
-  async function createShareLinkAction(formData: FormData) {
+  async function createShareLinkAction(
+    _prevState: ShareLinkFormState,
+    formData: FormData,
+  ): Promise<ShareLinkFormState> {
     "use server";
 
     const refreshedAccess = await getDroneOpsAccess();
@@ -363,15 +370,18 @@ export default async function ArtifactDetailPage({
       redirect("/dashboard");
     }
     if (!canPerformDroneOpsAction(refreshedAccess, "artifacts.share")) {
-      redirect(`/artifacts/${artifactId}?action=denied`);
+      return { status: "error", message: "Your role cannot issue share links." };
     }
 
     const refreshedDetail = await getArtifactDetail(refreshedAccess, artifactId);
     if (!refreshedDetail) {
-      redirect("/missions");
+      return { status: "error", message: "This artifact could not be loaded." };
     }
     if (refreshedDetail.output.status !== "ready") {
-      redirect(`/artifacts/${artifactId}?action=not-ready`);
+      return {
+        status: "error",
+        message: `Share links require a ready artifact. This one is currently ${refreshedDetail.output.status}.`,
+      };
     }
 
     const rawNote = formData.get("shareNote");
@@ -381,39 +391,49 @@ export default async function ArtifactDetailPage({
     const expiresInHours = parseExpiresInHoursInput(typeof rawExpires === "string" ? rawExpires : null);
     const maxUses = parseMaxUsesInput(typeof rawMaxUses === "string" ? rawMaxUses : null);
     const expiresAt = computeExpiresAt(expiresInHours);
+    // Plaintext is used once — to build the URL returned below — and only its
+    // hash is stored, so this URL can never be reconstructed from the DB.
     const token = generateShareToken();
 
+    let link: Awaited<ReturnType<typeof insertArtifactShareLink>>;
     try {
-      const link = await insertArtifactShareLink({
+      link = await insertArtifactShareLink({
         org_id: refreshedAccess.org.id,
         artifact_id: refreshedDetail.output.id,
-        token,
+        token_hash: hashShareToken(token),
         note,
         max_uses: maxUses,
         expires_at: expiresAt,
         created_by: refreshedAccess.user.id,
       });
-
-      if (link) {
-        await insertJobEvent({
-          org_id: refreshedAccess.org.id,
-          job_id: refreshedDetail.output.job_id,
-          event_type: "artifact.share_link.issued",
-          payload: {
-            title: "Artifact share link issued",
-            detail: `Share link issued for ${getString(
-              refreshedDetail.metadata.name,
-              refreshedDetail.output.kind.replaceAll("_", " "),
-            )}${expiresAt ? ` with expiry ${expiresAt}` : ""}${maxUses ? ` (max ${maxUses} uses)` : ""}${note ? `: ${note}` : "."}`,
-            linkId: link.id,
-          },
-        }).catch(() => undefined);
-      }
     } catch {
-      redirect(`/artifacts/${artifactId}?action=error`);
+      return { status: "error", message: "The share link could not be created." };
     }
 
-    redirect(`/artifacts/${artifactId}?action=share-link-issued`);
+    if (link) {
+      await insertJobEvent({
+        org_id: refreshedAccess.org.id,
+        job_id: refreshedDetail.output.job_id,
+        event_type: "artifact.share_link.issued",
+        payload: {
+          title: "Artifact share link issued",
+          detail: `Share link issued for ${getString(
+            refreshedDetail.metadata.name,
+            refreshedDetail.output.kind.replaceAll("_", " "),
+          )}${expiresAt ? ` with expiry ${expiresAt}` : ""}${maxUses ? ` (max ${maxUses} uses)` : ""}${note ? `: ${note}` : "."}`,
+          linkId: link.id,
+        },
+      }).catch(() => undefined);
+    }
+
+    const requestHeaders = await headers();
+    const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
+    const proto = requestHeaders.get("x-forwarded-proto") ?? "https";
+    const origin = host ? `${proto}://${host}` : "";
+    const url = origin ? `${origin}/s/${token}` : `/s/${token}`;
+
+    revalidatePath(`/artifacts/${artifactId}`);
+    return { status: "issued", url, note };
   }
 
   async function revokeShareLinkAction(formData: FormData) {
@@ -1224,7 +1244,7 @@ export default async function ArtifactDetailPage({
           <p className="eyebrow">External share</p>
           <h2>Signed share links</h2>
           <p className="muted">
-            Issue a revocable link that lets an external recipient download this artifact without signing in. The link points at <code>/s/&lt;token&gt;</code>; each download mints a short-lived signed storage URL and counts against the configured limit.
+            Issue a revocable link that lets an external recipient download this artifact without signing in. The link points at <code>/s/&lt;token&gt;</code>; each download mints a short-lived signed storage URL and counts against the configured limit. The token is stored hashed, so the full URL is shown only once at creation — copy it then.
           </p>
         </div>
 
@@ -1244,7 +1264,6 @@ export default async function ArtifactDetailPage({
               return (
                 <article key={link.id} className="share-links__item">
                   <div className="share-links__meta">
-                    <div className="share-links__url">{`/s/${link.token}`}</div>
                     <div className="share-links__stats">
                       <span className={statusPillClassName(tone)}>{status}</span>{" "}
                       · {usesLabel} · Expires {expiresLabel} · Created {formatDateTime(link.created_at)}
@@ -1266,28 +1285,7 @@ export default async function ArtifactDetailPage({
         )}
 
         {detail.output.status === "ready" ? (
-          <form action={createShareLinkAction} className="share-links__form">
-            <label className="stack-xs">
-              <span className="muted">Note (optional)</span>
-              <input
-                type="text"
-                name="shareNote"
-                placeholder="e.g. Client preview — do not redistribute"
-                maxLength={200}
-              />
-            </label>
-            <label className="stack-xs">
-              <span className="muted">Expires in hours (optional)</span>
-              <input type="number" name="shareExpiresInHours" min={1} max={8760} step={1} placeholder="24" />
-            </label>
-            <label className="stack-xs">
-              <span className="muted">Max uses (optional)</span>
-              <input type="number" name="shareMaxUses" min={1} step={1} placeholder="5" />
-            </label>
-            <button type="submit" className="button button-primary">
-              Issue share link
-            </button>
-          </form>
+          <ShareLinkForm action={createShareLinkAction} />
         ) : (
           <p className="muted">Share links require a ready artifact. This one is currently {detail.output.status}.</p>
         )}

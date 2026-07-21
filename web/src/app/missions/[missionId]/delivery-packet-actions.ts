@@ -18,6 +18,7 @@ import { getMissionDetail, getString } from "@/lib/missions/detail-data";
 import {
   computeExpiresAt,
   generateShareToken,
+  hashShareToken,
   parseExpiresInHoursInput,
   parseMaxUsesInput,
 } from "@/lib/sharing";
@@ -120,10 +121,13 @@ export async function createMissionDeliveryPacketAction(formData: FormData) {
       }
 
       const comments = await selectArtifactCommentsByArtifact(output.id);
+      // The plaintext token is used once — for the URL embedded in the packet
+      // ZIP below — and only its hash is persisted.
+      const shareToken = generateShareToken();
       const shareLink = await insertArtifactShareLink({
         org_id: access.org.id,
         artifact_id: output.id,
-        token: generateShareToken(),
+        token_hash: hashShareToken(shareToken),
         note: note ? `Delivery packet: ${title}. ${note}` : `Delivery packet: ${title}.`,
         max_uses: maxUses,
         expires_at: expiresAt,
@@ -152,8 +156,8 @@ export async function createMissionDeliveryPacketAction(formData: FormData) {
         comments,
         shareLink,
         shareUrl: origin
-          ? `${origin}/s/${encodeURIComponent(shareLink.token)}`
-          : `/s/${encodeURIComponent(shareLink.token)}`,
+          ? `${origin}/s/${encodeURIComponent(shareToken)}`
+          : `/s/${encodeURIComponent(shareToken)}`,
         metadata,
       });
     }

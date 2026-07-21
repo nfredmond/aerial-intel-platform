@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
 import type { ArtifactShareLinkRow } from "@/lib/supabase/admin";
 
@@ -17,6 +17,16 @@ export function generateShareToken(byteLength = 32): string {
     throw new Error("share tokens must be at least 16 random bytes");
   }
   return randomBytes(byteLength).toString("base64url");
+}
+
+/**
+ * The only value persisted for a share link. Must match the SHA-256 hex the
+ * redeem_drone_share_link RPC computes so a presented token resolves to its
+ * stored row. The plaintext token is never stored — it lives only in the
+ * capability URL handed to the recipient.
+ */
+export function hashShareToken(token: string): string {
+  return createHash("sha256").update(token, "utf8").digest("hex");
 }
 
 export function isShareLinkExpired(link: ArtifactShareLinkRow, now: Date = new Date()): boolean {

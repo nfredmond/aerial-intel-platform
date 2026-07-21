@@ -384,10 +384,8 @@ function TopShareLinksPanel({ rows }: { rows: ArtifactShareLinkRow[] }) {
             const status = shareLinkStatus(row);
             return (
               <tr key={row.id}>
-                <td className="admin-table__mono">
-                  <Link href={`/s/${row.token}`} className="admin-table__link">
-                    {row.token.slice(0, 10)}…
-                  </Link>
+                <td className="admin-table__mono" title="Tokens are stored hashed; the link URL is shown only at creation.">
+                  {row.token_hash.slice(0, 10)}…
                 </td>
                 <td className="admin-table__mono">
                   <Link href={`/artifacts/${row.artifact_id}`} className="admin-table__link">
@@ -429,10 +427,8 @@ function ExpiringShareLinksPanel({ rows }: { rows: ArtifactShareLinkRow[] }) {
             const status = shareLinkStatus(row);
             return (
               <tr key={row.id}>
-                <td className="admin-table__mono">
-                  <Link href={`/s/${row.token}`} className="admin-table__link">
-                    {row.token.slice(0, 10)}…
-                  </Link>
+                <td className="admin-table__mono" title="Tokens are stored hashed; the link URL is shown only at creation.">
+                  {row.token_hash.slice(0, 10)}…
                 </td>
                 <td className="admin-table__mono">
                   <Link href={`/artifacts/${row.artifact_id}`} className="admin-table__link">

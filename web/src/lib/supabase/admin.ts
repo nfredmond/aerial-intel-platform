@@ -1,3 +1,4 @@
+import { hashShareToken } from "@/lib/sharing";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import type { Json } from "@/lib/supabase/types";
 
@@ -509,7 +510,7 @@ export async function updateExternalProcessingRequest(
 export type ArtifactShareLinkInsert = {
   org_id: string;
   artifact_id: string;
-  token: string;
+  token_hash: string;
   note?: string | null;
   max_uses?: number | null;
   expires_at?: string | null;
@@ -529,7 +530,7 @@ export type ArtifactShareLinkRow = {
   id: string;
   org_id: string;
   artifact_id: string;
-  token: string;
+  token_hash: string;
   note: string | null;
   max_uses: number | null;
   use_count: number;
@@ -597,7 +598,7 @@ export async function selectArtifactShareLinkByToken(
   token: string,
 ): Promise<ArtifactShareLinkRow | null> {
   const rows = await adminRestRequest<ArtifactShareLinkRow[]>(
-    `drone_artifact_share_links?token=eq.${encodeURIComponent(token)}&select=*`,
+    `drone_artifact_share_links?token_hash=eq.${encodeURIComponent(hashShareToken(token))}&select=*`,
     { method: "GET" },
   );
   return rows[0] ?? null;
