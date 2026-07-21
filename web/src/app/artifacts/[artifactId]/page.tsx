@@ -214,7 +214,7 @@ export default async function ArtifactDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "artifacts.write")) {
       redirect(`/artifacts/${artifactId}?action=denied`);
     }
 
@@ -258,7 +258,7 @@ export default async function ArtifactDetailPage({
     });
 
     try {
-      await updateProcessingOutput(refreshedDetail.output.id, {
+      await updateProcessingOutput(refreshedDetail.output.id, refreshedDetail.output.org_id, {
         metadata: nextMetadata,
       });
 
@@ -305,7 +305,7 @@ export default async function ArtifactDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "handoffs.write")) {
       redirect(`/artifacts/${artifactId}?action=denied`);
     }
 
@@ -326,7 +326,7 @@ export default async function ArtifactDetailPage({
     });
 
     try {
-      await updateProcessingOutput(refreshedDetail.output.id, {
+      await updateProcessingOutput(refreshedDetail.output.id, refreshedDetail.output.org_id, {
         metadata: nextMetadata,
       });
 
@@ -362,7 +362,7 @@ export default async function ArtifactDetailPage({
     ) {
       redirect("/dashboard");
     }
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "artifacts.share")) {
       redirect(`/artifacts/${artifactId}?action=denied`);
     }
 
@@ -430,7 +430,7 @@ export default async function ArtifactDetailPage({
     ) {
       redirect("/dashboard");
     }
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "artifacts.share")) {
       redirect(`/artifacts/${artifactId}?action=denied`);
     }
 
@@ -446,7 +446,7 @@ export default async function ArtifactDetailPage({
     }
 
     try {
-      await updateArtifactShareLink(linkId, { revoked_at: new Date().toISOString() });
+      await updateArtifactShareLink(linkId, refreshedDetail.output.org_id, { revoked_at: new Date().toISOString() }, { artifactId: refreshedDetail.output.id });
 
       await insertJobEvent({
         org_id: refreshedAccess.org.id,
@@ -477,7 +477,7 @@ export default async function ArtifactDetailPage({
     ) {
       redirect("/dashboard");
     }
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "artifacts.comment")) {
       redirect(`/artifacts/${artifactId}?action=denied`);
     }
 
@@ -536,7 +536,7 @@ export default async function ArtifactDetailPage({
     ) {
       redirect("/dashboard");
     }
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "artifacts.comment")) {
       redirect(`/artifacts/${artifactId}?action=denied`);
     }
 
@@ -574,7 +574,7 @@ export default async function ArtifactDetailPage({
     ) {
       redirect("/dashboard");
     }
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "artifacts.approve")) {
       redirect(`/artifacts/${artifactId}?action=denied`);
     }
 

@@ -256,9 +256,9 @@ export async function insertMission(input: MissionInsert) {
   return rows[0] ?? null;
 }
 
-export async function updateMission(id: string, patch: MissionPatch) {
+export async function updateMission(id: string, orgId: string, patch: MissionPatch) {
   const rows = await adminRestRequest<Array<{ id: string }>>(
-    `drone_missions?id=eq.${encodeURIComponent(id)}&select=id`,
+    `drone_missions?id=eq.${encodeURIComponent(id)}&org_id=eq.${encodeURIComponent(orgId)}&select=id`,
     {
       method: "PATCH",
       body: JSON.stringify(patch),
@@ -304,9 +304,9 @@ export async function insertIngestSession(input: IngestSessionInsert) {
   return rows[0] ?? null;
 }
 
-export async function updateIngestSession(id: string, patch: IngestSessionPatch) {
+export async function updateIngestSession(id: string, orgId: string, patch: IngestSessionPatch) {
   const rows = await adminRestRequest<Array<{ id: string }>>(
-    `drone_ingest_sessions?id=eq.${encodeURIComponent(id)}&select=id`,
+    `drone_ingest_sessions?id=eq.${encodeURIComponent(id)}&org_id=eq.${encodeURIComponent(orgId)}&select=id`,
     {
       method: "PATCH",
       body: JSON.stringify(patch),
@@ -349,9 +349,9 @@ export async function insertJobEvent(input: JobEventInsert) {
   });
 }
 
-export async function updateMissionVersion(id: string, patch: MissionVersionPatch) {
+export async function updateMissionVersion(id: string, orgId: string, patch: MissionVersionPatch) {
   const rows = await adminRestRequest<Array<{ id: string }>>(
-    `drone_mission_versions?id=eq.${encodeURIComponent(id)}&select=id`,
+    `drone_mission_versions?id=eq.${encodeURIComponent(id)}&org_id=eq.${encodeURIComponent(orgId)}&select=id`,
     {
       method: "PATCH",
       body: JSON.stringify(patch),
@@ -361,9 +361,9 @@ export async function updateMissionVersion(id: string, patch: MissionVersionPatc
   return rows[0] ?? null;
 }
 
-export async function updateDataset(id: string, patch: DatasetPatch) {
+export async function updateDataset(id: string, orgId: string, patch: DatasetPatch) {
   const rows = await adminRestRequest<Array<{ id: string }>>(
-    `drone_datasets?id=eq.${encodeURIComponent(id)}&select=id`,
+    `drone_datasets?id=eq.${encodeURIComponent(id)}&org_id=eq.${encodeURIComponent(orgId)}&select=id`,
     {
       method: "PATCH",
       body: JSON.stringify(patch),
@@ -373,9 +373,9 @@ export async function updateDataset(id: string, patch: DatasetPatch) {
   return rows[0] ?? null;
 }
 
-export async function updateProcessingJob(id: string, patch: ProcessingJobPatch) {
+export async function updateProcessingJob(id: string, orgId: string, patch: ProcessingJobPatch) {
   const rows = await adminRestRequest<Array<{ id: string }>>(
-    `drone_processing_jobs?id=eq.${encodeURIComponent(id)}&select=id`,
+    `drone_processing_jobs?id=eq.${encodeURIComponent(id)}&org_id=eq.${encodeURIComponent(orgId)}&select=id`,
     {
       method: "PATCH",
       body: JSON.stringify(patch),
@@ -385,9 +385,9 @@ export async function updateProcessingJob(id: string, patch: ProcessingJobPatch)
   return rows[0] ?? null;
 }
 
-export async function updateProcessingOutput(id: string, patch: ProcessingOutputPatch) {
+export async function updateProcessingOutput(id: string, orgId: string, patch: ProcessingOutputPatch) {
   const rows = await adminRestRequest<Array<{ id: string }>>(
-    `drone_processing_outputs?id=eq.${encodeURIComponent(id)}&select=id`,
+    `drone_processing_outputs?id=eq.${encodeURIComponent(id)}&org_id=eq.${encodeURIComponent(orgId)}&select=id`,
     {
       method: "PATCH",
       body: JSON.stringify(patch),
@@ -443,14 +443,20 @@ export async function insertArtifactShareLink(input: ArtifactShareLinkInsert) {
   return rows[0] ?? null;
 }
 
-export async function updateArtifactShareLink(id: string, patch: ArtifactShareLinkPatch) {
-  const rows = await adminRestRequest<ArtifactShareLinkRow[]>(
-    `drone_artifact_share_links?id=eq.${encodeURIComponent(id)}&select=*`,
-    {
-      method: "PATCH",
-      body: JSON.stringify(patch),
-    },
-  );
+export async function updateArtifactShareLink(
+  id: string,
+  orgId: string,
+  patch: ArtifactShareLinkPatch,
+  options: { artifactId?: string } = {},
+) {
+  let query = `drone_artifact_share_links?id=eq.${encodeURIComponent(id)}&org_id=eq.${encodeURIComponent(orgId)}`;
+  if (options.artifactId) {
+    query += `&artifact_id=eq.${encodeURIComponent(options.artifactId)}`;
+  }
+  const rows = await adminRestRequest<ArtifactShareLinkRow[]>(`${query}&select=*`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
   return rows[0] ?? null;
 }
 
@@ -459,6 +465,23 @@ export async function selectArtifactShareLinksByArtifact(artifactId: string) {
     artifactId,
   )}&select=*&order=created_at.desc`;
   return adminRestRequest<ArtifactShareLinkRow[]>(query, { method: "GET" });
+}
+
+/**
+ * Atomically validate-and-increment a share link via the
+ * redeem_drone_share_link RPC. Returns the post-increment row, or null when
+ * the link is unknown, revoked, expired, or exhausted — in which case the
+ * caller must NOT serve the artifact.
+ */
+export async function redeemArtifactShareLink(token: string) {
+  const rows = await adminRestRequest<ArtifactShareLinkRow[]>(
+    "rpc/redeem_drone_share_link",
+    {
+      method: "POST",
+      body: JSON.stringify({ p_token: token }),
+    },
+  );
+  return rows[0] ?? null;
 }
 
 export async function selectArtifactShareLinkByToken(

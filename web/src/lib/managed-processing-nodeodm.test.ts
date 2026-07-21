@@ -134,7 +134,7 @@ describe("recordManagedNodeOdmLaunchOutcome", () => {
     expect(result).toBe("nodeodm-launch-recorded");
     expect(updateProcessingJobMock).toHaveBeenCalledTimes(1);
 
-    const [jobId, patch] = updateProcessingJobMock.mock.calls[0];
+    const [jobId, , patch] = updateProcessingJobMock.mock.calls[0];
     expect(jobId).toBe("job-1");
     expect(patch.output_summary.nodeodm).toEqual({
       taskUuid: acceptedLaunch.taskUuid,
@@ -187,7 +187,7 @@ describe("recordManagedNodeOdmLaunchOutcome", () => {
       expect.objectContaining({ event_type: "nodeodm.task.launch_note" }),
     );
 
-    const [, patch] = updateProcessingJobMock.mock.calls[0];
+    const [, , patch] = updateProcessingJobMock.mock.calls[0];
     expect(patch.output_summary.nodeodm.launchNotes).toBe("First stub-mode dry run");
   });
 
@@ -204,7 +204,7 @@ describe("recordManagedNodeOdmLaunchOutcome", () => {
     expect(result).toBe("nodeodm-launch-failed");
     expect(updateProcessingJobMock).toHaveBeenCalledTimes(1);
 
-    const [, patch] = updateProcessingJobMock.mock.calls[0];
+    const [, , patch] = updateProcessingJobMock.mock.calls[0];
     expect(patch.output_summary.nodeodm.taskUuid).toBeUndefined();
     expect(patch.output_summary.nodeodm.lastLaunchError).toBe("NodeODM createTask: fetch failed");
     expect(patch.output_summary.nodeodm.lastLaunchKind).toBe("network");
@@ -248,7 +248,7 @@ describe("recordManagedNodeOdmLaunchOutcome", () => {
       launch: networkFailureLaunch,
     });
 
-    const [, patch] = updateProcessingJobMock.mock.calls[0];
+    const [, , patch] = updateProcessingJobMock.mock.calls[0];
     expect(patch.output_summary.nodeodm.taskUuid).toBe("prior-task");
     expect(patch.output_summary.nodeodm.lastLaunchError).toBe("NodeODM createTask: fetch failed");
     expect(patch.output_summary.nodeodm.lastLaunchKind).toBe("network");

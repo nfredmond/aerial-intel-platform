@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PROVING_HEARTBEAT_CRON_SCHEDULE, PROVING_HEARTBEAT_ROUTE_PATH } from "@/lib/proving-heartbeat";
 
@@ -24,6 +24,10 @@ describe("GET /api/internal/proving-heartbeat", () => {
     recordProvingHeartbeatAuditMock.mockResolvedValue(1);
     isProvingLaneEnabledMock.mockReset();
     isProvingLaneEnabledMock.mockReturnValue(true);
+    process.env.CRON_SECRET = "top-secret";
+  });
+
+  afterEach(() => {
     delete process.env.CRON_SECRET;
   });
 
@@ -32,7 +36,7 @@ describe("GET /api/internal/proving-heartbeat", () => {
 
     const response = await GET(
       new NextRequest("https://example.com/api/internal/proving-heartbeat", {
-        headers: { "user-agent": "vercel-cron/1.0" },
+        headers: { authorization: "Bearer top-secret" },
       }),
     );
     const body = await response.json();
@@ -52,7 +56,23 @@ describe("GET /api/internal/proving-heartbeat", () => {
     await expect(response.json()).resolves.toEqual({ ok: false, error: "unauthorized" });
   });
 
-  it("accepts vercel cron requests without a configured secret", async () => {
+  it("fails closed when CRON_SECRET is not configured, even for vercel-cron user agents", async () => {
+    delete process.env.CRON_SECRET;
+
+    const response = await GET(
+      new NextRequest("https://example.com/api/internal/proving-heartbeat", {
+        headers: {
+          "user-agent": "vercel-cron/1.0",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ ok: false, error: "cron-secret-not-configured" });
+    expect(reconcileProvingJobsOutOfBandMock).not.toHaveBeenCalled();
+  });
+
+  it("runs the reconcile pass for an authorized request", async () => {
     reconcileProvingJobsOutOfBandMock.mockResolvedValue({
       scanned: 2,
       updates: 1,
@@ -62,7 +82,7 @@ describe("GET /api/internal/proving-heartbeat", () => {
 
     const request = new NextRequest("https://example.com/api/internal/proving-heartbeat", {
       headers: {
-        "user-agent": "vercel-cron/1.0",
+        authorization: "Bearer top-secret",
       },
     });
 
@@ -86,7 +106,6 @@ describe("GET /api/internal/proving-heartbeat", () => {
   });
 
   it("requires the bearer token when CRON_SECRET is configured", async () => {
-    process.env.CRON_SECRET = "top-secret";
     reconcileProvingJobsOutOfBandMock.mockResolvedValue({
       scanned: 0,
       updates: 0,

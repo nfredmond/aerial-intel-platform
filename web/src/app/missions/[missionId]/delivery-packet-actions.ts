@@ -62,7 +62,7 @@ async function revokeCreatedLinks(links: ArtifactShareLinkRow[]) {
   const revokedAt = new Date().toISOString();
   await Promise.all(
     links.map((link) =>
-      updateArtifactShareLink(link.id, { revoked_at: revokedAt }).catch(() => undefined),
+      updateArtifactShareLink(link.id, link.org_id, { revoked_at: revokedAt }).catch(() => undefined),
     ),
   );
 }

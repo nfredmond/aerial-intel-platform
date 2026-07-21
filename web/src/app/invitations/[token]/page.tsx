@@ -13,10 +13,11 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 type Params = { token: string };
+type Search = { accepted?: string; error?: string };
 
 const TOKEN_SHAPE = /^[A-Za-z0-9_-]{16,128}$/;
 
-async function isExpired(expiresAt: string): Promise<boolean> {
+function isExpired(expiresAt: string): boolean {
   const expiry = Date.parse(expiresAt);
   if (Number.isNaN(expiry)) return false;
   return expiry < Date.now();
@@ -52,12 +53,23 @@ function Frame({
   );
 }
 
+const ACTION_ERROR_MESSAGES: Record<string, string> = {
+  "not-pending": "This invitation can no longer be accepted. Contact your org admin for a new one.",
+  expired: "This invitation is past its expiration date. Ask your org admin to send a new one.",
+  "email-mismatch": "This invitation was sent to a different email address.",
+  "already-member": "This account already has a membership for this organization.",
+  failed: "Membership could not be created. Ask your org admin to send a fresh invitation.",
+};
+
 export default async function AcceptInvitationPage({
   params,
+  searchParams,
 }: {
   params: Promise<Params>;
+  searchParams: Promise<Search>;
 }) {
   const { token } = await params;
+  const { accepted, error } = await searchParams;
 
   if (!TOKEN_SHAPE.test(token)) {
     return (
@@ -76,6 +88,25 @@ export default async function AcceptInvitationPage({
     );
   }
 
+  if (accepted === "1" && invitation.status === "accepted") {
+    return (
+      <Frame heading="Invitation accepted" variant="success">
+        <p>
+          You now have the <strong>{invitation.role}</strong> role. Head to your dashboard to get
+          started.
+        </p>
+      </Frame>
+    );
+  }
+
+  if (error && ACTION_ERROR_MESSAGES[error]) {
+    return (
+      <Frame heading="Invitation could not be accepted" variant="error">
+        <p>{ACTION_ERROR_MESSAGES[error]}</p>
+      </Frame>
+    );
+  }
+
   if (invitation.status !== "pending") {
     return (
       <Frame heading={`Invitation already ${invitation.status}`} variant="info">
@@ -84,7 +115,7 @@ export default async function AcceptInvitationPage({
     );
   }
 
-  if (await isExpired(invitation.expires_at)) {
+  if (isExpired(invitation.expires_at)) {
     await updateInvitationStatus(invitation.id, invitation.org_id, { status: "expired" }).catch(
       () => undefined,
     );
@@ -129,38 +160,90 @@ export default async function AcceptInvitationPage({
     );
   }
 
-  const membership = await insertMembership({
-    org_id: invitation.org_id,
-    user_id: user.id,
-    role: invitation.role,
-    status: "active",
-  }).catch(() => null);
-  if (!membership) {
-    return (
-      <Frame heading="Invitation could not be accepted" variant="error">
-        <p>Membership could not be created. Ask your org admin to send a fresh invitation.</p>
-      </Frame>
+  // Acceptance is an explicit POST, never a side effect of rendering this
+  // page: link prefetchers and email scanners hit invitation URLs with GETs,
+  // and a GET must not create a membership.
+  async function acceptInvitation() {
+    "use server";
+
+    const fail = (code: string): never =>
+      redirect(`/invitations/${token}?error=${encodeURIComponent(code)}`);
+
+    const freshInvitation = await selectInvitationByToken(token).catch(() => null);
+    if (!freshInvitation || freshInvitation.status !== "pending") {
+      fail("not-pending");
+      return;
+    }
+    if (isExpired(freshInvitation.expires_at)) {
+      await updateInvitationStatus(freshInvitation.id, freshInvitation.org_id, {
+        status: "expired",
+      }).catch(() => undefined);
+      fail("expired");
+      return;
+    }
+
+    const freshSupabase = await createServerSupabaseClient();
+    const {
+      data: { user: freshUser },
+    } = await freshSupabase.auth.getUser();
+    if (!freshUser) {
+      redirect(`/sign-in?next=${encodeURIComponent(`/invitations/${token}`)}`);
+    }
+    if (freshUser.email?.toLowerCase() !== freshInvitation.email.toLowerCase()) {
+      fail("email-mismatch");
+      return;
+    }
+
+    const existing = await selectMembershipByOrgUser(freshInvitation.org_id, freshUser.id).catch(
+      () => null,
     );
+    if (existing) {
+      fail("already-member");
+      return;
+    }
+
+    const membership = await insertMembership({
+      org_id: freshInvitation.org_id,
+      user_id: freshUser.id,
+      role: freshInvitation.role,
+      status: "active",
+    }).catch(() => null);
+    if (!membership) {
+      fail("failed");
+      return;
+    }
+
+    await updateInvitationStatus(freshInvitation.id, freshInvitation.org_id, {
+      status: "accepted",
+      accepted_at: new Date().toISOString(),
+      accepted_by: freshUser.id,
+    });
+    await insertOrgEvent({
+      org_id: freshInvitation.org_id,
+      actor_user_id: freshUser.id,
+      event_type: "org.member.invitation_accepted",
+      payload: {
+        invitation_id: freshInvitation.id,
+        email: freshInvitation.email,
+        role: freshInvitation.role,
+      },
+    }).catch(() => undefined);
+
+    redirect(`/invitations/${token}?accepted=1`);
   }
 
-  await updateInvitationStatus(invitation.id, invitation.org_id, {
-    status: "accepted",
-    accepted_at: new Date().toISOString(),
-    accepted_by: user.id,
-  });
-  await insertOrgEvent({
-    org_id: invitation.org_id,
-    actor_user_id: user.id,
-    event_type: "org.member.invitation_accepted",
-    payload: { invitation_id: invitation.id, email: invitation.email, role: invitation.role },
-  }).catch(() => undefined);
-
   return (
-    <Frame heading="Invitation accepted" variant="success">
+    <Frame heading="Accept this invitation?" variant="info">
       <p>
-        You now have the <strong>{invitation.role}</strong> role. Head to your dashboard to get
-        started.
+        You are signed in as <code>{invitation.email}</code> and have been invited with the{" "}
+        <strong>{invitation.role}</strong> role. Accepting creates your membership in this
+        organization.
       </p>
+      <form action={acceptInvitation}>
+        <button type="submit" className="button button-primary">
+          Accept invitation
+        </button>
+      </form>
     </Frame>
   );
 }

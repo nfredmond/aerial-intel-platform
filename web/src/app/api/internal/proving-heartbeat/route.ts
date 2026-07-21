@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { checkCronAuth } from "@/lib/internal-route-auth";
 import { createLogger, extractRequestId } from "@/lib/logging";
 import {
   PROVING_HEARTBEAT_CRON_SCHEDULE,
@@ -15,27 +16,21 @@ import {
 
 export const dynamic = "force-dynamic";
 
-function isAuthorized(request: NextRequest) {
-  const configuredSecret = process.env.CRON_SECRET;
-  const authorization = request.headers.get("authorization");
-
-  if (configuredSecret) {
-    return authorization === `Bearer ${configuredSecret}`;
-  }
-
-  const userAgent = request.headers.get("user-agent") ?? "";
-  return userAgent.startsWith("vercel-cron/");
-}
-
 export async function GET(request: NextRequest) {
   const log = createLogger("api.internal.proving-heartbeat", {
     requestId: extractRequestId(request),
   });
   const startedAtMs = Date.now();
 
-  if (!isAuthorized(request)) {
-    log.warn("blocked.unauthorized");
-    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const auth = checkCronAuth(request);
+  if (!auth.ok) {
+    log.warn(auth.reason === "missing-secret" ? "blocked.cron-secret-missing" : "blocked.unauthorized");
+    return NextResponse.json(
+      auth.reason === "missing-secret"
+        ? { ok: false, error: "cron-secret-not-configured" }
+        : { ok: false, error: "unauthorized" },
+      { status: 401 },
+    );
   }
 
   const invokedAt = new Date().toISOString();

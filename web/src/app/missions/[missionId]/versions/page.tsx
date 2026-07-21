@@ -143,11 +143,11 @@ export default async function MissionVersionsPage({
     const planningGeometry = (payload.planningGeometry ?? null) as Json | null;
 
     try {
-      await updateMission(refreshed.mission.id, {
+      await updateMission(refreshed.mission.id, refreshed.mission.org_id, {
         summary,
         planning_geometry: planningGeometry,
       });
-      await updateMissionVersion(target.id, { status: "installed" });
+      await updateMissionVersion(target.id, refreshed.mission.org_id, { status: "installed" });
     } catch {
       redirect(`/missions/${missionId}/versions?error=promote-failed`);
     }

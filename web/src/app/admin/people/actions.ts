@@ -9,6 +9,7 @@ import {
   insertInvitation,
   insertOrgEvent,
   selectInvitationsForOrg,
+  selectMembershipByOrgUser,
   updateInvitationStatus,
   updateMembershipStatus,
 } from "@/lib/supabase/admin";
@@ -132,6 +133,15 @@ async function setMemberStatus(
   }
   if (userId === access.user.id) {
     return { status: "error", message: "You cannot change your own membership status." };
+  }
+
+  const target = await selectMembershipByOrgUser(orgId, userId);
+  if (!target) return { status: "error", message: "Member not found." };
+  if (target.role === "owner") {
+    return { status: "error", message: "The org owner's membership cannot be suspended or changed here." };
+  }
+  if (target.role === "admin" && access.role !== "owner") {
+    return { status: "error", message: "Only owners can change an admin's membership status." };
   }
 
   const row = await updateMembershipStatus(orgId, userId, { status });

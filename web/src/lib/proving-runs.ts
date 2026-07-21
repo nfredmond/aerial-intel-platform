@@ -272,7 +272,7 @@ export async function startManualProvingJob(options: {
   const sourceLabel = getSourceLabel(source);
   const now = new Date().toISOString();
 
-  await updateProcessingJob(detail.job.id, {
+  await updateProcessingJob(detail.job.id, orgId, {
     status: "running",
     stage: "orthomosaic",
     progress: 45,
@@ -307,7 +307,7 @@ export async function completeManualProvingJob(options: {
   const sourceLabel = getSourceLabel(source);
   const now = new Date().toISOString();
 
-  await updateProcessingJob(detail.job.id, {
+  await updateProcessingJob(detail.job.id, orgId, {
     status: "succeeded",
     stage: "complete",
     progress: 100,
@@ -333,7 +333,7 @@ export async function completeManualProvingJob(options: {
 
   await Promise.all(
     detail.outputs.map((output) =>
-      updateProcessingOutput(output.id, {
+      updateProcessingOutput(output.id, orgId, {
         status: "ready",
         metadata: {
           ...(output.metadata && typeof output.metadata === "object" && !Array.isArray(output.metadata)

@@ -400,7 +400,7 @@ export async function applyDispatchCallback(payload: DispatchCallbackPayload): P
     }),
   } satisfies JsonRecord;
 
-  await updateProcessingJob(job.id, {
+  await updateProcessingJob(job.id, job.org_id, {
     status: nextStatus,
     stage: nextStage,
     progress: nextProgress,

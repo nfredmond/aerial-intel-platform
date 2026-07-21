@@ -136,7 +136,7 @@ describe("GET /api/internal/nodeodm-upload (integration)", () => {
     expect(downloadStorageBytesMock).toHaveBeenCalledTimes(13);
 
     expect(updateProcessingJobMock).toHaveBeenCalledTimes(1);
-    const patch = updateProcessingJobMock.mock.calls[0][1] as Record<string, unknown>;
+    const patch = updateProcessingJobMock.mock.calls[0][2] as Record<string, unknown>;
     const summary = patch.output_summary as Record<string, unknown>;
     const nodeodm = summary.nodeodm as Record<string, unknown>;
     expect(nodeodm.uploadState).toBe("committed");
@@ -233,7 +233,7 @@ describe("GET /api/internal/nodeodm-upload (integration)", () => {
     expect(body.details[0]).toMatchObject({ outcome: "retrying" });
     expect(body.details[0].detail).toMatchObject({ retryCount: 1 });
 
-    const patch = updateProcessingJobMock.mock.calls[0][1] as Record<string, unknown>;
+    const patch = updateProcessingJobMock.mock.calls[0][2] as Record<string, unknown>;
     expect(patch.status).toBeUndefined();
     const nodeodm = (patch.output_summary as Record<string, unknown>).nodeodm as Record<string, unknown>;
     expect(nodeodm.uploadState).toBe("uploading");
@@ -271,7 +271,7 @@ describe("GET /api/internal/nodeodm-upload (integration)", () => {
     const body = await response.json();
     expect(body.details[0]).toMatchObject({ outcome: "failed" });
 
-    const patch = updateProcessingJobMock.mock.calls[0][1] as Record<string, unknown>;
+    const patch = updateProcessingJobMock.mock.calls[0][2] as Record<string, unknown>;
     expect(patch.status).toBe("failed");
     expect(patch.stage).toBe("failed");
     const nodeodm = (patch.output_summary as Record<string, unknown>).nodeodm as Record<string, unknown>;

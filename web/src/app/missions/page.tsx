@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
+import { canPerformDroneOpsAction } from "@/lib/auth/actions";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import { getArtifactHandoff, updateArtifactHandoffMetadata } from "@/lib/artifact-handoff";
 import { getJobDetail } from "@/lib/missions/detail-data";
@@ -191,7 +192,7 @@ export default async function MissionsPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "missions.write")) {
       redirect("/missions?create=bootstrap-denied");
     }
 
@@ -342,7 +343,7 @@ export default async function MissionsPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "missions.write")) {
       redirect("/missions?create=denied");
     }
 
@@ -458,7 +459,7 @@ export default async function MissionsPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "handoffs.write")) {
       redirect("/missions?handoff=denied");
     }
 
@@ -515,7 +516,7 @@ export default async function MissionsPage({
     });
 
     try {
-      await updateProcessingOutput(output.id, {
+      await updateProcessingOutput(output.id, refreshedAccess.org.id, {
         metadata: nextMetadata,
       });
 
@@ -563,7 +564,7 @@ export default async function MissionsPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "jobs.launch")) {
       redirect("/missions?proving=denied");
     }
 
@@ -607,7 +608,7 @@ export default async function MissionsPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "handoffs.write")) {
       redirect("/missions?handoff=denied");
     }
 
@@ -646,7 +647,7 @@ export default async function MissionsPage({
     });
 
     try {
-      await updateProcessingOutput(output.id, {
+      await updateProcessingOutput(output.id, refreshedAccess.org.id, {
         metadata: nextMetadata,
       });
 

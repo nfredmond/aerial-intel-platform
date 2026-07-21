@@ -282,7 +282,7 @@ export default async function JobDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "jobs.cancel")) {
       redirect(`/jobs/${jobId}?action=denied`);
     }
 
@@ -292,7 +292,7 @@ export default async function JobDetailPage({
     }
 
     try {
-      await updateProcessingJob(refreshedDetail.job.id, {
+      await updateProcessingJob(refreshedDetail.job.id, refreshedDetail.job.org_id, {
         status: "canceled",
         stage: "canceled",
         queue_position: null,
@@ -332,7 +332,7 @@ export default async function JobDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "jobs.retry")) {
       redirect(`/jobs/${jobId}?action=denied`);
     }
 
@@ -410,7 +410,7 @@ export default async function JobDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "jobs.launch")) {
       redirect(`/jobs/${jobId}?action=denied`);
     }
 
@@ -449,7 +449,7 @@ export default async function JobDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "jobs.launch")) {
       redirect(`/jobs/${jobId}?action=denied`);
     }
 
@@ -488,7 +488,7 @@ export default async function JobDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "jobs.launch")) {
       redirect(`/jobs/${jobId}?action=denied`);
     }
 
@@ -522,7 +522,7 @@ export default async function JobDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "jobs.launch")) {
       redirect(`/jobs/${jobId}?action=denied`);
     }
 
@@ -572,7 +572,7 @@ export default async function JobDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "jobs.launch")) {
       redirect(`/jobs/${jobId}?action=denied`);
     }
 
@@ -660,7 +660,7 @@ export default async function JobDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "jobs.launch")) {
       redirect(`/jobs/${jobId}?action=denied`);
     }
 
@@ -703,7 +703,7 @@ export default async function JobDetailPage({
       return { ok: false as const, error: "The current organization context is missing or inactive." };
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "jobs.import-outputs")) {
       return { ok: false as const, error: "Viewer access cannot upload managed import evidence." };
     }
 
@@ -766,7 +766,7 @@ export default async function JobDetailPage({
       return { ok: false as const, error: "The current organization context is missing or inactive." };
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "jobs.import-outputs")) {
       return { ok: false as const, error: "Viewer access cannot finalize managed imports." };
     }
 
@@ -885,7 +885,7 @@ export default async function JobDetailPage({
       };
 
       if (existingOutput?.id) {
-        await updateProcessingOutput(existingOutput.id, patch);
+        await updateProcessingOutput(existingOutput.id, refreshedDetail.job.org_id, patch);
       } else {
         outputsToInsert.push({
           org_id: refreshedAccess.org.id,
@@ -906,7 +906,7 @@ export default async function JobDetailPage({
       ? refreshedDetail.outputSummary.logTail.filter((line): line is string => typeof line === "string")
       : [];
 
-    await updateProcessingJob(refreshedDetail.job.id, {
+    await updateProcessingJob(refreshedDetail.job.id, refreshedDetail.job.org_id, {
       output_summary: {
         ...refreshedDetail.outputSummary,
         benchmarkSummary: parsedSummary.raw,
@@ -1240,7 +1240,7 @@ Operator note: ${operatorNotes}`
               <button
                 type="submit"
                 className="button button-secondary"
-                disabled={access.role === "viewer" || !["queued", "running"].includes(detail.job.status)}
+                disabled={!canPerformDroneOpsAction(access, "jobs.cancel") || !["queued", "running"].includes(detail.job.status)}
               >
                 Cancel job
               </button>

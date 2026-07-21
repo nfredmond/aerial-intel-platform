@@ -2,6 +2,7 @@ import { strFromU8, unzipSync } from "fflate";
 import { NextRequest, NextResponse } from "next/server";
 
 import { pollNodeOdmTask } from "@/lib/dispatch-adapter-nodeodm";
+import { checkCronAuth } from "@/lib/internal-route-auth";
 import { createLogger, extractRequestId } from "@/lib/logging";
 import { parseManagedBenchmarkSummaryText } from "@/lib/managed-processing-import";
 import { createConfiguredNodeOdmClient, getNodeOdmAdapterConfig } from "@/lib/nodeodm/config";
@@ -74,18 +75,6 @@ type ProcessingJobRow = {
   output_summary: Record<string, unknown> | null;
   org: { slug: string | null } | { slug: string | null }[] | null;
 };
-
-function isAuthorized(request: NextRequest) {
-  const configuredSecret = process.env.CRON_SECRET;
-  const authorization = request.headers.get("authorization");
-
-  if (configuredSecret) {
-    return authorization === `Bearer ${configuredSecret}`;
-  }
-
-  const userAgent = request.headers.get("user-agent") ?? "";
-  return userAgent.startsWith("vercel-cron/");
-}
 
 type NodeOdmJobCursor = {
   taskUuid: string;
@@ -376,7 +365,7 @@ async function advanceJobFromTaskInfo(cursor: NodeOdmJobCursor) {
     patch = { ...patch, status: "running", stage: "processing" };
   }
 
-  await updateProcessingJob(cursor.jobId, patch as Parameters<typeof updateProcessingJob>[1]);
+  await updateProcessingJob(cursor.jobId, cursor.orgId, patch as Parameters<typeof updateProcessingJob>[2]);
   return { jobId: cursor.jobId, statusName, progress: taskInfo.progress ?? null, importedOutputs };
 }
 
@@ -386,9 +375,15 @@ export async function GET(request: NextRequest) {
   });
   const startedAtMs = Date.now();
 
-  if (!isAuthorized(request)) {
-    log.warn("blocked.unauthorized");
-    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const auth = checkCronAuth(request);
+  if (!auth.ok) {
+    log.warn(auth.reason === "missing-secret" ? "blocked.cron-secret-missing" : "blocked.unauthorized");
+    return NextResponse.json(
+      auth.reason === "missing-secret"
+        ? { ok: false, error: "cron-secret-not-configured" }
+        : { ok: false, error: "unauthorized" },
+      { status: 401 },
+    );
   }
 
   const invokedAt = new Date().toISOString();

@@ -101,7 +101,7 @@ describe("dispatch-callback", () => {
     });
 
     expect(result.action).toBe("updated");
-    expect(updateProcessingJobMock).toHaveBeenCalledWith("job-1", expect.objectContaining({
+    expect(updateProcessingJobMock).toHaveBeenCalledWith("job-1", "org-1", expect.objectContaining({
       status: "running",
       stage: "processing",
       progress: 68,
@@ -156,7 +156,7 @@ describe("dispatch-callback", () => {
       metrics: { finishedAt: "2026-04-06T18:59:00.000Z" },
     });
 
-    expect(updateProcessingJobMock).toHaveBeenCalledWith("job-1", expect.objectContaining({
+    expect(updateProcessingJobMock).toHaveBeenCalledWith("job-1", "org-1", expect.objectContaining({
       status: "running",
       stage: "processing",
       progress: 90,
@@ -166,7 +166,7 @@ describe("dispatch-callback", () => {
       }),
     }));
 
-    const patch = updateProcessingJobMock.mock.calls[0][1];
+    const patch = updateProcessingJobMock.mock.calls[0][2];
     expect(patch.output_summary.logTail).toContain("Do not start QA or claim delivery until real outputs are attached/imported.");
   });
 

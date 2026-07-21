@@ -278,7 +278,7 @@ async function startManagedIntakeReview(options: {
   const now = new Date().toISOString();
   const sourceLabel = getSourceLabel(options.source);
 
-  await updateProcessingJob(options.detail.job.id, {
+  await updateProcessingJob(options.detail.job.id, options.orgId, {
     status: "running",
     stage: "intake_review",
     progress: 15,
@@ -331,7 +331,7 @@ async function recordManagedDispatch(options: {
   const dispatchNotes = normalizeOptionalString(options.handoff.dispatchNotes);
   const dispatchedByEmail = normalizeOptionalString(options.handoff.dispatchedByEmail);
 
-  await updateProcessingJob(options.detail.job.id, {
+  await updateProcessingJob(options.detail.job.id, options.orgId, {
     status: "running",
     stage: "processing",
     progress: 45,
@@ -475,7 +475,7 @@ export async function recordManagedDispatchAdapterOutcome(options: {
     return "dispatch-recorded" as const;
   }
 
-  await updateProcessingJob(options.detail.job.id, {
+  await updateProcessingJob(options.detail.job.id, options.orgId, {
     output_summary: {
       ...options.detail.outputSummary,
       workflowMode: "managed_processing_v1",
@@ -537,7 +537,7 @@ async function startManagedQaReview(options: {
 }) {
   const sourceLabel = getSourceLabel(options.source);
 
-  await updateProcessingJob(options.detail.job.id, {
+  await updateProcessingJob(options.detail.job.id, options.orgId, {
     status: "running",
     stage: "qa_review",
     progress: 80,
@@ -583,7 +583,7 @@ async function completeManagedProcessingRequest(options: {
 }) {
   const now = new Date().toISOString();
 
-  await updateProcessingJob(options.detail.job.id, {
+  await updateProcessingJob(options.detail.job.id, options.orgId, {
     status: "succeeded",
     stage: "complete",
     progress: 100,
@@ -724,7 +724,7 @@ export async function recordManagedNodeOdmLaunchOutcome(options: {
     const { taskUuid, adapterLabel, presetId, acceptedAt } = options.launch;
     const taskUuidShort = taskUuid.slice(0, 8);
 
-    await updateProcessingJob(options.detail.job.id, {
+    await updateProcessingJob(options.detail.job.id, options.orgId, {
       output_summary: {
         ...options.detail.outputSummary,
         workflowMode: "managed_processing_v1",
@@ -805,7 +805,7 @@ export async function recordManagedNodeOdmLaunchOutcome(options: {
     return "nodeodm-launch-unconfigured";
   }
 
-  await updateProcessingJob(options.detail.job.id, {
+  await updateProcessingJob(options.detail.job.id, options.orgId, {
     output_summary: {
       ...options.detail.outputSummary,
       workflowMode: "managed_processing_v1",

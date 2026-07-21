@@ -4,9 +4,9 @@ import { createLogger, extractRequestId } from "@/lib/logging";
 import { validateShareLink } from "@/lib/sharing";
 import { tryCreateSignedDownloadUrl } from "@/lib/storage-delivery";
 import {
+  redeemArtifactShareLink,
   selectArtifactShareLinkByToken,
   selectProcessingOutputById,
-  updateArtifactShareLink,
 } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -58,6 +58,22 @@ export async function GET(
     return rejectWith(`/s/${encodeURIComponent(token)}`, origin);
   }
 
+  // Redeem BEFORE serving, in one atomic statement: the increment and the
+  // revoked/expired/max_uses checks happen together, so concurrent downloads
+  // cannot exceed the cap and a failed increment never serves the file.
+  let redeemed;
+  try {
+    redeemed = await redeemArtifactShareLink(token);
+  } catch (error) {
+    log.error("redeem.failed", { error, linkId: valid.id });
+    return rejectWith(`/s/${encodeURIComponent(token)}`, origin);
+  }
+
+  if (!redeemed) {
+    log.info("share.rejected", { reason: "redeem-refused", linkId: valid.id });
+    return rejectWith(`/s/${encodeURIComponent(token)}`, origin);
+  }
+
   const signedUrl = await tryCreateSignedDownloadUrl({
     bucket: artifact.storage_bucket,
     path: artifact.storage_path,
@@ -70,19 +86,10 @@ export async function GET(
     return rejectWith(`/s/${encodeURIComponent(token)}`, origin);
   }
 
-  try {
-    await updateArtifactShareLink(valid.id, {
-      use_count: valid.use_count + 1,
-      last_used_at: new Date().toISOString(),
-    });
-  } catch (error) {
-    log.warn("increment.failed", { error, linkId: valid.id });
-  }
-
   log.info("share.redirected", {
-    linkId: valid.id,
-    artifactId: valid.artifact_id,
-    useCount: valid.use_count + 1,
+    linkId: redeemed.id,
+    artifactId: redeemed.artifact_id,
+    useCount: redeemed.use_count,
   });
 
   return redirectTo(signedUrl);

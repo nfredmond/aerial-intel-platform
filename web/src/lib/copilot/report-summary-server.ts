@@ -186,7 +186,7 @@ export async function runReportSummaryForArtifact(
       outputTokens: result.outputTokens,
     });
 
-    await updateProcessingOutput(detail.output.id, {
+    await updateProcessingOutput(detail.output.id, detail.output.org_id, {
       metadata: {
         ...detail.metadata,
         copilotReportSummary: {

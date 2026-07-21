@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { checkCronAuth } from "@/lib/internal-route-auth";
 import { createLogger, extractRequestId } from "@/lib/logging";
 import {
   buildUploadCheckpointPatch,
@@ -24,18 +25,6 @@ import { downloadStorageBytes, listStorageObjects } from "@/lib/supabase/admin-s
 import type { Json } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
-
-function isAuthorized(request: NextRequest) {
-  const configuredSecret = process.env.CRON_SECRET;
-  const authorization = request.headers.get("authorization");
-
-  if (configuredSecret) {
-    return authorization === `Bearer ${configuredSecret}`;
-  }
-
-  const userAgent = request.headers.get("user-agent") ?? "";
-  return userAgent.startsWith("vercel-cron/");
-}
 
 async function fetchActiveUploadCursors(): Promise<NodeOdmUploadCursor[]> {
   const rows = await adminSelect<NodeOdmJobRow[]>(
@@ -172,7 +161,7 @@ async function applyUploadResult(
       lastUploadAttemptAt: now,
       committedAt: result.committed ? now : undefined,
     });
-    await updateProcessingJob(cursor.jobId, patch as Parameters<typeof updateProcessingJob>[1]);
+    await updateProcessingJob(cursor.jobId, cursor.orgId, patch as Parameters<typeof updateProcessingJob>[2]);
     if (result.committed) {
       await insertJobEvent({
         job_id: cursor.jobId,
@@ -218,7 +207,7 @@ async function applyUploadResult(
     jobPatch.status = "failed";
     jobPatch.stage = "failed";
   }
-  await updateProcessingJob(cursor.jobId, jobPatch as Parameters<typeof updateProcessingJob>[1]);
+  await updateProcessingJob(cursor.jobId, cursor.orgId, jobPatch as Parameters<typeof updateProcessingJob>[2]);
   await insertJobEvent({
     job_id: cursor.jobId,
     org_id: cursor.orgId,
@@ -242,9 +231,15 @@ export async function GET(request: NextRequest) {
   });
   const startedAtMs = Date.now();
 
-  if (!isAuthorized(request)) {
-    log.warn("blocked.unauthorized");
-    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const auth = checkCronAuth(request);
+  if (!auth.ok) {
+    log.warn(auth.reason === "missing-secret" ? "blocked.cron-secret-missing" : "blocked.unauthorized");
+    return NextResponse.json(
+      auth.reason === "missing-secret"
+        ? { ok: false, error: "cron-secret-not-configured" }
+        : { ok: false, error: "unauthorized" },
+      { status: 401 },
+    );
   }
 
   const invokedAt = new Date().toISOString();

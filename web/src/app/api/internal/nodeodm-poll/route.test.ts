@@ -84,7 +84,7 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
     expect(tick1Body.details[0].statusName).toBe("queued");
 
     expect(updateProcessingJobMock).toHaveBeenCalledTimes(1);
-    const firstPatch = updateProcessingJobMock.mock.calls[0][1] as Record<string, unknown>;
+    const firstPatch = updateProcessingJobMock.mock.calls[0][2] as Record<string, unknown>;
     expect(firstPatch.status).toBeUndefined();
     expect(firstPatch.stage).toBeUndefined();
     expect(firstPatch.output_summary).toMatchObject({
@@ -99,7 +99,7 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
     const tick2Body = await tick2.json();
     expect(tick2Body.details[0].statusName).toBe("running");
     expect(updateProcessingJobMock).toHaveBeenCalledTimes(2);
-    const runningPatch = updateProcessingJobMock.mock.calls[1][1] as Record<string, unknown>;
+    const runningPatch = updateProcessingJobMock.mock.calls[1][2] as Record<string, unknown>;
     expect(runningPatch.status).toBe("running");
     expect(runningPatch.stage).toBe("processing");
 
@@ -111,7 +111,7 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
     expect(finalBody.details[0].statusName).toBe("completed");
     expect(finalBody.details[0].importedOutputs).toBe(4);
 
-    const patches = updateProcessingJobMock.mock.calls.map((call) => call[1] as Record<string, unknown>);
+    const patches = updateProcessingJobMock.mock.calls.map((call) => call[2] as Record<string, unknown>);
     const succeededPatch = patches.find((p) => p.status === "succeeded");
     expect(succeededPatch).toBeDefined();
     expect(succeededPatch?.stage).toBe("complete");
@@ -178,7 +178,7 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
 
     try {
       await GET(authorizedPollRequest());
-      const patches = updateProcessingJobMock.mock.calls.map((call) => call[1] as Record<string, unknown>);
+      const patches = updateProcessingJobMock.mock.calls.map((call) => call[2] as Record<string, unknown>);
       const awaitingPatch = patches.find((p) => {
         const summary = (p.output_summary as Record<string, unknown>) ?? {};
         const nodeodm = (summary.nodeodm as Record<string, unknown>) ?? {};
@@ -234,7 +234,7 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
     stubClient.completeTask(launch.taskUuid);
 
     await GET(authorizedPollRequest());
-    const patches = updateProcessingJobMock.mock.calls.map((call) => call[1] as Record<string, unknown>);
+    const patches = updateProcessingJobMock.mock.calls.map((call) => call[2] as Record<string, unknown>);
     const succeededPatch = patches.find((p) => p.status === "succeeded");
     expect(succeededPatch).toBeDefined();
     expect(succeededPatch?.stage).toBe("complete");
@@ -321,7 +321,7 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
 
     // Every status ever written must satisfy the check constraint.
     const writtenStatuses = updateProcessingJobMock.mock.calls
-      .map((call) => (call[1] as Record<string, unknown>).status)
+      .map((call) => (call[2] as Record<string, unknown>).status)
       .filter((status): status is string => typeof status === "string");
     expect(writtenStatuses.length).toBeGreaterThan(0);
     for (const status of writtenStatuses) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { checkCronAuth } from "@/lib/internal-route-auth";
 import { createLogger, extractRequestId } from "@/lib/logging";
 import { getSharedStubNodeOdmClient } from "@/lib/nodeodm/stub";
 import { NodeOdmError } from "@/lib/nodeodm/errors";
@@ -10,18 +11,6 @@ const VALID_TARGETS = new Set(["running", "completed", "failed", "canceled", "pr
 
 function isDevStubEnabled(): boolean {
   return process.env.AERIAL_NODEODM_MODE === "stub" && process.env.NODE_ENV !== "production";
-}
-
-function isAuthorized(request: NextRequest): boolean {
-  const configuredSecret = process.env.CRON_SECRET;
-  const authorization = request.headers.get("authorization");
-
-  if (configuredSecret) {
-    return authorization === `Bearer ${configuredSecret}`;
-  }
-
-  const userAgent = request.headers.get("user-agent") ?? "";
-  return userAgent.startsWith("vercel-cron/");
 }
 
 function notFound() {
@@ -38,9 +27,15 @@ export async function POST(request: NextRequest) {
     return notFound();
   }
 
-  if (!isAuthorized(request)) {
-    log.warn("blocked.unauthorized");
-    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const auth = checkCronAuth(request);
+  if (!auth.ok) {
+    log.warn(auth.reason === "missing-secret" ? "blocked.cron-secret-missing" : "blocked.unauthorized");
+    return NextResponse.json(
+      auth.reason === "missing-secret"
+        ? { ok: false, error: "cron-secret-not-configured" }
+        : { ok: false, error: "unauthorized" },
+      { status: 401 },
+    );
   }
 
   const url = new URL(request.url);

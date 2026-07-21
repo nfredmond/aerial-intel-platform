@@ -437,7 +437,7 @@ export default async function MissionDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "datasets.write")) {
       redirect(`/missions/${missionId}?attached=denied`);
     }
 
@@ -515,7 +515,7 @@ export default async function MissionDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "ingest.write")) {
       redirect(`/missions/${missionId}?ingest=denied`);
     }
 
@@ -645,7 +645,7 @@ export default async function MissionDetailPage({
       return { ok: false as const, error: "The current organization context is missing or inactive." };
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "ingest.write")) {
       return { ok: false as const, error: "Viewer access cannot upload mission ZIPs." };
     }
 
@@ -724,7 +724,7 @@ export default async function MissionDetailPage({
       return { ok: false as const, error: "The current organization context is missing or inactive." };
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "ingest.write")) {
       return { ok: false as const, error: "Viewer access cannot finalize browser ZIP ingest sessions." };
     }
 
@@ -832,7 +832,7 @@ export default async function MissionDetailPage({
       redirect(`/missions/${missionId}?extract=denied`);
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "ingest.write")) {
       redirect(`/missions/${missionId}?extract=denied`);
     }
 
@@ -893,7 +893,7 @@ export default async function MissionDetailPage({
           );
         }
 
-        await updateIngestSession(sessionId, {
+        await updateIngestSession(sessionId, refreshedAccess.org.id, {
           extracted_dataset_path: destPath,
           image_count: images.length,
           status: "extracted",
@@ -929,7 +929,7 @@ export default async function MissionDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "jobs.create")) {
       redirect(`/missions/${missionId}?queued=denied`);
     }
 
@@ -1001,7 +1001,7 @@ export default async function MissionDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "jobs.create")) {
       redirect(`/missions/${missionId}?seeded=denied`);
     }
 
@@ -1200,7 +1200,7 @@ export default async function MissionDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "jobs.launch")) {
       redirect(`/missions/${missionId}?proving=denied`);
     }
 
@@ -1244,7 +1244,7 @@ export default async function MissionDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "artifacts.export")) {
       redirect(`/missions/${missionId}?bundled=denied`);
     }
 
@@ -1347,7 +1347,7 @@ export default async function MissionDetailPage({
         },
       });
 
-      await updateMissionVersion(latestVersion.id, {
+      await updateMissionVersion(latestVersion.id, refreshedDetail.mission.org_id, {
         export_summary: {
           ...existingExportSummary,
           available: mergedAvailable,
@@ -1375,7 +1375,7 @@ export default async function MissionDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "missions.write")) {
       redirect(`/missions/${missionId}?aoi=denied`);
     }
 
@@ -1389,7 +1389,7 @@ export default async function MissionDetailPage({
 
     try {
       const geometry = parseGeoJsonSurface(geometryText);
-      await updateMission(refreshedDetail.mission.id, {
+      await updateMission(refreshedDetail.mission.id, refreshedDetail.mission.org_id, {
         planning_geometry: geometry,
       });
     } catch (error) {
@@ -1414,7 +1414,7 @@ export default async function MissionDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "missions.write")) {
       redirect(`/missions/${missionId}?overlay=denied`);
     }
 
@@ -1428,7 +1428,7 @@ export default async function MissionDetailPage({
       .filter((value): value is string => typeof value === "string" && value.trim().length > 0);
 
     try {
-      await updateMission(refreshedDetail.mission.id, {
+      await updateMission(refreshedDetail.mission.id, refreshedDetail.mission.org_id, {
         summary: {
           ...refreshedDetail.summary,
           overlayReview: {
@@ -1458,7 +1458,7 @@ export default async function MissionDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "versions.promote")) {
       redirect(`/missions/${missionId}?approved=denied`);
     }
 
@@ -1472,7 +1472,7 @@ export default async function MissionDetailPage({
     const existingValidationSummary = (latestVersion.validation_summary as Record<string, unknown> | null) ?? {};
 
     try {
-      await updateMissionVersion(latestVersion.id, {
+      await updateMissionVersion(latestVersion.id, refreshedDetail.mission.org_id, {
         status: "approved",
         validation_summary: {
           ...existingValidationSummary,
@@ -1483,7 +1483,7 @@ export default async function MissionDetailPage({
         },
       });
 
-      await updateMission(refreshedDetail.mission.id, {
+      await updateMission(refreshedDetail.mission.id, refreshedDetail.mission.org_id, {
         status: "validated",
         summary: {
           ...refreshedDetail.summary,
@@ -1512,7 +1512,7 @@ export default async function MissionDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "versions.write")) {
       redirect(`/missions/${missionId}?installed=denied`);
     }
 
@@ -1526,7 +1526,7 @@ export default async function MissionDetailPage({
     const existingExportSummary = (latestVersion.export_summary as Record<string, unknown> | null) ?? {};
 
     try {
-      await updateMissionVersion(latestVersion.id, {
+      await updateMissionVersion(latestVersion.id, refreshedDetail.mission.org_id, {
         status: "installed",
         export_summary: {
           ...existingExportSummary,
@@ -1553,7 +1553,7 @@ export default async function MissionDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "missions.write")) {
       redirect(`/missions/${missionId}?delivered=denied`);
     }
 
@@ -1563,7 +1563,7 @@ export default async function MissionDetailPage({
     }
 
     try {
-      await updateMission(refreshedDetail.mission.id, {
+      await updateMission(refreshedDetail.mission.id, refreshedDetail.mission.org_id, {
         status: "delivered",
         summary: {
           ...refreshedDetail.summary,

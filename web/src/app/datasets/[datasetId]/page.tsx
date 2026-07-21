@@ -116,7 +116,7 @@ export default async function DatasetDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "datasets.write")) {
       redirect(`/datasets/${datasetId}?reviewed=denied`);
     }
 
@@ -129,7 +129,7 @@ export default async function DatasetDetailPage({
     const preflight = (metadata.preflight as Record<string, unknown> | null) ?? {};
 
     try {
-      await updateDataset(refreshedDetail.dataset.id, {
+      await updateDataset(refreshedDetail.dataset.id, refreshedDetail.dataset.org_id, {
         status: "ready",
         metadata: {
           ...metadata,
@@ -162,7 +162,7 @@ export default async function DatasetDetailPage({
       redirect("/dashboard");
     }
 
-    if (refreshedAccess.role === "viewer") {
+    if (!canPerformDroneOpsAction(refreshedAccess, "datasets.write")) {
       redirect(`/datasets/${datasetId}?geometry=denied`);
     }
 
@@ -176,7 +176,7 @@ export default async function DatasetDetailPage({
 
     try {
       const geometry = parseGeoJsonSurface(geometryText);
-      await updateDataset(refreshedDetail.dataset.id, {
+      await updateDataset(refreshedDetail.dataset.id, refreshedDetail.dataset.org_id, {
         spatial_footprint: geometry,
       });
     } catch (error) {

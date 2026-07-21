@@ -12,6 +12,7 @@ const {
   selectInvitationsForOrgMock,
   updateInvitationStatusMock,
   updateMembershipStatusMock,
+  selectMembershipByOrgUserMock,
   revalidatePathMock,
 } = vi.hoisted(() => ({
   getDroneOpsAccessMock: vi.fn(),
@@ -20,6 +21,7 @@ const {
   selectInvitationsForOrgMock: vi.fn(),
   updateInvitationStatusMock: vi.fn(),
   updateMembershipStatusMock: vi.fn(),
+  selectMembershipByOrgUserMock: vi.fn(),
   revalidatePathMock: vi.fn(),
 }));
 
@@ -33,6 +35,7 @@ vi.mock("@/lib/supabase/admin", () => ({
   selectInvitationsForOrg: selectInvitationsForOrgMock,
   updateInvitationStatus: updateInvitationStatusMock,
   updateMembershipStatus: updateMembershipStatusMock,
+  selectMembershipByOrgUser: selectMembershipByOrgUserMock,
 }));
 
 vi.mock("next/cache", () => ({
@@ -100,6 +103,8 @@ beforeEach(() => {
   selectInvitationsForOrgMock.mockReset();
   updateInvitationStatusMock.mockReset();
   updateMembershipStatusMock.mockReset();
+  selectMembershipByOrgUserMock.mockReset();
+  selectMembershipByOrgUserMock.mockResolvedValue({ role: "viewer" });
   revalidatePathMock.mockReset();
   insertOrgEventMock.mockResolvedValue(undefined);
   selectInvitationsForOrgMock.mockResolvedValue([]);

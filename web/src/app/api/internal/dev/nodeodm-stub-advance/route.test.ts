@@ -50,14 +50,14 @@ describe("POST /api/internal/dev/nodeodm-stub-advance", () => {
     expect(body.error).toBe("unauthorized");
   });
 
-  it("accepts the cron user-agent fallback only when CRON_SECRET is unset", async () => {
+  it("fails closed when CRON_SECRET is unset, even for vercel-cron user agents", async () => {
     vi.stubEnv("CRON_SECRET", "");
     const response = await POST(
       postRequest({ taskUuid: "never-created", to: "running" }, { "user-agent": "vercel-cron/1.0" }),
     );
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(401);
     const body = await response.json();
-    expect(body.error).toBe("task-not-found");
+    expect(body.error).toBe("cron-secret-not-configured");
   });
 
   it("returns 400 when taskUuid is missing", async () => {
