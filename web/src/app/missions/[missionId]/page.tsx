@@ -64,6 +64,7 @@ import {
 import {
   advanceManualProvingJob,
   isProvingJobRecord,
+  isProvingLaneEnabled,
 } from "@/lib/proving-runs";
 import { normalizeSlug } from "@/lib/slug";
 import { tryCreateSignedDownloadUrl } from "@/lib/storage-delivery";
@@ -261,26 +262,30 @@ function getCalloutMessage(options: {
 
   if (options.seeded) {
     return options.seeded === "1"
-      ? "Live proving run seeded. This mission now has a real dataset, queued job, events, and placeholder outputs in the protected data path."
+      ? "Simulated proving run seeded (demo lane). This mission now has a demo dataset, queued job, events, and placeholder outputs — no real processing occurs."
       : options.seeded === "already"
         ? "This mission already has datasets or jobs, so no proving run seed was added."
         : options.seeded === "denied"
           ? "Viewer access cannot seed a proving run."
-          : "The proving run seed failed. Check server configuration and try again.";
+          : options.seeded === "disabled"
+            ? "The proving lane is disabled. It is a simulation for demos only; set AERIAL_PROVING_LANE=demo to enable it."
+            : "The proving run seed failed. Check server configuration and try again.";
   }
 
   if (options.proving) {
     return options.proving === "started"
-      ? "Proving job started from the mission page. The live run is now in active processing."
+      ? "Simulated proving job started from the mission page (demo lane; no real processing occurs)."
       : options.proving === "completed"
-        ? "Proving job completed from the mission page. Ready artifacts are now waiting in the delivery lane."
+        ? "Simulated proving job completed from the mission page. The placeholder artifacts in the delivery lane are demo data."
         : options.proving === "not-found"
           ? "No active proving job was available to advance from this mission."
           : options.proving === "noop"
             ? "This proving job does not have a next-step automation available right now. Open the job detail if you need deeper triage."
             : options.proving === "denied"
               ? "Viewer access cannot advance proving jobs from the mission page."
-              : "The proving job could not be advanced from the mission page. Check server configuration and try again.";
+              : options.proving === "disabled"
+                ? "The proving lane is disabled. It is a simulation for demos only; set AERIAL_PROVING_LANE=demo to enable it."
+                : "The proving job could not be advanced from the mission page. Check server configuration and try again.";
   }
 
   if (options.bundled) {
@@ -998,6 +1003,10 @@ export default async function MissionDetailPage({
 
     if (refreshedAccess.role === "viewer") {
       redirect(`/missions/${missionId}?seeded=denied`);
+    }
+
+    if (!isProvingLaneEnabled()) {
+      redirect(`/missions/${missionId}?seeded=disabled`);
     }
 
     const refreshedDetail = await getMissionDetail(refreshedAccess, missionId);

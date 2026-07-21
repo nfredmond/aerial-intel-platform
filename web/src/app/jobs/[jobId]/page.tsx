@@ -116,14 +116,14 @@ function getCalloutMessage(actionState?: string) {
   if (actionState === "started") {
     return {
       tone: "success",
-      text: "Proving job started. The live run is now in an active processing state.",
+      text: "Simulated proving job started (demo lane; no real processing occurs).",
     } as const;
   }
 
   if (actionState === "completed") {
     return {
       tone: "success",
-      text: "Proving job completed. Output artifacts are now ready for real review/share/export work.",
+      text: "Simulated proving job completed. The placeholder artifacts are demo data, not real processing outputs.",
     } as const;
   }
 
@@ -215,6 +215,13 @@ function getCalloutMessage(actionState?: string) {
     return {
       tone: "success",
       text: "Retry job queued. A new processing run has been created from this job configuration.",
+    } as const;
+  }
+
+  if (actionState === "proving-disabled") {
+    return {
+      tone: "error",
+      text: "The proving lane is disabled. It is a simulation for demos only; set AERIAL_PROVING_LANE=demo to enable it.",
     } as const;
   }
 
@@ -416,8 +423,9 @@ export default async function JobDetailPage({
       redirect(`/jobs/${jobId}?action=not-proving`);
     }
 
+    let result: Awaited<ReturnType<typeof advanceManualProvingJob>>;
     try {
-      await advanceManualProvingJob({
+      result = await advanceManualProvingJob({
         orgId: refreshedAccess.org.id,
         detail: refreshedDetail,
         source: "job-detail",
@@ -426,7 +434,7 @@ export default async function JobDetailPage({
       redirect(`/jobs/${jobId}?action=error`);
     }
 
-    redirect(`/jobs/${jobId}?action=started`);
+    redirect(`/jobs/${jobId}?action=${result === "disabled" ? "proving-disabled" : "started"}`);
   }
 
   async function completeProvingJob() {
@@ -454,8 +462,9 @@ export default async function JobDetailPage({
       redirect(`/jobs/${jobId}?action=not-proving`);
     }
 
+    let result: Awaited<ReturnType<typeof advanceManualProvingJob>>;
     try {
-      await advanceManualProvingJob({
+      result = await advanceManualProvingJob({
         orgId: refreshedAccess.org.id,
         detail: refreshedDetail,
         source: "job-detail",
@@ -464,7 +473,7 @@ export default async function JobDetailPage({
       redirect(`/jobs/${jobId}?action=error`);
     }
 
-    redirect(`/jobs/${jobId}?action=completed`);
+    redirect(`/jobs/${jobId}?action=${result === "disabled" ? "proving-disabled" : "completed"}`);
   }
 
   async function advanceManagedJob() {

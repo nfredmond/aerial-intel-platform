@@ -766,7 +766,7 @@ export async function selectStaleInFlightJobsForOrg(
   return adminRestRequest<StaleInFlightJobAdminRow[]>(
     `drone_processing_jobs?org_id=eq.${encodeURIComponent(
       orgId,
-    )}&status=in.(pending,queued,processing,awaiting_output_import)&updated_at=lt.${encodeURIComponent(
+    )}&status=in.(queued,running)&updated_at=lt.${encodeURIComponent(
       cutoff,
     )}&select=id,org_id,mission_id,engine,status,stage,progress,updated_at&order=updated_at.asc&limit=${safeLimit}`,
     { method: "GET" },

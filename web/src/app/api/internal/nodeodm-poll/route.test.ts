@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { launchNodeOdmTask } from "@/lib/dispatch-adapter-nodeodm";
 import { resetSharedStubNodeOdmClient } from "@/lib/nodeodm/stub";
+import { isProcessingJobStatus } from "@/lib/processing-job-status";
 
 import { GET } from "./route";
 
@@ -69,8 +70,8 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
         org_id: "org-1",
         mission_id: "mission-1",
         dataset_id: "dataset-1",
-        status: "queued",
-        stage: "dispatched",
+        status: "running",
+        stage: "intake_review",
         output_summary: { nodeodm: { taskUuid: launch.taskUuid } },
         org: { slug: "gv-ops" },
       },
@@ -99,7 +100,7 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
     expect(tick2Body.details[0].statusName).toBe("running");
     expect(updateProcessingJobMock).toHaveBeenCalledTimes(2);
     const runningPatch = updateProcessingJobMock.mock.calls[1][1] as Record<string, unknown>;
-    expect(runningPatch.status).toBe("processing");
+    expect(runningPatch.status).toBe("running");
     expect(runningPatch.stage).toBe("processing");
 
     await GET(authorizedPollRequest());
@@ -113,7 +114,7 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
     const patches = updateProcessingJobMock.mock.calls.map((call) => call[1] as Record<string, unknown>);
     const succeededPatch = patches.find((p) => p.status === "succeeded");
     expect(succeededPatch).toBeDefined();
-    expect(succeededPatch?.stage).toBe("completed");
+    expect(succeededPatch?.stage).toBe("complete");
     expect(succeededPatch?.completed_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 
     const succeededSummary = (succeededPatch?.output_summary as Record<string, unknown>) ?? {};
@@ -146,7 +147,7 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
     expect((importedEvents[0].payload as Record<string, unknown>).outputCount).toBe(4);
   });
 
-  it("falls back to awaiting_output_import when benchmark_summary.json is missing from the asset bundle", async () => {
+  it("keeps the job running and records the import error when benchmark_summary.json is missing from the asset bundle", async () => {
     const launch = await launchNodeOdmTask({ jobId: "job-2", presetId: "balanced" });
     if (!launch.ok) throw new Error(`expected launch to succeed, got ${launch.kind}`);
 
@@ -156,8 +157,8 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
         org_id: "org-2",
         mission_id: null,
         dataset_id: null,
-        status: "queued",
-        stage: "dispatched",
+        status: "running",
+        stage: "intake_review",
         output_summary: { nodeodm: { taskUuid: launch.taskUuid } },
         org: { slug: "gv-ops" },
       },
@@ -178,12 +179,18 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
     try {
       await GET(authorizedPollRequest());
       const patches = updateProcessingJobMock.mock.calls.map((call) => call[1] as Record<string, unknown>);
-      const awaitingPatch = patches.find((p) => p.status === "awaiting_output_import");
+      const awaitingPatch = patches.find((p) => {
+        const summary = (p.output_summary as Record<string, unknown>) ?? {};
+        const nodeodm = (summary.nodeodm as Record<string, unknown>) ?? {};
+        return typeof nodeodm.lastImportError === "string";
+      });
       expect(awaitingPatch).toBeDefined();
-      expect(awaitingPatch?.stage).toBe("awaiting-output-import");
+      expect(awaitingPatch?.status).toBe("running");
+      expect(awaitingPatch?.stage).toBe("processing");
       const awaitingSummary = (awaitingPatch?.output_summary as Record<string, unknown>) ?? {};
-      const awaitingNodeodm = (awaitingSummary.nodeodm as Record<string, unknown>) ?? {};
-      expect(typeof awaitingNodeodm.lastImportError).toBe("string");
+      expect(awaitingSummary.latestCheckpoint).toBe(
+        "NodeODM compute finished; output import pending retry",
+      );
     } finally {
       vi.spyOn(stubClient, "downloadAllAssets").mockImplementation(originalDownload);
     }
@@ -199,8 +206,8 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
         org_id: "org-3",
         mission_id: "mission-3",
         dataset_id: "dataset-3",
-        status: "queued",
-        stage: "dispatched",
+        status: "running",
+        stage: "intake_review",
         output_summary: { nodeodm: { taskUuid: launch.taskUuid } },
         org: { slug: "tribal-lands" },
       },
@@ -230,7 +237,7 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
     const patches = updateProcessingJobMock.mock.calls.map((call) => call[1] as Record<string, unknown>);
     const succeededPatch = patches.find((p) => p.status === "succeeded");
     expect(succeededPatch).toBeDefined();
-    expect(succeededPatch?.stage).toBe("completed");
+    expect(succeededPatch?.stage).toBe("complete");
 
     const succeededSummary = (succeededPatch?.output_summary as Record<string, unknown>) ?? {};
     const benchmarkSummary = succeededSummary.benchmarkSummary as Record<string, unknown>;
@@ -275,6 +282,52 @@ describe("GET /api/internal/nodeodm-poll (integration)", () => {
     const succeededNodeodm = (succeededSummary.nodeodm as Record<string, unknown>) ?? {};
     expect(succeededNodeodm.copiedToStorageCount).toBe(3);
     expect(succeededNodeodm.storageBucket).toBe("drone-ops");
+  });
+
+  it("queries and writes only statuses the DB check constraint allows", async () => {
+    const launch = await launchNodeOdmTask({ jobId: "job-4", presetId: "balanced" });
+    if (!launch.ok) throw new Error(`expected launch to succeed, got ${launch.kind}`);
+
+    // The exact shape recordManagedNodeOdmLaunchOutcome leaves a job in.
+    adminSelectMock.mockResolvedValue([
+      {
+        id: "job-4",
+        org_id: "org-4",
+        mission_id: "mission-4",
+        dataset_id: "dataset-4",
+        status: "running",
+        stage: "intake_review",
+        output_summary: { nodeodm: { taskUuid: launch.taskUuid, uploadState: "pending" } },
+        org: { slug: "gv-ops" },
+      },
+    ]);
+
+    const stubClient = (await import("@/lib/nodeodm/stub")).getSharedStubNodeOdmClient();
+    await stubClient.commitTask(launch.taskUuid);
+    for (let i = 0; i < 5; i += 1) {
+      await GET(authorizedPollRequest());
+    }
+
+    // The launched job must be selected: the query filter may only contain
+    // legal statuses (the old filter listed four values that can never exist).
+    const selectQueries = adminSelectMock.mock.calls.map((call) => call[0] as string);
+    for (const query of selectQueries) {
+      const filterMatch = query.match(/status=in\.\(([^)]+)\)/);
+      expect(filterMatch).not.toBeNull();
+      for (const status of filterMatch![1].split(",")) {
+        expect(isProcessingJobStatus(status), `illegal status in query filter: ${status}`).toBe(true);
+      }
+    }
+
+    // Every status ever written must satisfy the check constraint.
+    const writtenStatuses = updateProcessingJobMock.mock.calls
+      .map((call) => (call[1] as Record<string, unknown>).status)
+      .filter((status): status is string => typeof status === "string");
+    expect(writtenStatuses.length).toBeGreaterThan(0);
+    for (const status of writtenStatuses) {
+      expect(isProcessingJobStatus(status), `illegal status written: ${status}`).toBe(true);
+    }
+    expect(writtenStatuses).toContain("succeeded");
   });
 
   it("returns 401 without a valid bearer", async () => {

@@ -7,7 +7,11 @@ import {
   getProvingHeartbeatAuthModeLabel,
   getProvingHeartbeatCadenceLabel,
 } from "@/lib/proving-heartbeat";
-import { recordProvingHeartbeatAudit, reconcileProvingJobsOutOfBand } from "@/lib/proving-runs";
+import {
+  isProvingLaneEnabled,
+  recordProvingHeartbeatAudit,
+  reconcileProvingJobsOutOfBand,
+} from "@/lib/proving-runs";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +46,20 @@ export async function GET(request: NextRequest) {
     authModeLabel: getProvingHeartbeatAuthModeLabel(),
     invokedAt,
   };
+
+  if (!isProvingLaneEnabled()) {
+    log.info("skip.proving-lane-disabled");
+    return NextResponse.json({
+      ok: true,
+      heartbeat,
+      enabled: false,
+      note: "Proving lane is disabled (simulation only). Set AERIAL_PROVING_LANE=demo to enable the demo lane.",
+      scanned: 0,
+      updates: 0,
+      started: 0,
+      completed: 0,
+    });
+  }
 
   try {
     const result = await reconcileProvingJobsOutOfBand();

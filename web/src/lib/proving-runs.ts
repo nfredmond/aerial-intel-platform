@@ -24,6 +24,16 @@ export type ProvingActionSource = "job-detail" | "mission-detail" | "workspace" 
 const PROVING_QUEUE_PICKUP_MS = 15_000;
 const PROVING_AUTO_COMPLETE_MS = 45_000;
 
+/**
+ * The proving lane is a timer-driven SIMULATION: it advances jobs and marks
+ * placeholder outputs "ready" without any real processing. It is quarantined
+ * behind this flag (default OFF) so fabricated evidence can never appear in a
+ * workspace unless an operator explicitly opts into the demo lane.
+ */
+export function isProvingLaneEnabled(): boolean {
+  return process.env.AERIAL_PROVING_LANE === "demo";
+}
+
 type ProvingEvent = {
   eventType: string;
   title: string;
@@ -61,7 +71,7 @@ function buildStartedLogTail(source: ProvingActionSource) {
     opener,
     "Queue handoff cleared.",
     "Worker picked up proving run.",
-    "Orthomosaic stage started.",
+    "Simulated orthomosaic stage started (demo lane; no real processing occurs).",
     "Initial QA checkpoint opened for downstream deliverables.",
   ];
 }
@@ -74,11 +84,11 @@ function buildCompletedLogTail(source: ProvingActionSource) {
 
   return [
     opener,
-    "Orthomosaic generated.",
-    "DSM generated.",
-    "Point cloud generated.",
-    "Mission brief exported.",
-    "Artifacts promoted to ready-for-review state.",
+    "Simulated orthomosaic milestone recorded (no real orthomosaic exists).",
+    "Simulated DSM milestone recorded (no real DSM exists).",
+    "Simulated point cloud milestone recorded (no real point cloud exists).",
+    "Simulated mission brief milestone recorded.",
+    "Placeholder outputs promoted to ready-for-review state (demo lane).",
   ];
 }
 
@@ -102,7 +112,7 @@ function buildStartedEvents(source: ProvingActionSource): ProvingEvent[] {
     {
       eventType: "job.progress.updated",
       title: "Orthomosaic stage active",
-      detail: "The proving run is now working through the orthomosaic stage on the live path.",
+      detail: "The proving run is simulating the orthomosaic stage (demo lane; no real processing occurs).",
     },
   ];
 }
@@ -127,7 +137,7 @@ function buildCompletedEvents(source: ProvingActionSource): ProvingEvent[] {
     {
       eventType: "artifact.generated",
       title: "Artifacts ready for review",
-      detail: "All proving-run placeholder outputs are now marked ready for the delivery lane.",
+      detail: "All proving-run placeholder outputs are now marked ready for the delivery lane. These are simulated demo artifacts, not real processing outputs.",
     },
   ];
 }
@@ -350,6 +360,10 @@ export async function advanceManualProvingJob(options: {
 }) {
   const { orgId, detail, source } = options;
 
+  if (!isProvingLaneEnabled()) {
+    return "disabled" as const;
+  }
+
   if (!isManualProvingJobDetail(detail)) {
     return "not-proving" as const;
   }
@@ -368,6 +382,10 @@ export async function advanceManualProvingJob(options: {
 }
 
 export async function reconcileProvingJobsOutOfBand() {
+  if (!isProvingLaneEnabled()) {
+    return { scanned: 0, updates: 0, started: 0, completed: 0, auditTargets: [] as HeartbeatAuditTarget[] };
+  }
+
   const rows = await adminSelect<Array<Pick<ProcessingJobRow, "id" | "org_id" | "preset_id" | "status" | "input_summary" | "created_at" | "started_at" | "updated_at">>>(
     "drone_processing_jobs?status=in.(queued,running)&select=id,org_id,preset_id,status,input_summary,created_at,started_at,updated_at&order=updated_at.desc&limit=50",
   );

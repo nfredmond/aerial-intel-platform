@@ -5,6 +5,7 @@ import { pollNodeOdmTask } from "@/lib/dispatch-adapter-nodeodm";
 import { createLogger, extractRequestId } from "@/lib/logging";
 import { parseManagedBenchmarkSummaryText } from "@/lib/managed-processing-import";
 import { createConfiguredNodeOdmClient, getNodeOdmAdapterConfig } from "@/lib/nodeodm/config";
+import { ACTIVE_PROCESSING_JOB_STATUS_FILTER } from "@/lib/processing-job-status";
 import { statusCodeName } from "@/lib/nodeodm/contracts";
 import { isNodeOdmError } from "@/lib/nodeodm/errors";
 import {
@@ -120,8 +121,11 @@ function extractNodeOdmCursor(row: ProcessingJobRow): NodeOdmJobCursor | null {
 }
 
 async function fetchActiveNodeOdmJobs(): Promise<NodeOdmJobCursor[]> {
+  // A NodeODM-launched job holds status 'running' (stage 'intake_review') from
+  // launch through upload; extractNodeOdmCursor narrows to rows that actually
+  // carry a nodeodm.taskUuid, so this cannot pick up unrelated managed jobs.
   const rows = await adminSelect<ProcessingJobRow[]>(
-    "drone_processing_jobs?status=in.(pending,queued,processing,awaiting_output_import)&select=id,org_id,mission_id,dataset_id,status,stage,output_summary,org:drone_orgs(slug)",
+    `drone_processing_jobs?status=${ACTIVE_PROCESSING_JOB_STATUS_FILTER}&select=id,org_id,mission_id,dataset_id,status,stage,output_summary,org:drone_orgs(slug)`,
   );
   return rows
     .map(extractNodeOdmCursor)
@@ -319,7 +323,7 @@ async function advanceJobFromTaskInfo(cursor: NodeOdmJobCursor) {
       patch = {
         output_summary: summary,
         status: "succeeded",
-        stage: "completed",
+        stage: "complete",
         completed_at: new Date().toISOString(),
       };
       await insertJobEvent({
@@ -336,10 +340,14 @@ async function advanceJobFromTaskInfo(cursor: NodeOdmJobCursor) {
         ...(summary.nodeodm as Record<string, unknown>),
         lastImportError: importError ?? "output import unavailable",
       };
+      summary.latestCheckpoint = "NodeODM compute finished; output import pending retry";
+      // 'awaiting_output_import' is not a legal drone_processing_jobs.status —
+      // the job stays 'running' (same convention as the dispatch-callback lane)
+      // and the next poll tick retries the import.
       patch = {
         output_summary: summary,
-        status: "awaiting_output_import",
-        stage: "awaiting-output-import",
+        status: "running",
+        stage: "processing",
       };
     }
 
@@ -365,7 +373,7 @@ async function advanceJobFromTaskInfo(cursor: NodeOdmJobCursor) {
       } as Json,
     });
   } else if (taskInfo.status?.code === 20) {
-    patch = { ...patch, status: "processing", stage: "processing" };
+    patch = { ...patch, status: "running", stage: "processing" };
   }
 
   await updateProcessingJob(cursor.jobId, patch as Parameters<typeof updateProcessingJob>[1]);

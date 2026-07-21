@@ -5,14 +5,16 @@ import { PROVING_HEARTBEAT_CRON_SCHEDULE, PROVING_HEARTBEAT_ROUTE_PATH } from "@
 
 import { GET } from "./route";
 
-const { reconcileProvingJobsOutOfBandMock, recordProvingHeartbeatAuditMock } = vi.hoisted(() => ({
+const { reconcileProvingJobsOutOfBandMock, recordProvingHeartbeatAuditMock, isProvingLaneEnabledMock } = vi.hoisted(() => ({
   reconcileProvingJobsOutOfBandMock: vi.fn(),
   recordProvingHeartbeatAuditMock: vi.fn(),
+  isProvingLaneEnabledMock: vi.fn(),
 }));
 
 vi.mock("@/lib/proving-runs", () => ({
   reconcileProvingJobsOutOfBand: reconcileProvingJobsOutOfBandMock,
   recordProvingHeartbeatAudit: recordProvingHeartbeatAuditMock,
+  isProvingLaneEnabled: isProvingLaneEnabledMock,
 }));
 
 describe("GET /api/internal/proving-heartbeat", () => {
@@ -20,7 +22,27 @@ describe("GET /api/internal/proving-heartbeat", () => {
     reconcileProvingJobsOutOfBandMock.mockReset();
     recordProvingHeartbeatAuditMock.mockReset();
     recordProvingHeartbeatAuditMock.mockResolvedValue(1);
+    isProvingLaneEnabledMock.mockReset();
+    isProvingLaneEnabledMock.mockReturnValue(true);
     delete process.env.CRON_SECRET;
+  });
+
+  it("no-ops without touching the proving lane when the lane is disabled", async () => {
+    isProvingLaneEnabledMock.mockReturnValue(false);
+
+    const response = await GET(
+      new NextRequest("https://example.com/api/internal/proving-heartbeat", {
+        headers: { "user-agent": "vercel-cron/1.0" },
+      }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(body.enabled).toBe(false);
+    expect(body.updates).toBe(0);
+    expect(reconcileProvingJobsOutOfBandMock).not.toHaveBeenCalled();
+    expect(recordProvingHeartbeatAuditMock).not.toHaveBeenCalled();
   });
 
   it("rejects unauthorized requests", async () => {

@@ -62,6 +62,7 @@ function mockJobRow(overrides: { taskUuid: string; uploadedCount?: number; total
     id: "job-1",
     org_id: "org-1",
     mission_id: "mission-1",
+    dataset_id: "dataset-1",
     status: "running",
     stage: "intake_review",
     output_summary: {
@@ -116,6 +117,7 @@ describe("GET /api/internal/nodeodm-upload (integration)", () => {
           {
             id: "sess-1",
             mission_id: "mission-1",
+            dataset_id: "dataset-1",
             extracted_dataset_path: "orgs/org-1/missions/mission-1/extract",
             updated_at: "2026-04-17T00:00:00Z",
           },
@@ -160,6 +162,7 @@ describe("GET /api/internal/nodeodm-upload (integration)", () => {
     const ingestRow = {
       id: "sess-1",
       mission_id: "mission-1",
+      dataset_id: "dataset-1",
       extracted_dataset_path: "orgs/org-1/missions/mission-1/extract",
       updated_at: "2026-04-17T00:00:00Z",
     };
@@ -212,6 +215,7 @@ describe("GET /api/internal/nodeodm-upload (integration)", () => {
           {
             id: "sess-1",
             mission_id: "mission-1",
+            dataset_id: "dataset-1",
             extracted_dataset_path: "orgs/org-1/missions/mission-1/extract",
             updated_at: "2026-04-17T00:00:00Z",
           },
@@ -251,6 +255,7 @@ describe("GET /api/internal/nodeodm-upload (integration)", () => {
           {
             id: "sess-1",
             mission_id: "mission-1",
+            dataset_id: "dataset-1",
             extracted_dataset_path: "orgs/org-1/missions/mission-1/extract",
             updated_at: "2026-04-17T00:00:00Z",
           },

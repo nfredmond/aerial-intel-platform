@@ -631,8 +631,8 @@ export default async function AdminConsolePage() {
           <p className="eyebrow">Compute</p>
           <h2>Stuck in-flight jobs</h2>
           <p className="muted">
-            Jobs in pending, queued, processing, or awaiting-output-import with no update for over
-            an hour. Healthy jobs are updated by the cron or adapter every few minutes.
+            Jobs still queued or running with no update for over an hour. Healthy jobs are
+            updated by the cron or adapter every few minutes.
           </p>
         </div>
         <StaleJobsPanel rows={staleJobs} />

@@ -5,7 +5,7 @@ import {
   computeBatchSlice,
   extractNodeOdmUploadCursor,
   isImageFilename,
-  pickLatestSessionByMission,
+  pickSessionForCursor,
   shouldEscalateFailure,
   UPLOAD_BATCH_CAP,
 } from "./nodeodm-upload";
@@ -32,6 +32,7 @@ describe("extractNodeOdmUploadCursor", () => {
     id: "job-1",
     org_id: "org-1",
     mission_id: "mission-1",
+    dataset_id: "dataset-1",
     status: "running",
     stage: "intake_review",
     output_summary: {
@@ -93,22 +94,44 @@ describe("extractNodeOdmUploadCursor", () => {
   });
 });
 
-describe("pickLatestSessionByMission", () => {
-  it("keeps only the latest session per mission by updated_at", () => {
-    const byMission = pickLatestSessionByMission([
-      { id: "s1", mission_id: "m1", extracted_dataset_path: "a", updated_at: "2026-01-01" },
-      { id: "s2", mission_id: "m1", extracted_dataset_path: "b", updated_at: "2026-02-01" },
-      { id: "s3", mission_id: "m2", extracted_dataset_path: "c", updated_at: "2026-03-01" },
+describe("pickSessionForCursor", () => {
+  it("picks the latest session for the mission when the job has no dataset", () => {
+    const session = pickSessionForCursor({ missionId: "m1", datasetId: null }, [
+      { id: "s1", mission_id: "m1", dataset_id: null, extracted_dataset_path: "a", updated_at: "2026-01-01" },
+      { id: "s2", mission_id: "m1", dataset_id: null, extracted_dataset_path: "b", updated_at: "2026-02-01" },
+      { id: "s3", mission_id: "m2", dataset_id: null, extracted_dataset_path: "c", updated_at: "2026-03-01" },
     ]);
-    expect(byMission.get("m1")?.id).toBe("s2");
-    expect(byMission.get("m2")?.id).toBe("s3");
+    expect(session?.id).toBe("s2");
+  });
+
+  it("prefers the session tied to the job's dataset over a newer session for another dataset", () => {
+    const session = pickSessionForCursor({ missionId: "m1", datasetId: "d1" }, [
+      { id: "s1", mission_id: "m1", dataset_id: "d1", extracted_dataset_path: "a", updated_at: "2026-01-01" },
+      { id: "s2", mission_id: "m1", dataset_id: "d2", extracted_dataset_path: "b", updated_at: "2026-02-01" },
+    ]);
+    expect(session?.id).toBe("s1");
+  });
+
+  it("never picks a session explicitly tied to a different dataset", () => {
+    const session = pickSessionForCursor({ missionId: "m1", datasetId: "d1" }, [
+      { id: "s2", mission_id: "m1", dataset_id: "d2", extracted_dataset_path: "b", updated_at: "2026-02-01" },
+    ]);
+    expect(session).toBeUndefined();
+  });
+
+  it("falls back to a legacy session without a dataset when none match the job's dataset", () => {
+    const session = pickSessionForCursor({ missionId: "m1", datasetId: "d1" }, [
+      { id: "s1", mission_id: "m1", dataset_id: null, extracted_dataset_path: "a", updated_at: "2026-01-01" },
+      { id: "s2", mission_id: "m1", dataset_id: "d2", extracted_dataset_path: "b", updated_at: "2026-02-01" },
+    ]);
+    expect(session?.id).toBe("s1");
   });
 
   it("ignores sessions with null extracted_dataset_path", () => {
-    const byMission = pickLatestSessionByMission([
-      { id: "s1", mission_id: "m1", extracted_dataset_path: null, updated_at: "2026-01-01" },
+    const session = pickSessionForCursor({ missionId: "m1", datasetId: null }, [
+      { id: "s1", mission_id: "m1", dataset_id: null, extracted_dataset_path: null, updated_at: "2026-01-01" },
     ]);
-    expect(byMission.size).toBe(0);
+    expect(session).toBeUndefined();
   });
 });
 

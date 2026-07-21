@@ -121,12 +121,17 @@ function getWorkspaceNotice(states: { create?: string; handoff?: string; proving
     case "started":
       return {
         tone: "success" as const,
-        message: "Proving job started from the workspace. The live run is now in active processing.",
+        message: "Simulated proving job started from the workspace (demo lane; no real processing occurs).",
       };
     case "completed":
       return {
         tone: "success" as const,
-        message: "Proving job completed from the workspace. Ready artifacts are now waiting in the delivery lane.",
+        message: "Simulated proving job completed from the workspace. The placeholder artifacts in the delivery lane are demo data.",
+      };
+    case "disabled":
+      return {
+        tone: "warning" as const,
+        message: "The proving lane is disabled. It is a simulation for demos only; set AERIAL_PROVING_LANE=demo to enable it.",
       };
     case "denied":
       return {

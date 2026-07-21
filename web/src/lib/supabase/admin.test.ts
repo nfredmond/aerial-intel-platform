@@ -179,7 +179,7 @@ describe("selectStaleInFlightJobsForOrg", () => {
     const { url, init } = calls[0];
     expect(url).toContain("https://example.supabase.co/rest/v1/drone_processing_jobs?");
     expect(url).toContain(`org_id=eq.${encodeURIComponent("org with space/slash")}`);
-    expect(url).toContain("status=in.(pending,queued,processing,awaiting_output_import)");
+    expect(url).toContain("status=in.(queued,running)");
     expect(url).toContain(
       "select=id,org_id,mission_id,engine,status,stage,progress,updated_at",
     );

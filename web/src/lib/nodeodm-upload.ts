@@ -17,6 +17,7 @@ export type NodeOdmJobRow = {
   id: string;
   org_id: string;
   mission_id: string | null;
+  dataset_id: string | null;
   status: string;
   stage: string | null;
   output_summary: Record<string, unknown> | null;
@@ -26,6 +27,7 @@ export type NodeOdmUploadCursor = {
   jobId: string;
   orgId: string;
   missionId: string | null;
+  datasetId: string | null;
   taskUuid: string;
   uploadState: NodeOdmUploadState;
   uploadedCount: number;
@@ -62,6 +64,7 @@ export function extractNodeOdmUploadCursor(row: NodeOdmJobRow): NodeOdmUploadCur
     jobId: row.id,
     orgId: row.org_id,
     missionId: row.mission_id,
+    datasetId: row.dataset_id,
     taskUuid,
     uploadState,
     uploadedCount: asInt(nodeodm.uploadedCount, 0),
@@ -75,28 +78,45 @@ export function extractNodeOdmUploadCursor(row: NodeOdmJobRow): NodeOdmUploadCur
 export type IngestSessionRow = {
   id: string;
   mission_id: string | null;
+  dataset_id: string | null;
   extracted_dataset_path: string | null;
   updated_at: string | null;
 };
 
-export function pickLatestSessionByMission(
-  sessions: IngestSessionRow[],
-): Map<string, IngestSessionRow> {
-  const byMission = new Map<string, IngestSessionRow>();
+function latestSession(sessions: IngestSessionRow[]): IngestSessionRow | undefined {
+  let latest: IngestSessionRow | undefined;
   for (const session of sessions) {
-    if (!session.mission_id || !session.extracted_dataset_path) continue;
-    const existing = byMission.get(session.mission_id);
-    if (!existing) {
-      byMission.set(session.mission_id, session);
-      continue;
-    }
-    const existingStamp = existing.updated_at ?? "";
-    const candidateStamp = session.updated_at ?? "";
-    if (candidateStamp > existingStamp) {
-      byMission.set(session.mission_id, session);
+    if (!latest || (session.updated_at ?? "") > (latest.updated_at ?? "")) {
+      latest = session;
     }
   }
-  return byMission;
+  return latest;
+}
+
+/**
+ * Choose the ingest session whose extracted images should feed a NodeODM job.
+ *
+ * A session explicitly tied to a DIFFERENT dataset than the job's is never
+ * eligible — a mission with multiple ingest sessions must not upload the wrong
+ * image set. Sessions without a dataset_id (legacy ingests) remain eligible as
+ * a fallback when no session matches the job's dataset.
+ */
+export function pickSessionForCursor(
+  cursor: Pick<NodeOdmUploadCursor, "missionId" | "datasetId">,
+  sessions: IngestSessionRow[],
+): IngestSessionRow | undefined {
+  if (!cursor.missionId) return undefined;
+  const missionSessions = sessions.filter(
+    (session) => session.mission_id === cursor.missionId && session.extracted_dataset_path,
+  );
+  if (cursor.datasetId) {
+    const datasetMatches = missionSessions.filter(
+      (session) => session.dataset_id === cursor.datasetId,
+    );
+    if (datasetMatches.length > 0) return latestSession(datasetMatches);
+    return latestSession(missionSessions.filter((session) => session.dataset_id === null));
+  }
+  return latestSession(missionSessions);
 }
 
 export type BatchSlice = {

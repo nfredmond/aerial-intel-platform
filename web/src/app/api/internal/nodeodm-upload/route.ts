@@ -6,7 +6,7 @@ import {
   computeBatchSlice,
   extractNodeOdmUploadCursor,
   isImageFilename,
-  pickLatestSessionByMission,
+  pickSessionForCursor,
   shouldEscalateFailure,
   UPLOAD_CHUNK_SIZE,
   type IngestSessionRow,
@@ -39,24 +39,21 @@ function isAuthorized(request: NextRequest) {
 
 async function fetchActiveUploadCursors(): Promise<NodeOdmUploadCursor[]> {
   const rows = await adminSelect<NodeOdmJobRow[]>(
-    "drone_processing_jobs?status=eq.running&stage=eq.intake_review&select=id,org_id,mission_id,status,stage,output_summary",
+    "drone_processing_jobs?status=eq.running&stage=eq.intake_review&select=id,org_id,mission_id,dataset_id,status,stage,output_summary",
   );
   return rows
     .map(extractNodeOdmUploadCursor)
     .filter((cursor): cursor is NodeOdmUploadCursor => cursor !== null);
 }
 
-async function fetchSessionsForMissions(
-  missionIds: string[],
-): Promise<Map<string, IngestSessionRow>> {
-  if (missionIds.length === 0) return new Map();
+async function fetchSessionsForMissions(missionIds: string[]): Promise<IngestSessionRow[]> {
+  if (missionIds.length === 0) return [];
   const inList = missionIds.map((id) => encodeURIComponent(id)).join(",");
   const query =
     `drone_ingest_sessions?mission_id=in.(${inList})` +
     `&extracted_dataset_path=not.is.null` +
-    `&select=id,mission_id,extracted_dataset_path,updated_at`;
-  const rows = await adminSelect<IngestSessionRow[]>(query);
-  return pickLatestSessionByMission(rows);
+    `&select=id,mission_id,dataset_id,extracted_dataset_path,updated_at`;
+  return adminSelect<IngestSessionRow[]>(query);
 }
 
 type UploadableImage = { name: string; size: number | null };
@@ -268,13 +265,13 @@ export async function GET(request: NextRequest) {
     const missionIds = Array.from(
       new Set(cursors.map((c) => c.missionId).filter((id): id is string => typeof id === "string")),
     );
-    const sessionsByMission = await fetchSessionsForMissions(missionIds);
+    const sessions = await fetchSessionsForMissions(missionIds);
     const processed: Array<{ jobId: string; outcome: string; detail: Record<string, unknown> }> = [];
     const failures: Array<{ jobId: string; error: string }> = [];
 
     for (const cursor of cursors) {
       try {
-        const session = cursor.missionId ? sessionsByMission.get(cursor.missionId) : undefined;
+        const session = pickSessionForCursor(cursor, sessions);
         const images = session?.extracted_dataset_path
           ? await listDatasetImages(session.extracted_dataset_path)
           : [];
