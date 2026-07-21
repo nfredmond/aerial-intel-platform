@@ -1,4 +1,4 @@
-import { isAuthSessionMissingError, type User } from "@supabase/supabase-js";
+import { isAuthApiError, isAuthSessionMissingError, type User } from "@supabase/supabase-js";
 
 import { computeDroneOpsActions, type DroneOpsAction } from "@/lib/auth/actions";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -19,6 +19,27 @@ export type DroneOpsAccessResult = {
   entitlement: EntitlementRow | null;
   blockedReason: string | null;
 };
+
+/**
+ * A stale, expired, or otherwise invalid session cookie must degrade the
+ * request to signed-out (pages then redirect to /sign-in), not crash to the
+ * error boundary. supabase.auth.getUser() validates the JWT against the auth
+ * server; any 4xx from that check means the presented credentials are
+ * unacceptable — an expired token, a malformed token, or a `sub` claim for a
+ * user that no longer exists ("User from sub claim in JWT does not exist").
+ * All of those are "not signed in". 5xx responses and network/retryable
+ * errors are genuine failures and still propagate so they aren't masked as a
+ * login prompt.
+ */
+export function isInvalidSessionError(error: unknown): boolean {
+  if (isAuthSessionMissingError(error)) {
+    return true;
+  }
+  if (isAuthApiError(error)) {
+    return error.status >= 400 && error.status < 500;
+  }
+  return false;
+}
 
 function buildSignedOutAccess(): DroneOpsAccessResult {
   return {
@@ -43,7 +64,7 @@ export async function getDroneOpsAccess(): Promise<DroneOpsAccessResult> {
   } = await supabase.auth.getUser();
 
   if (userError) {
-    if (isAuthSessionMissingError(userError)) {
+    if (isInvalidSessionError(userError)) {
       return buildSignedOutAccess();
     }
 
