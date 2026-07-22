@@ -12,7 +12,12 @@ import {
   selectSupportFacts,
   type SupportDocFact,
 } from "./support-assistant";
-import { checkQuotaAndReserve, readOrgCopilotEnabled, recordSpend } from "./quota";
+import {
+  checkQuotaAndReserve,
+  reconcileCopilotSpend,
+  readOrgCopilotEnabled,
+  type QuotaReserveResult,
+} from "./quota";
 
 export type SupportAssistantServerResult =
   | {
@@ -55,6 +60,8 @@ export async function runSupportAssistantForQuestion(
   question: string,
 ): Promise<SupportAssistantServerResult> {
   let auditContext: CopilotAuditContext | null = null;
+  let reservation: QuotaReserveResult | null = null;
+  let actualTenthCents = 0;
   try {
     const trimmedQuestion = question.trim();
     const access = await getDroneOpsAccess();
@@ -107,7 +114,7 @@ export async function runSupportAssistantForQuestion(
       return { status: "blocked", reason: "no-matching-docs" };
     }
 
-    const reservation = await checkQuotaAndReserve({
+    reservation = await checkQuotaAndReserve({
       orgId,
       budgetTenthCents: estimateSupportAssistantBudgetTenthCents({
         question: trimmedQuestion,
@@ -138,10 +145,7 @@ export async function runSupportAssistantForQuestion(
       facts,
     });
 
-    await recordSpend({
-      quotaRowId: reservation.quotaRowId,
-      deltaTenthCents: result.spendTenthCents,
-    });
+    actualTenthCents = result.spendTenthCents;
 
     if (result.status === "refused") {
       await recordCopilotAuditEventSafely({
@@ -201,5 +205,15 @@ export async function runSupportAssistantForQuestion(
       });
     }
     return { status: "error", message };
+  } finally {
+    // Reconcile the reservation exactly once: refund actual-vs-reserved on
+    // success, or the full budget when the model call never billed.
+    if (reservation?.allowed) {
+      await reconcileCopilotSpend({
+        quotaRowId: reservation.quotaRowId,
+        reservedTenthCents: reservation.reservedTenthCents,
+        actualTenthCents,
+      }).catch(() => {});
+    }
   }
 }

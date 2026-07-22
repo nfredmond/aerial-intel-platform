@@ -12,7 +12,12 @@ import {
   generateProcessingQaNote,
 } from "./processing-qa";
 import { buildProcessingQaFacts } from "./processing-qa-facts";
-import { checkQuotaAndReserve, readOrgCopilotEnabled, recordSpend } from "./quota";
+import {
+  checkQuotaAndReserve,
+  reconcileCopilotSpend,
+  readOrgCopilotEnabled,
+  type QuotaReserveResult,
+} from "./quota";
 
 export type ProcessingQaServerResult =
   | {
@@ -53,6 +58,8 @@ export async function runProcessingQaForJob(
   jobId: string,
 ): Promise<ProcessingQaServerResult> {
   let auditContext: CopilotAuditContext | null = null;
+  let reservation: QuotaReserveResult | null = null;
+  let actualTenthCents = 0;
   try {
     const access = await getDroneOpsAccess();
     if (!access.isAuthenticated) return { status: "blocked", reason: "not-authenticated" };
@@ -106,7 +113,7 @@ export async function runProcessingQaForJob(
       return { status: "blocked", reason: "no-facts" };
     }
 
-    const reservation = await checkQuotaAndReserve({
+    reservation = await checkQuotaAndReserve({
       orgId,
       budgetTenthCents: estimateProcessingQaBudgetTenthCents({ jobId, facts }),
     });
@@ -130,10 +137,7 @@ export async function runProcessingQaForJob(
 
     const note = await generateProcessingQaNote({ orgId, jobId, facts });
 
-    await recordSpend({
-      quotaRowId: reservation.quotaRowId,
-      deltaTenthCents: note.spendTenthCents,
-    });
+    actualTenthCents = note.spendTenthCents;
 
     if (note.status === "refused") {
       await recordCopilotAuditEventSafely({
@@ -191,5 +195,15 @@ export async function runProcessingQaForJob(
       });
     }
     return { status: "error", message };
+  } finally {
+    // Reconcile the reservation exactly once: refund actual-vs-reserved on
+    // success, or the full budget when the model call never billed.
+    if (reservation?.allowed) {
+      await reconcileCopilotSpend({
+        quotaRowId: reservation.quotaRowId,
+        reservedTenthCents: reservation.reservedTenthCents,
+        actualTenthCents,
+      }).catch(() => {});
+    }
   }
 }

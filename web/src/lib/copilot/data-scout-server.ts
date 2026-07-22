@@ -13,7 +13,12 @@ import {
   type DataScoutFlag,
 } from "./data-scout";
 import { buildDataScoutInputs } from "./data-scout-facts";
-import { checkQuotaAndReserve, readOrgCopilotEnabled, recordSpend } from "./quota";
+import {
+  checkQuotaAndReserve,
+  reconcileCopilotSpend,
+  readOrgCopilotEnabled,
+  type QuotaReserveResult,
+} from "./quota";
 
 export type DataScoutServerResult =
   | {
@@ -59,6 +64,8 @@ export async function runDataScoutForDataset(
   datasetId: string,
 ): Promise<DataScoutServerResult> {
   let auditContext: CopilotAuditContext | null = null;
+  let reservation: QuotaReserveResult | null = null;
+  let actualTenthCents = 0;
   try {
     const access = await getDroneOpsAccess();
     if (!access.isAuthenticated) return { status: "blocked", reason: "not-authenticated" };
@@ -120,7 +127,7 @@ export async function runDataScoutForDataset(
       return { status: "blocked", reason: "all-clean" };
     }
 
-    const reservation = await checkQuotaAndReserve({
+    reservation = await checkQuotaAndReserve({
       orgId,
       budgetTenthCents: estimateDataScoutBudgetTenthCents({
         datasetName: detail.dataset.name,
@@ -155,10 +162,7 @@ export async function runDataScoutForDataset(
       facts,
     });
 
-    await recordSpend({
-      quotaRowId: reservation.quotaRowId,
-      deltaTenthCents: result.spendTenthCents,
-    });
+    actualTenthCents = result.spendTenthCents;
 
     if (result.status === "refused") {
       await recordCopilotAuditEventSafely({
@@ -220,5 +224,15 @@ export async function runDataScoutForDataset(
       });
     }
     return { status: "error", message };
+  } finally {
+    // Reconcile the reservation exactly once: refund actual-vs-reserved on
+    // success, or the full budget when the model call never billed.
+    if (reservation?.allowed) {
+      await reconcileCopilotSpend({
+        quotaRowId: reservation.quotaRowId,
+        reservedTenthCents: reservation.reservedTenthCents,
+        actualTenthCents,
+      }).catch(() => {});
+    }
   }
 }

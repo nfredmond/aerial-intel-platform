@@ -9,7 +9,12 @@ import {
 } from "./audit";
 import { estimateMissionBriefBudgetTenthCents, generateMissionBrief } from "./mission-brief";
 import { buildMissionBriefFacts } from "./mission-brief-facts";
-import { checkQuotaAndReserve, readOrgCopilotEnabled, recordSpend } from "./quota";
+import {
+  checkQuotaAndReserve,
+  reconcileCopilotSpend,
+  readOrgCopilotEnabled,
+  type QuotaReserveResult,
+} from "./quota";
 
 export type MissionBriefServerResult =
   | {
@@ -50,6 +55,8 @@ export async function runMissionBriefForMission(
   missionId: string,
 ): Promise<MissionBriefServerResult> {
   let auditContext: CopilotAuditContext | null = null;
+  let reservation: QuotaReserveResult | null = null;
+  let actualTenthCents = 0;
   try {
     const access = await getDroneOpsAccess();
     if (!access.isAuthenticated) return { status: "blocked", reason: "not-authenticated" };
@@ -103,7 +110,7 @@ export async function runMissionBriefForMission(
       return { status: "blocked", reason: "no-facts" };
     }
 
-    const reservation = await checkQuotaAndReserve({
+    reservation = await checkQuotaAndReserve({
       orgId,
       budgetTenthCents: estimateMissionBriefBudgetTenthCents({
         missionName: detail.mission.name,
@@ -134,10 +141,7 @@ export async function runMissionBriefForMission(
       facts,
     });
 
-    await recordSpend({
-      quotaRowId: reservation.quotaRowId,
-      deltaTenthCents: brief.spendTenthCents,
-    });
+    actualTenthCents = brief.spendTenthCents;
 
     if (brief.status === "refused") {
       await recordCopilotAuditEventSafely({
@@ -195,5 +199,15 @@ export async function runMissionBriefForMission(
       });
     }
     return { status: "error", message };
+  } finally {
+    // Reconcile the reservation exactly once: refund actual-vs-reserved on
+    // success, or the full budget when the model call never billed.
+    if (reservation?.allowed) {
+      await reconcileCopilotSpend({
+        quotaRowId: reservation.quotaRowId,
+        reservedTenthCents: reservation.reservedTenthCents,
+        actualTenthCents,
+      }).catch(() => {});
+    }
   }
 }

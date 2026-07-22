@@ -52,42 +52,11 @@ async function restRequest<T>(path: string, init: RequestInit = {}): Promise<T> 
   return payload as T;
 }
 
-async function selectCurrentQuotaRow(orgId: string, period: string): Promise<QuotaRow | null> {
-  const rows = await restRequest<QuotaRow[]>(
-    `drone_org_ai_quota?org_id=eq.${encodeURIComponent(orgId)}` +
-      `&period_month=eq.${encodeURIComponent(period)}&select=*`,
-    { method: "GET" },
-  );
-  return rows[0] ?? null;
-}
-
-async function insertQuotaRow(
-  orgId: string,
-  period: string,
-  capTenthCents: number,
-): Promise<QuotaRow> {
-  const rows = await restRequest<QuotaRow[]>("drone_org_ai_quota?select=*", {
-    method: "POST",
-    body: JSON.stringify({ org_id: orgId, period_month: period, cap_tenth_cents: capTenthCents }),
-  });
-  if (!rows[0]) throw new Error("Copilot quota insert returned no row.");
-  return rows[0];
-}
-
-export async function ensureCurrentQuotaRow(
-  orgId: string,
-  config: CopilotConfig = getCopilotConfig(),
-): Promise<QuotaRow> {
-  const period = currentPeriodMonthIso();
-  const existing = await selectCurrentQuotaRow(orgId, period);
-  if (existing) return existing;
-  return insertQuotaRow(orgId, period, config.defaultCapTenthCents);
-}
-
 export type QuotaReserveResult =
   | {
       allowed: true;
       quotaRowId: string;
+      reservedTenthCents: number;
       capTenthCents: number;
       spendTenthCents: number;
       remainingTenthCents: number;
@@ -100,68 +69,85 @@ export type QuotaReserveResult =
       remainingTenthCents: number;
     };
 
+type ReserveRpcRow = {
+  quota_row_id: string;
+  cap_tenth_cents: number;
+  spend_tenth_cents: number;
+  allowed: boolean;
+};
+
 /**
- * Reads the current-month row (creating it if missing) and decides whether
- * `budgetTenthCents` fits under the cap. Callers must pass a conservative
- * upper bound for the model call, including max output tokens, so actual spend
- * cannot exceed the pre-call gate for a single request. This is still a check,
- * not an atomic reservation; concurrent calls can race within a single month.
+ * Atomically reserves `budgetTenthCents` against the org's current-month quota
+ * via the `reserve_copilot_budget` RPC: the budget is added to `spend` in a
+ * single guarded UPDATE that only succeeds if it still fits under the cap. This
+ * is a real reservation — concurrent requests cannot both pass and overspend.
+ *
+ * Callers must pass a conservative upper bound for the model call (including max
+ * output tokens) and then reconcile the actual spend with `reconcileCopilotSpend`
+ * once the call completes (or refund via the same call with `actualTenthCents: 0`
+ * when it never runs).
  */
-export async function checkQuotaAndReserve(input: {
-  orgId: string;
-  budgetTenthCents: number;
-}): Promise<QuotaReserveResult> {
-  const row = await ensureCurrentQuotaRow(input.orgId);
-  const projected = row.spend_tenth_cents + input.budgetTenthCents;
-  const remaining = row.cap_tenth_cents - row.spend_tenth_cents;
-  if (projected > row.cap_tenth_cents) {
+export async function checkQuotaAndReserve(
+  input: { orgId: string; budgetTenthCents: number },
+  config: CopilotConfig = getCopilotConfig(),
+): Promise<QuotaReserveResult> {
+  const rows = await restRequest<ReserveRpcRow[]>("rpc/reserve_copilot_budget", {
+    method: "POST",
+    body: JSON.stringify({
+      p_org_id: input.orgId,
+      p_period: currentPeriodMonthIso(),
+      p_default_cap: config.defaultCapTenthCents,
+      p_budget: input.budgetTenthCents,
+    }),
+  });
+  const row = rows[0];
+  if (!row) throw new Error("reserve_copilot_budget returned no row.");
+
+  const cap = Number(row.cap_tenth_cents);
+  const spendNow = Number(row.spend_tenth_cents);
+  if (row.allowed) {
+    // `spendNow` is post-reservation; report the pre-call spend to the caller.
+    const spendBefore = spendNow - input.budgetTenthCents;
     return {
-      allowed: false,
-      reason: "cap-exceeded",
-      capTenthCents: row.cap_tenth_cents,
-      spendTenthCents: row.spend_tenth_cents,
-      remainingTenthCents: Math.max(remaining, 0),
+      allowed: true,
+      quotaRowId: row.quota_row_id,
+      reservedTenthCents: input.budgetTenthCents,
+      capTenthCents: cap,
+      spendTenthCents: spendBefore,
+      remainingTenthCents: Math.max(cap - spendBefore, 0),
     };
   }
   return {
-    allowed: true,
-    quotaRowId: row.id,
-    capTenthCents: row.cap_tenth_cents,
-    spendTenthCents: row.spend_tenth_cents,
-    remainingTenthCents: Math.max(remaining, 0),
+    allowed: false,
+    reason: "cap-exceeded",
+    capTenthCents: cap,
+    spendTenthCents: spendNow,
+    remainingTenthCents: Math.max(cap - spendNow, 0),
   };
 }
 
+/** Applies a signed spend delta atomically via the `adjust_copilot_spend` RPC. */
+async function adjustCopilotSpend(quotaRowId: string, deltaTenthCents: number): Promise<QuotaRow> {
+  const rows = await restRequest<QuotaRow[]>("rpc/adjust_copilot_spend", {
+    method: "POST",
+    body: JSON.stringify({ p_quota_row_id: quotaRowId, p_delta: deltaTenthCents }),
+  });
+  if (!rows[0]) throw new Error(`Copilot quota row not found: ${quotaRowId}`);
+  return rows[0];
+}
+
 /**
- * Commits a completed call's actual spend. Read-modify-write because Supabase
- * REST PATCH can't express `spend = spend + $1` as an atomic expression; the
- * race is documented in `checkQuotaAndReserve` above.
+ * Reconciles a reservation once the call is done: applies `actual - reserved` to
+ * spend atomically. On success this refunds the unused portion of the
+ * conservative budget; passing `actualTenthCents: 0` fully refunds a reservation
+ * whose model call never produced billable spend (e.g. it threw).
  */
-export async function recordSpend(input: {
+export async function reconcileCopilotSpend(input: {
   quotaRowId: string;
-  deltaTenthCents: number;
-}): Promise<QuotaRow> {
-  if (input.deltaTenthCents < 0) {
-    throw new Error("recordSpend delta must be non-negative.");
-  }
-  const current = await restRequest<QuotaRow[]>(
-    `drone_org_ai_quota?id=eq.${encodeURIComponent(input.quotaRowId)}&select=*`,
-    { method: "GET" },
-  );
-  const row = current[0];
-  if (!row) throw new Error(`Copilot quota row not found: ${input.quotaRowId}`);
-  const patched = await restRequest<QuotaRow[]>(
-    `drone_org_ai_quota?id=eq.${encodeURIComponent(input.quotaRowId)}&select=*`,
-    {
-      method: "PATCH",
-      body: JSON.stringify({
-        spend_tenth_cents: row.spend_tenth_cents + input.deltaTenthCents,
-        last_call_at: new Date().toISOString(),
-      }),
-    },
-  );
-  if (!patched[0]) throw new Error("Copilot quota patch returned no row.");
-  return patched[0];
+  reservedTenthCents: number;
+  actualTenthCents: number;
+}): Promise<void> {
+  await adjustCopilotSpend(input.quotaRowId, input.actualTenthCents - input.reservedTenthCents);
 }
 
 export async function readOrgCopilotEnabled(orgId: string): Promise<boolean> {

@@ -406,9 +406,9 @@ export default async function AdminCopilotPage() {
         </div>
         <QuotaHistoryPanel rows={quotaRows} />
         <p className="muted">
-          Spend above is derived directly from the `drone_org_ai_quota` row, updated by
-          `recordSpend` after every metered call. Event rows below are org-scoped audit records in
-          `drone_org_events`.
+          Spend above is derived directly from the `drone_org_ai_quota` row: each metered call
+          atomically reserves a conservative budget before running and reconciles to actual spend
+          after. Event rows below are org-scoped audit records in `drone_org_events`.
         </p>
       </section>
 

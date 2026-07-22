@@ -13,7 +13,12 @@ import {
   type CopilotAuditContext,
 } from "./audit";
 import { checkCopilotCallGate, getCopilotConfig } from "./config";
-import { checkQuotaAndReserve, readOrgCopilotEnabled, recordSpend } from "./quota";
+import {
+  checkQuotaAndReserve,
+  reconcileCopilotSpend,
+  readOrgCopilotEnabled,
+  type QuotaReserveResult,
+} from "./quota";
 import { estimateReportSummaryBudgetTenthCents, generateReportSummary } from "./report-summary";
 import { buildReportSummaryFacts } from "./report-summary-facts";
 
@@ -56,6 +61,8 @@ export async function runReportSummaryForArtifact(
   artifactId: string,
 ): Promise<ReportSummaryServerResult> {
   let auditContext: CopilotAuditContext | null = null;
+  let reservation: QuotaReserveResult | null = null;
+  let actualTenthCents = 0;
   try {
     const access = await getDroneOpsAccess();
     if (!access.isAuthenticated) return { status: "blocked", reason: "not-authenticated" };
@@ -114,7 +121,7 @@ export async function runReportSummaryForArtifact(
     }
 
     const artifactName = getString(detail.metadata.name, detail.output.kind.replaceAll("_", " "));
-    const reservation = await checkQuotaAndReserve({
+    reservation = await checkQuotaAndReserve({
       orgId,
       budgetTenthCents: estimateReportSummaryBudgetTenthCents({
         artifactName,
@@ -145,10 +152,7 @@ export async function runReportSummaryForArtifact(
       facts,
     });
 
-    await recordSpend({
-      quotaRowId: reservation.quotaRowId,
-      deltaTenthCents: result.spendTenthCents,
-    });
+    actualTenthCents = result.spendTenthCents;
 
     if (result.status === "refused") {
       await recordCopilotAuditEventSafely({
@@ -222,5 +226,15 @@ export async function runReportSummaryForArtifact(
       });
     }
     return { status: "error", message };
+  } finally {
+    // Reconcile the reservation exactly once: refund actual-vs-reserved on
+    // success, or the full budget when the model call never billed.
+    if (reservation?.allowed) {
+      await reconcileCopilotSpend({
+        quotaRowId: reservation.quotaRowId,
+        reservedTenthCents: reservation.reservedTenthCents,
+        actualTenthCents,
+      }).catch(() => {});
+    }
   }
 }
