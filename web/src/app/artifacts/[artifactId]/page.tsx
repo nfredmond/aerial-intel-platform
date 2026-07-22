@@ -6,6 +6,7 @@ import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { SupportContextCopyButton } from "@/app/dashboard/support-context-copy-button";
 import { ReportSummaryPanel } from "@/components/copilot/report-summary-panel";
+import { PointCloudViewer } from "@/components/point-cloud-viewer";
 import { RasterViewer } from "@/components/raster-viewer";
 import { canPerformDroneOpsAction } from "@/lib/auth/actions";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
@@ -739,6 +740,21 @@ export default async function ArtifactDetailPage({
       }).catch(() => null)
     : null;
 
+  const isPointCloudArtifact =
+    detail.output.kind === "point_cloud" &&
+    detail.output.status === "ready" &&
+    Boolean(detail.output.storage_bucket) &&
+    Boolean(detail.output.storage_path);
+  // The browser decodes and renders the LAZ directly, so this signed URL is
+  // fetched client-side — no TiTiler / storage-origin rewrite involved.
+  const pointCloudUrl = isPointCloudArtifact
+    ? await tryCreateSignedDownloadUrl({
+        bucket: detail.output.storage_bucket,
+        path: detail.output.storage_path,
+        expiresInSeconds: 60 * 60 * 6,
+      })
+    : null;
+
   return (
     <main className="app-shell stack-md">
       <section className="surface section-header">
@@ -970,6 +986,23 @@ export default async function ArtifactDetailPage({
               Set <code>AERIAL_TITILER_URL</code> to point at a running TiTiler service to enable the in-page raster viewer for this artifact.
             </p>
           </div>
+        </section>
+      ) : null}
+
+      {pointCloudUrl ? (
+        <section className="surface stack-sm">
+          <div className="stack-xs">
+            <p className="eyebrow">3D preview</p>
+            <h2>Point cloud</h2>
+            <p className="muted">
+              Decoded and rendered in your browser from the georeferenced LAZ. Drag to orbit, scroll or pinch to zoom, and right-drag to pan.
+            </p>
+          </div>
+          <PointCloudViewer
+            signedUrl={pointCloudUrl}
+            label={artifactName}
+            ariaLabel={`3D point-cloud preview for ${artifactName}`}
+          />
         </section>
       ) : null}
 
