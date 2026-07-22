@@ -94,8 +94,10 @@ export function PointCloudViewer({
           Math.max(cloud.boundingRadius / 1000, 0.05),
           cloud.boundingRadius * 100,
         );
-        const distance = cloud.boundingRadius * 2.2;
-        camera.position.set(distance * 0.85, distance * 0.9, distance * 0.85);
+        // Frame the cloud: a normalized view direction times a distance that
+        // fits the bounding sphere comfortably in the 60° field of view.
+        const viewDirection = new THREE.Vector3(0.7, 0.6, 0.7).normalize();
+        camera.position.copy(viewDirection.multiplyScalar(cloud.boundingRadius * 1.6));
 
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute("position", new THREE.BufferAttribute(cloud.positions, 3));
@@ -123,6 +125,8 @@ export function PointCloudViewer({
         controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.08;
+        controls.minDistance = cloud.boundingRadius * 0.15;
+        controls.maxDistance = cloud.boundingRadius * 12;
         controls.target.set(0, 0, 0);
         controls.update();
 
