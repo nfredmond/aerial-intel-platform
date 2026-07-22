@@ -8,15 +8,24 @@ responds with PNG tiles. The app itself does not need to proxy anything.
 
 ## Environment
 
-The only env var the app reads is:
+The app reads two env vars:
 
 ```
 AERIAL_TITILER_URL=http://localhost:8000
+# Optional — only when TiTiler cannot reach the app's storage origin directly:
+AERIAL_TITILER_STORAGE_URL=http://172.17.0.1:55321
 ```
 
-Set it for local dev (via `.env.local`) and for the Vercel project (per
-environment). The raster preview is automatically suppressed when the var is
-unset — users see a "viewer not configured" card instead of a broken embed.
+`AERIAL_TITILER_URL` is the browser- and server-facing TiTiler base URL. Set it
+for local dev (via `.env.local`) and for the deployment. The raster preview is
+automatically suppressed when it is unset — users see a "viewer not configured"
+card instead of a broken embed.
+
+`AERIAL_TITILER_STORAGE_URL` is optional and rewrites the *origin* of the signed
+COG URL handed to TiTiler (path + signing token preserved). Leave it unset for
+hosted Supabase, where TiTiler reaches the signed `supabase.co` URL directly.
+Set it when TiTiler runs in a container that cannot reach the app's storage
+origin — see the reachability section below.
 
 ## Run TiTiler locally (Docker)
 
@@ -54,13 +63,24 @@ TiTiler-inside-a-container to resolve that URL, the Supabase Storage endpoint
 must be reachable from *inside* the container:
 
 - **Hosted Supabase (prod / staging):** works by default — the signed URL is an
-  HTTPS `supabase.co` URL, TiTiler fetches it like any other upstream.
-- **Local Supabase (`supabase start`):** the signed URL points at
-  `http://localhost:54321`. A container on the default bridge network cannot
-  resolve `localhost` on the host. Either (a) put TiTiler on the `host` network
-  (`--network host`), or (b) rewrite the Supabase base URL the app uses for
-  signed-download to `http://host.docker.internal:54321` before handing the URL
-  to the browser. Keeping TiTiler on host-network is simplest for dev loops.
+  HTTPS `supabase.co` URL, TiTiler fetches it like any other upstream. Leave
+  `AERIAL_TITILER_STORAGE_URL` unset.
+- **Local / self-hosted Supabase:** the signed URL points at the app's storage
+  origin (on the self-host, `http://127.0.0.1:55321`). A container on the default
+  bridge network cannot reach `127.0.0.1`/`localhost` on the host — GDAL's
+  `/vsicurl` fails with `CURL error: Failed to connect to 127.0.0.1 ...` and the
+  tile/info request 500s. Fix it by setting `AERIAL_TITILER_STORAGE_URL` to an
+  origin the TiTiler container *can* reach:
+  - Default bridge network: the host is the bridge gateway, `172.17.0.1`, so use
+    `AERIAL_TITILER_STORAGE_URL=http://172.17.0.1:55321`
+    (confirm with `docker network inspect bridge --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}'`).
+  - Or run the container with `--add-host=host.docker.internal:host-gateway` and
+    set `AERIAL_TITILER_STORAGE_URL=http://host.docker.internal:55321`.
+
+  The app rewrites only the origin of the copy handed to TiTiler; the
+  browser-facing signed URL (used for direct downloads) still points at the app's
+  storage origin. `--network host` also works but is coarser and changes port
+  publishing. This var is server-only, so a restart picks it up — no rebuild.
 
 ## Running beside NodeODM
 

@@ -48,6 +48,7 @@ import {
 } from "@/lib/supabase/admin";
 import { buildTitilerTileUrl, fetchTitilerTileJson } from "@/lib/titiler/client";
 import { getTitilerConfig } from "@/lib/titiler/config";
+import { resolveTitilerSourceUrl } from "@/lib/titiler/source";
 import { formatDateTime } from "@/lib/ui/datetime";
 import { statusPillClassName, type Tone } from "@/lib/ui/tones";
 
@@ -719,16 +720,22 @@ export default async function ArtifactDetailPage({
         expiresInSeconds: 60 * 60 * 6,
       })
     : null;
-  const rasterTileUrlTemplate = rasterCogUrl
+  // TiTiler fetches the COG server-side; rewrite the signed URL's origin to one
+  // reachable from the TiTiler process (see resolveTitilerSourceUrl). No-op
+  // unless AERIAL_TITILER_STORAGE_URL is set.
+  const rasterTitilerCogUrl = rasterCogUrl
+    ? resolveTitilerSourceUrl(rasterCogUrl)
+    : null;
+  const rasterTileUrlTemplate = rasterTitilerCogUrl
     ? buildTitilerTileUrl({
         baseUrl: titilerConfig.baseUrl ?? undefined,
-        cogUrl: rasterCogUrl,
+        cogUrl: rasterTitilerCogUrl,
       })
     : null;
-  const rasterTileJson = rasterCogUrl
+  const rasterTileJson = rasterTitilerCogUrl
     ? await fetchTitilerTileJson({
         baseUrl: titilerConfig.baseUrl ?? undefined,
-        cogUrl: rasterCogUrl,
+        cogUrl: rasterTitilerCogUrl,
       }).catch(() => null)
     : null;
 
