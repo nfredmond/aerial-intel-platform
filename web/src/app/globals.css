@@ -1573,3 +1573,131 @@ main {
   background: linear-gradient(135deg, #2563eb, #4f46e5);
   color: #ffffff;
 }
+
+/* Point-cloud viewer: measurement toolbar + readout overlay */
+.point-cloud-viewer__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.pcv-colormode {
+  display: inline-flex;
+  gap: 0.3rem;
+}
+
+.pcv-btn {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #1e293b;
+  border-radius: 0.6rem;
+  padding: 0.34rem 0.68rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.pcv-btn:hover:not(:disabled) {
+  background: #eef2ff;
+  border-color: #a5b4fc;
+}
+
+.pcv-btn[data-active="true"] {
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  border-color: transparent;
+  color: #ffffff;
+}
+
+.pcv-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.pcv-sep {
+  width: 1px;
+  align-self: stretch;
+  min-height: 1.4rem;
+  background: #cbd5e1;
+  margin: 0 0.15rem;
+}
+
+.pcv-readout {
+  position: absolute;
+  top: 0.6rem;
+  left: 0.6rem;
+  max-width: min(20rem, calc(100% - 1.2rem));
+  background: rgba(11, 16, 32, 0.82);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  color: #e2e8f0;
+  font-size: 0.8rem;
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
+.pcv-readout__hint {
+  margin: 0 0 0.4rem;
+  color: #cbd5f5;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.pcv-readout__values {
+  display: grid;
+  gap: 0.2rem 0.75rem;
+  margin: 0;
+}
+
+.pcv-readout__values > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.pcv-readout__values dt {
+  color: #94a3b8;
+  font-size: 0.76rem;
+}
+
+.pcv-readout__values dd {
+  color: #f8fafc;
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.pcv-readout__pending {
+  margin: 0;
+  color: #cbd5f5;
+  font-size: 0.78rem;
+}
+
+.pcv-readout__coord {
+  margin: 0.4rem 0 0;
+  padding-top: 0.4rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+  color: #94a3b8;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Center reticle shown while keyboard-focused in a measurement mode: Enter
+   places the point nearest this crosshair. */
+.pcv-reticle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  background:
+    linear-gradient(#f8fafc, #f8fafc) center / 2px 22px no-repeat,
+    linear-gradient(#f8fafc, #f8fafc) center / 22px 2px no-repeat;
+  opacity: 0.85;
+  mix-blend-mode: difference;
+}

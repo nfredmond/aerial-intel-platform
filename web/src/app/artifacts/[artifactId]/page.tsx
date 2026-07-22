@@ -995,7 +995,8 @@ export default async function ArtifactDetailPage({
             <p className="eyebrow">3D preview</p>
             <h2>Point cloud</h2>
             <p className="muted">
-              Decoded and rendered in your browser from the georeferenced LAZ. Drag to orbit, scroll or pinch to zoom, and right-drag to pan.
+              Decoded and rendered in your browser from the georeferenced LAZ. Drag to orbit, scroll or pinch to zoom, and right-drag to pan. Switch to a
+              measurement tool to read distance, plan area, or cut/fill volume, and toggle true-color versus an elevation ramp.
             </p>
           </div>
           <PointCloudViewer
