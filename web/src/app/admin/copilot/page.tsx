@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { BlockedAccessView } from "@/app/dashboard/blocked-access-view";
 import { SignOutForm } from "@/app/dashboard/sign-out-form";
 import { SupportAssistantPanel } from "@/components/copilot/support-assistant-panel";
+import { CopilotCapForm, CopilotEnableForm } from "./copilot-settings-forms";
 import { canPerformDroneOpsAction } from "@/lib/auth/actions";
 import { getDroneOpsAccess } from "@/lib/auth/drone-ops-access";
 import { getCopilotConfig } from "@/lib/copilot/config";
@@ -301,8 +302,8 @@ export default async function AdminCopilotPage() {
           <h1>Aerial Copilot — spend + enablement</h1>
           <p className="muted">
             Per-org view of copilot enablement, month-to-date spend, and the six-month history of
-            quota rows. Writes (cap changes, enablement toggles) are still SQL-only for now; see
-            ADR-002 open decisions.
+            quota rows. Owners and admins can toggle enablement and set this month&rsquo;s spend cap
+            directly below.
           </p>
         </div>
         <div className="header-actions">
@@ -391,11 +392,40 @@ export default async function AdminCopilotPage() {
                 detail={
                   orgEnabled
                     ? `Enabled on ${formatDateTime(settings?.updated_at ?? "")}.`
-                    : "Admin must UPDATE drone_org_settings SET copilot_enabled=true for this org before skills run."
+                    : "Off for this org. Use the enablement control below to turn it on before skills run."
                 }
               />
             </tbody>
           </table>
+        </div>
+      </section>
+
+      <section className="surface stack-sm">
+        <div className="stack-xs">
+          <p className="eyebrow">Manage</p>
+          <h2>Enablement &amp; spend cap</h2>
+          <p className="muted">
+            Enabling copilot only allows skills for this org once the deployment env flag and AI
+            Gateway credentials are also present (see the gates above). The cap applies to the
+            current month; future months start at the deployment default of{" "}
+            {formatTenthCents(config.defaultCapTenthCents)}.
+          </p>
+        </div>
+        <div className="grid-cards">
+          <article className="surface stack-sm info-card">
+            <div className="stack-xs">
+              <p className="eyebrow">Enablement</p>
+              <h3>Aerial Copilot is {orgEnabled ? "on" : "off"} for this org</h3>
+            </div>
+            <CopilotEnableForm enabled={orgEnabled} />
+          </article>
+          <article className="surface stack-sm info-card">
+            <div className="stack-xs">
+              <p className="eyebrow">Spend cap</p>
+              <h3>Current cap {formatTenthCents(capThisMonth)}</h3>
+            </div>
+            <CopilotCapForm capTenthCents={capThisMonth} />
+          </article>
         </div>
       </section>
 

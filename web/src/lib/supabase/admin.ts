@@ -1135,3 +1135,52 @@ export async function selectCopilotOrgSettings(orgId: string) {
   const rows = await adminRestRequest<CopilotOrgSettingsRow[]>(query, { method: "GET" });
   return rows[0] ?? null;
 }
+
+/**
+ * Upsert the per-org copilot enablement flag. drone_org_settings is keyed by
+ * org_id, so this creates the settings row on first write and flips the flag
+ * thereafter. Service-role bypasses RLS; tenant safety is by construction since
+ * org_id is set explicitly.
+ */
+export async function upsertCopilotOrgEnabled(orgId: string, enabled: boolean) {
+  const rows = await adminRestRequest<CopilotOrgSettingsRow[]>(
+    "drone_org_settings?on_conflict=org_id&select=org_id,copilot_enabled,created_at,updated_at",
+    {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+      body: JSON.stringify({
+        org_id: orgId,
+        copilot_enabled: enabled,
+        updated_at: new Date().toISOString(),
+      }),
+    },
+  );
+  return rows[0] ?? null;
+}
+
+/**
+ * Set the monthly copilot spend cap (tenth-cents) for a period. Upserts on the
+ * (org_id, period_month) unique index and leaves spend_tenth_cents untouched on
+ * an existing row (it is not in the payload). `period` must be first-of-month
+ * UTC (YYYY-MM-01) to match the index + period CHECK.
+ */
+export async function upsertCopilotCap(
+  orgId: string,
+  period: string,
+  capTenthCents: number,
+) {
+  const rows = await adminRestRequest<CopilotQuotaRow[]>(
+    "drone_org_ai_quota?on_conflict=org_id,period_month&select=*",
+    {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+      body: JSON.stringify({
+        org_id: orgId,
+        period_month: period,
+        cap_tenth_cents: capTenthCents,
+        updated_at: new Date().toISOString(),
+      }),
+    },
+  );
+  return rows[0] ?? null;
+}
